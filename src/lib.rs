@@ -1,4 +1,5 @@
 mod game_primitives;
+mod reversi;
 
 #[cfg(test)]
 mod tests {
