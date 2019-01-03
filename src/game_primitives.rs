@@ -11,12 +11,12 @@ pub enum GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove : Copy {}
+pub trait GameMove: Copy {}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
 /// or any other relevant info.
-pub trait GameState : Clone {
+pub trait GameState: Clone {
     type Move: GameMove;
 
     /// Returns a human-friendly string for representing the state.
@@ -39,16 +39,18 @@ pub trait GameState : Clone {
     }
 }
 
-pub trait Game {
+pub trait Game<WhiteAgent, BlackAgent>
+where
+    WhiteAgent: GameAgent<Self::State>,
+    BlackAgent: GameAgent<Self::State>,
+{
     type State: GameState;
-    type WhiteAgent: GameAgent<Self::State>;
-    type BlackAgent: GameAgent<Self::State>;
 
     /// Returns the player whose turn it is.
     fn whose_turn(&self) -> PlayerColor;
 
-    fn white_agent(&self) -> &Self::WhiteAgent;
-    fn black_agent(&self) -> &Self::BlackAgent;
+    fn white_agent(&self) -> &WhiteAgent;
+    fn black_agent(&self) -> &BlackAgent;
 
     /// The game's current state.
     fn game_state(&self) -> &Self::State;
