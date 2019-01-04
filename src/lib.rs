@@ -6,7 +6,7 @@ mod reversi;
 mod tests {
     use crate::agents::random_agent::RandomAgent;
     use crate::game_primitives::PlayerColor;
-    use crate::reversi::Reversi;
+    use crate::reversi::reversi::Reversi;
 
     #[test]
     fn it_works() {

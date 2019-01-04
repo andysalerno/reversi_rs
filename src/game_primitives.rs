@@ -4,6 +4,7 @@ pub enum PlayerColor {
     White,
 }
 
+#[derive(Copy, Clone)]
 pub enum GameResult {
     Tie,
     WhiteWins,
@@ -95,8 +96,4 @@ where
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState) -> TState::Move;
-}
-
-mod tests {
-    use super::*;
 }
