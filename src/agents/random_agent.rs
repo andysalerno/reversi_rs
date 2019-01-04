@@ -1,7 +1,14 @@
 use crate::game_primitives::{GameAgent, GameState, PlayerColor};
 
-struct RandomAgent {
+pub struct RandomAgent {
     color: PlayerColor,
+}
+
+impl RandomAgent {
+    /// Creates a new RandomAgent, playing for the given color.
+    pub fn new(color: PlayerColor) -> Self {
+        RandomAgent { color }
+    }
 }
 
 impl<TState: GameState> GameAgent<TState> for RandomAgent {

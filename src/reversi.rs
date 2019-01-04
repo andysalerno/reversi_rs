@@ -1,11 +1,11 @@
 use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, GameState, PlayerColor};
 
 #[derive(Copy, Clone)]
-struct ReversiMove;
+pub struct ReversiMove;
 impl GameMove for ReversiMove {}
 
 #[derive(Clone)]
-struct ReversiState;
+pub struct ReversiState;
 
 impl GameState for ReversiState {
     type Move = ReversiMove;
@@ -25,13 +25,26 @@ impl GameState for ReversiState {
     fn apply_move(&mut self, action: Self::Move) {}
 }
 
-struct Reversi<WhiteAgent, BlackAgent>
+pub struct Reversi<WhiteAgent, BlackAgent>
 where
     WhiteAgent: GameAgent<ReversiState>,
     BlackAgent: GameAgent<ReversiState>,
 {
     white_agent: WhiteAgent,
     black_agent: BlackAgent,
+}
+
+impl<WhiteAgent, BlackAgent> Reversi<WhiteAgent, BlackAgent>
+where
+    WhiteAgent: GameAgent<ReversiState>,
+    BlackAgent: GameAgent<ReversiState>,
+{
+    pub fn new(white_agent: WhiteAgent, black_agent: BlackAgent) -> Self {
+        Reversi {
+            white_agent,
+            black_agent,
+        }
+    }
 }
 
 impl<W, B> Game<W, B> for Reversi<W, B>
