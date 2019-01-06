@@ -8,7 +8,7 @@ const BOARD_SIZE: usize = 8;
 pub struct ReversiMove;
 impl GameMove for ReversiMove {}
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum ReversiPiece {
     Black,
     White,
@@ -26,13 +26,39 @@ pub struct ReversiState {
 }
 
 impl ReversiState {
+    fn new() -> Self {
+        let board: Board = [[None; BOARD_SIZE]; BOARD_SIZE];
+
+        ReversiState {
+            board,
+            current_player_turn: PlayerColor::Black,
+        }
+    }
+
+    fn transform_coords(col: usize, row: usize) -> (usize, usize) {
+        (col, BOARD_SIZE - row - 1)
+    }
+
     /// Given an (x,y) coord within range of the board, return the ReversiPiece
     /// present on that spot, or None if the position is empty.
     /// Note: (0,0) is the bottom-left position.
-    fn piece_at(&self, col: usize, row: usize) -> Option<ReversiPiece> {
-        let row_prime = BOARD_SIZE - row - 1;
+    fn get_piece(&self, col: usize, row: usize) -> Option<ReversiPiece> {
+        let (col_p, row_p) = ReversiState::transform_coords(col, row);
 
-        self.board[row_prime][col]
+        self.board[row_p][col_p]
+    }
+
+    /// Set the piece at the coordinates to the given piece.
+    fn set_piece(&mut self, col: usize, row: usize, piece: Option<ReversiPiece>) {
+        let (col_p, row_p) = ReversiState::transform_coords(col, row);
+
+        self.board[row_p][col_p] = piece;
+    }
+
+    /// Since the human-friendly output is always the same size,
+    /// might as well pre-compute it so we can reserve the space ahead of time.
+    const fn friendly_print_size() -> usize {
+        189
     }
 }
 
@@ -47,18 +73,20 @@ impl GameState for ReversiState {
         const WHITE_PIECE: char = 'O';
         const EMPTY_SPACE: char = '-';
 
+        result.reserve(ReversiState::friendly_print_size());
+
         result.push('\n');
 
         for row in (0..BOARD_SIZE).rev() {
             result.push_str("| ");
 
-            for col in (0..BOARD_SIZE) {
-                let piece = self.piece_at(col, row);
+            for col in 0..BOARD_SIZE {
+                let piece = self.get_piece(col, row);
 
                 let piece_char = match piece {
                     Some(ReversiPiece::White) => WHITE_PIECE,
                     Some(ReversiPiece::Black) => BLACK_PIECE,
-                    None => EMPTY_SPACE, 
+                    None => EMPTY_SPACE,
                 };
 
                 result.push(piece_char);
@@ -69,8 +97,14 @@ impl GameState for ReversiState {
         }
 
         result.push(' ');
-        for _ in (0..BOARD_SIZE) {
+        for _ in 0..BOARD_SIZE {
             result.push_str("--");
+        }
+
+        result.push('\n');
+        result.push_str("  ");
+        for col in 0..BOARD_SIZE {
+            result.push_str(&format!("{} ", col));
         }
 
         result
@@ -93,20 +127,40 @@ impl GameState for ReversiState {
 
 #[cfg(test)]
 mod tests {
+    use super::{Board, GameState, PlayerColor, ReversiPiece, ReversiState, BOARD_SIZE};
+
     #[test]
     fn it_works() {
-        use super::{Board, GameState, PlayerColor, ReversiState, BOARD_SIZE};
+        let mut state = ReversiState::new();
 
-        let board: Board = [[None; BOARD_SIZE]; BOARD_SIZE];
-        let state = ReversiState {
-            board,
-            current_player_turn: PlayerColor::Black,
-        };
-
+        state.set_piece(2, 3, Some(ReversiPiece::Black));
         let stringified = state.human_friendly();
 
         println!("{}", stringified);
 
         assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn human_friendly_reserves_correct_size() {
+        let state = ReversiState::new();
+
+        let stringified = state.human_friendly();
+
+        assert_eq!(ReversiState::friendly_print_size(), stringified.len());
+    }
+
+    #[test]
+    fn state_can_set_and_get_piece() {
+        let mut state = ReversiState::new();
+
+        let piece_before = state.get_piece(2, 3);
+
+        state.set_piece(2, 3, Some(ReversiPiece::White));
+
+        let piece_after = state.get_piece(2, 3);
+
+        assert_eq!(None, piece_before);
+        assert_eq!(Some(ReversiPiece::White), piece_after);
     }
 }
