@@ -1,29 +1,5 @@
-use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, GameState, PlayerColor};
-
-#[derive(Copy, Clone)]
-pub struct ReversiMove;
-impl GameMove for ReversiMove {}
-
-#[derive(Clone)]
-pub struct ReversiState;
-
-impl GameState for ReversiState {
-    type Move = ReversiMove;
-
-    /// Returns a human-friendly string for representing the state.
-    fn human_friendly(&self) -> String {
-        "hello".to_owned()
-    }
-
-    /// Returns the possible moves the given player can make for the current state.
-    fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move> {
-        Vec::new()
-    }
-
-    /// Apply the given move (or 'action') to this state, mutating this state
-    /// and advancing it to the resulting state.
-    fn apply_move(&mut self, action: Self::Move) {}
-}
+use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, PlayerColor};
+use crate::reversi::reversi_gamestate::ReversiState;
 
 pub struct Reversi<WhiteAgent, BlackAgent>
 where
@@ -53,11 +29,6 @@ where
     B: GameAgent<ReversiState>,
 {
     type State = ReversiState;
-
-    /// Returns the player whose turn it is.
-    fn whose_turn(&self) -> PlayerColor {
-        PlayerColor::White
-    }
 
     fn white_agent(&self) -> &W {
         unimplemented!()

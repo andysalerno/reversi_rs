@@ -31,6 +31,9 @@ pub trait GameState: Clone {
     /// and advancing it to the resulting state.
     fn apply_move(&mut self, action: Self::Move);
 
+    /// Returns the current player whose turn it currently is.
+    fn current_player_turn(&self) -> PlayerColor;
+
     /// Given a legal move (or 'action'), return the resulting state of applying the action
     /// to this state (does not mutate this state).
     fn next_state(&self, action: Self::Move) -> Self {
@@ -47,9 +50,6 @@ where
     BlackAgent: GameAgent<Self::State>,
 {
     type State: GameState;
-
-    /// Returns the player whose turn it is.
-    fn whose_turn(&self) -> PlayerColor;
 
     fn white_agent(&self) -> &WhiteAgent;
     fn black_agent(&self) -> &BlackAgent;
@@ -84,7 +84,7 @@ where
     /// and returns the game result.
     fn play_to_end(&mut self) -> GameResult {
         while !self.is_game_over() {
-            let cur_player_color = self.whose_turn();
+            let cur_player_color = self.game_state().current_player_turn();
             self.player_take_turn(cur_player_color);
         }
 
