@@ -25,12 +25,55 @@ pub struct ReversiState {
     current_player_turn: PlayerColor,
 }
 
+impl ReversiState {
+    /// Given an (x,y) coord within range of the board, return the ReversiPiece
+    /// present on that spot, or None if the position is empty.
+    /// Note: (0,0) is the bottom-left position.
+    fn piece_at(&self, col: usize, row: usize) -> Option<ReversiPiece> {
+        let row_prime = BOARD_SIZE - row - 1;
+
+        self.board[row_prime][col]
+    }
+}
+
 impl GameState for ReversiState {
     type Move = ReversiMove;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
-        "hello".to_owned()
+        let mut result = String::new();
+
+        const BLACK_PIECE: char = 'X';
+        const WHITE_PIECE: char = 'O';
+        const EMPTY_SPACE: char = '-';
+
+        result.push('\n');
+
+        for row in (0..BOARD_SIZE).rev() {
+            result.push_str("| ");
+
+            for col in (0..BOARD_SIZE) {
+                let piece = self.piece_at(col, row);
+
+                let piece_char = match piece {
+                    Some(ReversiPiece::White) => WHITE_PIECE,
+                    Some(ReversiPiece::Black) => BLACK_PIECE,
+                    None => EMPTY_SPACE, 
+                };
+
+                result.push(piece_char);
+                result.push(' ');
+            }
+
+            result.push('\n');
+        }
+
+        result.push(' ');
+        for _ in (0..BOARD_SIZE) {
+            result.push_str("--");
+        }
+
+        result
     }
 
     /// Returns the possible moves the given player can make for the current state.
@@ -61,6 +104,8 @@ mod tests {
         };
 
         let stringified = state.human_friendly();
+
+        println!("{}", stringified);
 
         assert_eq!(2 + 2, 4);
     }
