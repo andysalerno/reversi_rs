@@ -159,7 +159,7 @@ impl GameState for ReversiState {
     /// In the game of Reversi, this places the piece at the given position,
     /// and flips all opponent pieces in any direction that terminates with another one of our pieces.
     ///
-    /// Example:
+    /// E.x.:
     ///     O X X X *
     ///           X X
     ///         O   X

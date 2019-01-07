@@ -9,7 +9,7 @@ mod tests {
     use crate::reversi::reversi::Reversi;
 
     #[test]
-    fn it_works() {
+    fn create_game() {
         assert_eq!(2 + 2, 4);
         let white = RandomAgent::new(PlayerColor::White);
         let black = RandomAgent::new(PlayerColor::Black);
