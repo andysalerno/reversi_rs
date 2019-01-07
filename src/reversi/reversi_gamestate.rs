@@ -5,7 +5,16 @@ use crate::game_primitives::{GameMove, GameState, PlayerColor};
 const BOARD_SIZE: usize = 8;
 
 #[derive(Copy, Clone)]
-pub struct ReversiMove;
+pub struct ReversiMove {
+    /// The piece to be placed at the given location.
+    piece: ReversiPiece,
+
+    /// The row index.  Begins at 0. 0 indicates the "bottom" row.
+    row: usize,
+
+    /// The col index.  Begins at 0. 0 indicates the leftmost col.
+    col: usize,
+}
 impl GameMove for ReversiMove {}
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -53,6 +62,17 @@ impl ReversiState {
         let (col_p, row_p) = ReversiState::transform_coords(col, row);
 
         self.board[row_p][col_p] = piece;
+    }
+
+    fn flip_piece(&mut self, col: usize, row: usize) {
+        let before_flip = self.get_piece(col, row);
+        let flipped = match before_flip {
+            Some(ReversiPiece::White) => Some(ReversiPiece::Black),
+            Some(ReversiPiece::Black) => Some(ReversiPiece::White),
+            None => panic!("attempted to flip a position that is empty."),
+        };
+
+        self.set_piece(col, row, flipped);
     }
 
     /// Since the human-friendly output is always the same size,
@@ -117,7 +137,51 @@ impl GameState for ReversiState {
 
     /// Apply the given move (or 'action') to this state, mutating this state
     /// and advancing it to the resulting state.
-    fn apply_move(&mut self, action: Self::Move) {}
+    /// In the game of Reversi, this places the piece at the given position,
+    /// and flips all opponent pieces in any direction that terminates with another one of our pieces.
+    ///
+    /// Example:
+    ///     O X X X *
+    ///           X X
+    ///         O   X
+    ///             X
+    ///             
+    /// Placing a white piece ('O') at the position marked with the * will result in the following state:
+    ///
+    ///     O O O O O
+    ///           O X
+    ///         O   X
+    ///             X
+    fn apply_move(&mut self, action: Self::Move) {
+        if self.get_piece(action.col, action.row).is_some() {
+            panic!("Cannot place a piece at a location that already contains a piece. Position: ({},{})");
+        }
+
+        self.set_piece(action.col, action.row, Some(action.piece));
+
+        // Direction: For col and row, we check all directions for which pieces to flip.
+        //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
+        //      For row, we can check all rows below us (direction -1), above us (direction 1), or the current row (direction 0).
+        //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
+        for col_direction in -1..=1 {
+            for row_direction in -1..=1 {
+                if row_direction == 0 && col_direction == 0 {
+                    continue;
+                }
+
+                // Distance: For every given direction, check every distance away in that direction for the terminating position.
+                //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
+                //      A legal terminating point is one where we encounter only opponent pieces, ending with an empty position.
+                for col_dist in 0..BOARD_SIZE as i32 {
+                    let col_pos = (action.col as i32) + (col_dist * col_direction);
+
+                    for row_dist in 0..BOARD_SIZE as i32 {
+                        let row_pos = (action.row as i32) + (row_dist * row_direction);
+                    }
+                }
+            }
+        }
+    }
 
     /// Returns the current player whose turn it currently is.
     fn current_player_turn(&self) -> PlayerColor {
@@ -162,5 +226,29 @@ mod tests {
 
         assert_eq!(None, piece_before);
         assert_eq!(Some(ReversiPiece::White), piece_after);
+    }
+
+    #[test]
+    fn flip_piece_flips_piece() {
+        let mut state = ReversiState::new();
+        state.set_piece(2, 3, Some(ReversiPiece::White));
+
+        state.flip_piece(2, 3);
+
+        let flipped_piece = state.get_piece(2, 3);
+
+        assert_eq!(Some(ReversiPiece::Black), flipped_piece);
+    }
+
+    #[test]
+    #[should_panic]
+    fn flip_piece_panics_when_empty() {
+        let mut state = ReversiState::new();
+
+        // ensure the position is empty
+        state.set_piece(2, 3, None);
+
+        // this should panic.
+        state.flip_piece(2, 3);
     }
 }
