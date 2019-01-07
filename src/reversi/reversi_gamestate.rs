@@ -210,19 +210,30 @@ impl GameState for ReversiState {
                         let row_pos = (action.row as i32) + (row_dist * row_direction);
 
                         if row_pos < 0 || row_pos >= BOARD_SIZE as i32 {
-                            break;
+                            // We've exceeded the bounds; no reason to continue.
+                            break 'distance;
                         }
 
                         // Invariant: (col_pos, row_pos) must now be a position in range of the board.
-                        // If we encounter a piece of our same color, this is not a valid direction to check.
                         let piece = self.get_piece(action.col, action.row);
+
+                        if piece.is_none() {
+                            // This direction is not valid, since it did not end in a piece of our color.
+                            break 'distance;
+                        }
+
+                        if piece.unwrap() == opponent(action.piece) {
+                            // We are still in the 'opponent' segment, so keep going.
+                            continue;
+                        }
+
+                        // Invariant: the piece we are checking is not none, and it is not
+                        // the opponent's color, so therefore it is our piece.
+                        // The first time we encounter this specific scenario, we know this is a valid direction,
+                        // and we can stop testing it.
 
                         // If the position we are checking has a piece with the same color
                         // as the one we are placing, this is not a valid direction to check.
-                        // Example:
-                        if piece.is_some() && piece.unwrap() == action.piece {
-                            break 'distance;
-                        }
 
                         break 'distance;
                     }
