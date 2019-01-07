@@ -23,6 +23,13 @@ enum ReversiPiece {
     White,
 }
 
+fn opponent(piece: ReversiPiece) -> ReversiPiece {
+    match piece {
+        ReversiPiece::Black => ReversiPiece::White,
+        ReversiPiece::White => ReversiPiece::Black,
+    }
+}
+
 type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
 
 #[derive(Clone)]
@@ -79,6 +86,18 @@ impl ReversiState {
     /// might as well pre-compute it so we can reserve the space ahead of time.
     const fn friendly_print_size() -> usize {
         189
+    }
+
+    fn position_in_bounds(col: usize, row: usize) -> bool {
+        ReversiState::col_in_bounds(col) && ReversiState::row_in_bounds(row)
+    }
+
+    fn col_in_bounds(col: usize) -> bool {
+        col < BOARD_SIZE
+    }
+
+    fn row_in_bounds(row: usize) -> bool {
+        row < BOARD_SIZE
     }
 }
 
@@ -153,6 +172,13 @@ impl GameState for ReversiState {
     ///         O   X
     ///             X
     fn apply_move(&mut self, action: Self::Move) {
+        if !ReversiState::position_in_bounds(action.col, action.row) {
+            panic!(
+                "Provided position exceeds bounds: {},{}",
+                action.col, action.row
+            );
+        }
+
         if self.get_piece(action.col, action.row).is_some() {
             panic!("Cannot place a piece at a location that already contains a piece. Position: ({},{})");
         }
@@ -165,6 +191,7 @@ impl GameState for ReversiState {
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
         for col_direction in -1..=1 {
             for row_direction in -1..=1 {
+                // 0 for both directions means we are not checking anything.
                 if row_direction == 0 && col_direction == 0 {
                     continue;
                 }
@@ -172,11 +199,32 @@ impl GameState for ReversiState {
                 // Distance: For every given direction, check every distance away in that direction for the terminating position.
                 //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
                 //      A legal terminating point is one where we encounter only opponent pieces, ending with an empty position.
-                for col_dist in 0..BOARD_SIZE as i32 {
+                'distance: for col_dist in 1..BOARD_SIZE as i32 {
                     let col_pos = (action.col as i32) + (col_dist * col_direction);
 
-                    for row_dist in 0..BOARD_SIZE as i32 {
+                    if col_pos < 0 || col_pos >= BOARD_SIZE as i32 {
+                        break;
+                    }
+
+                    for row_dist in 1..BOARD_SIZE as i32 {
                         let row_pos = (action.row as i32) + (row_dist * row_direction);
+
+                        if row_pos < 0 || row_pos >= BOARD_SIZE as i32 {
+                            break;
+                        }
+
+                        // Invariant: (col_pos, row_pos) must now be a position in range of the board.
+                        // If we encounter a piece of our same color, this is not a valid direction to check.
+                        let piece = self.get_piece(action.col, action.row);
+
+                        // If the position we are checking has a piece with the same color
+                        // as the one we are placing, this is not a valid direction to check.
+                        // Example:
+                        if piece.is_some() && piece.unwrap() == action.piece {
+                            break 'distance;
+                        }
+
+                        break 'distance;
                     }
                 }
             }
