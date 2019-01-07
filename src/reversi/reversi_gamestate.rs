@@ -159,18 +159,18 @@ impl GameState for ReversiState {
     /// In the game of Reversi, this places the piece at the given position,
     /// and flips all opponent pieces in any direction that terminates with another one of our pieces.
     ///
-    /// E.x.:
-    ///     O X X X *
-    ///           X X
-    ///         O   X
-    ///             X
+    /// Example:
+    ///    O X X X *
+    ///          X X
+    ///        O   X
+    ///            X
     ///             
     /// Placing a white piece ('O') at the position marked with the * will result in the following state:
     ///
-    ///     O O O O O
-    ///           O X
-    ///         O   X
-    ///             X
+    ///    O O O O O
+    ///          O X
+    ///        O   X
+    ///            X
     fn apply_move(&mut self, action: Self::Move) {
         if !ReversiState::position_in_bounds(action.col, action.row) {
             panic!(
