@@ -185,6 +185,9 @@ impl GameState for ReversiState {
 
         self.set_piece(action.col, action.row, Some(action.piece));
 
+        // Todo: enhance this with a stack-based structure
+        let mut to_flip = Vec::new();
+
         // Direction: For col and row, we check all directions for which pieces to flip.
         //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
         //      For row, we can check all rows below us (direction -1), above us (direction 1), or the current row (direction 0).
@@ -195,6 +198,8 @@ impl GameState for ReversiState {
                 if row_direction == 0 && col_direction == 0 {
                     continue;
                 }
+
+                let mut visited_positions = Vec::new();
 
                 // Distance: For every given direction, check every distance away in that direction for the terminating position.
                 //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
@@ -224,21 +229,27 @@ impl GameState for ReversiState {
 
                         if piece.unwrap() == opponent(action.piece) {
                             // We are still in the 'opponent' segment, so keep going.
+                            visited_positions.push((col_pos, row_pos));
                             continue;
                         }
 
                         // Invariant: the piece we are checking is not none, and it is not
-                        // the opponent's color, so therefore it is our piece.
+                        // the opponent's color, so therefore it is our own color.
                         // The first time we encounter this specific scenario, we know this is a valid direction,
                         // and we can stop testing it.
 
                         // If the position we are checking has a piece with the same color
                         // as the one we are placing, this is not a valid direction to check.
+                        to_flip.append(&mut visited_positions);
 
                         break 'distance;
                     }
                 }
             }
+        }
+
+        for (col, row) in to_flip {
+            self.flip_piece(col as usize, row as usize);
         }
     }
 
@@ -250,7 +261,9 @@ impl GameState for ReversiState {
 
 #[cfg(test)]
 mod tests {
-    use super::{Board, GameState, PlayerColor, ReversiPiece, ReversiState, BOARD_SIZE};
+    use super::{
+        Board, GameState, PlayerColor, ReversiMove, ReversiPiece, ReversiState, BOARD_SIZE,
+    };
 
     #[test]
     fn it_works() {
@@ -309,5 +322,30 @@ mod tests {
 
         // this should panic.
         state.flip_piece(2, 3);
+    }
+
+    #[test]
+    fn apply_move_flips_pieces() {
+        let mut state = ReversiState::new();
+
+        // We have two pieces next to each other, like this:
+        // O X
+        state.set_piece(2, 2, Some(ReversiPiece::White));
+        state.set_piece(3, 2, Some(ReversiPiece::Black));
+
+        // We place a white piece at the asterisk:
+        // O X *
+        let action = ReversiMove {
+            piece: ReversiPiece::White,
+            col: 4,
+            row: 2,
+        };
+
+        state.apply_move(action);
+
+        // All three pieces should now be white.
+        assert_eq!(ReversiPiece::White, state.get_piece(2, 2).unwrap());
+        assert_eq!(ReversiPiece::White, state.get_piece(3, 2).unwrap());
+        assert_eq!(ReversiPiece::White, state.get_piece(4, 2).unwrap());
     }
 }
