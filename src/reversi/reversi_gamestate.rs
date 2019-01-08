@@ -4,6 +4,14 @@ use crate::game_primitives::{GameMove, GameState, PlayerColor};
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
 const BOARD_SIZE: usize = 8;
 
+enum Direction {
+    Positive,
+    Negative,
+    Same,
+}
+
+struct Directions(Direction, Direction);
+
 #[derive(Copy, Clone)]
 pub struct ReversiMove {
     /// The piece to be placed at the given location.
@@ -98,6 +106,37 @@ impl ReversiState {
 
     fn row_in_bounds(row: usize) -> bool {
         row < BOARD_SIZE
+    }
+
+    /// Given a position of a piece on the board,
+    /// find its sibling piece in a given direction.
+    /// 
+    /// A sibling piece is defined as a piece of the same color that,
+    /// combined with the current piece, traps enemies in the given direction.
+    /// 
+    /// Examples:
+    ///     In the below case, the pieces at 'a' and 'b'
+    ///     are siblings, since together they surrouned the 3 enemy pieces. 
+    ///         X O O O X
+    ///         a       b
+    /// 
+    ///     In the below case, the pieces at 'a' and 'b'
+    ///     are NOT siblings, since there is a gap (empty space) at 'x' preventing them
+    ///     from trapping the other pieces.
+    ///         X O _ O X
+    ///         a   x   b
+    /// 
+    /// This function only checks for a sibling in the given direction.
+    /// 
+    /// If a sibling is found, it returns the (col, pos) of that sibling.
+    /// Otherwise, it gives None.
+    fn find_sibling_piece_pos(
+        &self,
+        col: usize,
+        row: usize,
+        directions: Directions,
+    ) -> Option<(usize, usize)> {
+        None
     }
 }
 
@@ -220,7 +259,7 @@ impl GameState for ReversiState {
                         }
 
                         // Invariant: (col_pos, row_pos) must now be a position in range of the board.
-                        let piece = self.get_piece(action.col, action.row);
+                        let piece = self.get_piece(col_pos as usize, row_pos as usize);
 
                         if piece.is_none() {
                             // This direction is not valid, since it did not end in a piece of our color.
@@ -325,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_move_flips_pieces() {
+    fn apply_move_flips_pieces_simple() {
         let mut state = ReversiState::new();
 
         // We have two pieces next to each other, like this:
@@ -347,5 +386,43 @@ mod tests {
         assert_eq!(ReversiPiece::White, state.get_piece(2, 2).unwrap());
         assert_eq!(ReversiPiece::White, state.get_piece(3, 2).unwrap());
         assert_eq!(ReversiPiece::White, state.get_piece(4, 2).unwrap());
+    }
+
+    #[test]
+    fn apply_move_flips_pieces_complex() {
+        let mut state = ReversiState::new();
+
+        // We have this arrangemnt of pieces on the board:
+        //       X
+        //     O
+        //   O
+        // * O O O X
+        state.set_piece(2, 2, Some(ReversiPiece::White));
+        state.set_piece(3, 2, Some(ReversiPiece::White));
+        state.set_piece(4, 2, Some(ReversiPiece::White));
+        state.set_piece(5, 2, Some(ReversiPiece::Black));
+
+        state.set_piece(2, 3, Some(ReversiPiece::White));
+        state.set_piece(3, 4, Some(ReversiPiece::White));
+        state.set_piece(4, 5, Some(ReversiPiece::Black));
+
+        // We place a black piece at the asterisk:
+        let action = ReversiMove {
+            piece: ReversiPiece::Black,
+            col: 1,
+            row: 2,
+        };
+
+        state.apply_move(action);
+
+        // All pieces should now be black.
+        assert_eq!(ReversiPiece::Black, state.get_piece(1, 2).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(2, 2).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(3, 2).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(4, 2).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(5, 2).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(2, 3).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(3, 4).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(4, 5).unwrap());
     }
 }
