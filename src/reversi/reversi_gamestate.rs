@@ -4,12 +4,17 @@ use crate::game_primitives::{GameMove, GameState, PlayerColor};
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
 const BOARD_SIZE: usize = 8;
 
-#[derive(Copy, Clone, PartialEq)]
-enum Direction {
-    Positive,
-    Negative,
-    Same,
-}
+/// When traversing pieces on the board,
+/// a positive direction indicates increasing values for col or row,
+/// a negative direction indicates decreasing values for col or row,
+/// and a 'same' direction indicates no movement for col or row.
+/// Example: if we ask to traverse as 'col: positive, row: negative',
+/// our traversal will increment with increasing col values, whereas row will be decremented.
+/// (I.e., down and to the right.)
+type Direction = i8;
+const POSITIVE: Direction = 1;
+const NEGATIVE: Direction = -1;
+const SAME: Direction = 0;
 
 #[derive(Copy, Clone)]
 struct Directions {
