@@ -4,13 +4,24 @@ use crate::game_primitives::{GameMove, GameState, PlayerColor};
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
 const BOARD_SIZE: usize = 8;
 
+#[derive(Copy, Clone, PartialEq)]
 enum Direction {
     Positive,
     Negative,
     Same,
 }
 
-struct Directions(Direction, Direction);
+#[derive(Copy, Clone)]
+struct Directions {
+    col_dir: Direction,
+    row_dir: Direction,
+}
+
+#[derive(Copy, Clone)]
+struct BoardPosition {
+    col: usize,
+    row: usize,
+}
 
 #[derive(Copy, Clone)]
 pub struct ReversiMove {
@@ -110,32 +121,92 @@ impl ReversiState {
 
     /// Given a position of a piece on the board,
     /// find its sibling piece in a given direction.
-    /// 
+    ///
     /// A sibling piece is defined as a piece of the same color that,
     /// combined with the current piece, traps enemies in the given direction.
-    /// 
+    ///
     /// Examples:
     ///     In the below case, the pieces at 'a' and 'b'
-    ///     are siblings, since together they surrouned the 3 enemy pieces. 
+    ///     are siblings, since together they surrouned the 3 enemy pieces.
     ///         X O O O X
     ///         a       b
-    /// 
+    ///
     ///     In the below case, the pieces at 'a' and 'b'
     ///     are NOT siblings, since there is a gap (empty space) at 'x' preventing them
     ///     from trapping the other pieces.
     ///         X O _ O X
     ///         a   x   b
-    /// 
+    ///
     /// This function only checks for a sibling in the given direction.
-    /// 
-    /// If a sibling is found, it returns the (col, pos) of that sibling.
+    ///
+    /// If a sibling is found, it returns the BoardPosition of that sibling.
     /// Otherwise, it gives None.
     fn find_sibling_piece_pos(
         &self,
-        col: usize,
-        row: usize,
+        origin: BoardPosition,
+        origin_color: ReversiPiece,
         directions: Directions,
-    ) -> Option<(usize, usize)> {
+    ) -> Option<BoardPosition> {
+        // 'Same' for both directions means we are not checking anything.
+        if directions.col_dir == Direction::Same && directions.row_dir == Direction::Same {
+            return None;
+        }
+
+        let col_dir_delta = match directions.col_dir {
+            Direction::Negative => -1,
+            Direction::Positive => 1,
+            Direction::Same => 0,
+        };
+
+        let row_dir_delta = match directions.row_dir {
+            Direction::Negative => -1,
+            Direction::Positive => 1,
+            Direction::Same => 0,
+        };
+
+        // Distance: For every given direction, check every distance away in that direction for the terminating position.
+        //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
+        //      A legal terminating point is one where we encounter only opponent pieces, ending with an empty position.
+        for col_dist in 1..BOARD_SIZE as i32 {
+            let col_pos = (origin.col as i32) + (col_dist * col_dir_delta);
+
+            if col_pos < 0 || col_pos >= BOARD_SIZE as i32 {
+                // We reached the boundaries without encountering a sibling piece.
+                return None;
+            }
+
+            for row_dist in 1..BOARD_SIZE as i32 {
+                let row_pos = (origin.row as i32) + (row_dist * row_dir_delta);
+
+                if row_pos < 0 || row_pos >= BOARD_SIZE as i32 {
+                    // We reached the boundaries without encountering a sibling piece.
+                    return None;
+                }
+
+                // Invariant: (col_pos, row_pos) must now be a position in range of the board.
+                let piece = self.get_piece(col_pos as usize, row_pos as usize);
+
+                if piece.is_none() {
+                    // This direction is not valid, since it did not end in a piece of our color.
+                    return None;
+                } else if piece.unwrap() == opponent(origin_color) {
+                    // We are still in the 'opponent' segment, so keep going.
+                    continue;
+                } else if piece.unwrap() == origin_color {
+                    // We've found another piece of our own color.
+                    // But it is only a sibling piece if it traps an enemy piece (must be >1 piece away).
+                    if row_dist > 1 || col_dist > 1 {
+                        return Some(BoardPosition {
+                            col: col_pos as usize,
+                            row: row_pos as usize,
+                        });
+                    } else {
+                        return None;
+                    }
+                }
+            }
+        }
+
         None
     }
 }
@@ -224,71 +295,23 @@ impl GameState for ReversiState {
 
         self.set_piece(action.col, action.row, Some(action.piece));
 
-        // Todo: enhance this with a stack-based structure
-        let mut to_flip = Vec::new();
+        let all_directions = [Direction::Positive, Direction::Negative, Direction::Same];
 
         // Direction: For col and row, we check all directions for which pieces to flip.
         //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
         //      For row, we can check all rows below us (direction -1), above us (direction 1), or the current row (direction 0).
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
-        for col_direction in -1..=1 {
-            for row_direction in -1..=1 {
-                // 0 for both directions means we are not checking anything.
-                if row_direction == 0 && col_direction == 0 {
-                    continue;
-                }
+        for col_dir in all_directions.iter() {
+            for row_dir in all_directions.iter() {
+                let directions = Directions { col_dir: *col_dir, row_dir: *row_dir };
+                let origin = BoardPosition {col: action.col, row: action.row};
+                let sibling = self.find_sibling_piece_pos(origin, action.piece, directions);
 
-                let mut visited_positions = Vec::new();
-
-                // Distance: For every given direction, check every distance away in that direction for the terminating position.
-                //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
-                //      A legal terminating point is one where we encounter only opponent pieces, ending with an empty position.
-                'distance: for col_dist in 1..BOARD_SIZE as i32 {
-                    let col_pos = (action.col as i32) + (col_dist * col_direction);
-
-                    if col_pos < 0 || col_pos >= BOARD_SIZE as i32 {
-                        break;
-                    }
-
-                    for row_dist in 1..BOARD_SIZE as i32 {
-                        let row_pos = (action.row as i32) + (row_dist * row_direction);
-
-                        if row_pos < 0 || row_pos >= BOARD_SIZE as i32 {
-                            // We've exceeded the bounds; no reason to continue.
-                            break 'distance;
-                        }
-
-                        // Invariant: (col_pos, row_pos) must now be a position in range of the board.
-                        let piece = self.get_piece(col_pos as usize, row_pos as usize);
-
-                        if piece.is_none() {
-                            // This direction is not valid, since it did not end in a piece of our color.
-                            break 'distance;
-                        }
-
-                        if piece.unwrap() == opponent(action.piece) {
-                            // We are still in the 'opponent' segment, so keep going.
-                            visited_positions.push((col_pos, row_pos));
-                            continue;
-                        }
-
-                        // Invariant: the piece we are checking is not none, and it is not
-                        // the opponent's color, so therefore it is our own color.
-                        // The first time we encounter this specific scenario, we know this is a valid direction,
-                        // and we can stop testing it.
-
-                        // If the position we are checking has a piece with the same color
-                        // as the one we are placing, this is not a valid direction to check.
-                        to_flip.append(&mut visited_positions);
-
-                        break 'distance;
-                    }
+                if sibling.is_some() {
+                    // have an iterator for getting pieces in a direction directions
+                    // like: for piece in self.traverse_from(origin: (col, row), direction: (dir, dir), distance: usize) { /* flip */}
                 }
             }
-        }
-
-        for (col, row) in to_flip {
-            self.flip_piece(col as usize, row as usize);
         }
     }
 
