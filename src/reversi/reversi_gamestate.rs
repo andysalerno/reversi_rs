@@ -1,3 +1,4 @@
+use super::util;
 use crate::game_primitives::{GameMove, GameState, PlayerColor};
 
 /// The size of the board.
@@ -17,19 +18,19 @@ const NEGATIVE: Direction = -1;
 const SAME: Direction = 0;
 
 #[derive(Copy, Clone)]
-struct Directions {
+pub(super) struct Directions {
     col_dir: Direction,
     row_dir: Direction,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum ReversiPiece {
+pub(super) enum ReversiPiece {
     Black,
     White,
 }
 
 #[derive(Copy, Clone, Debug)]
-struct BoardPosition {
+pub(super) struct BoardPosition {
     col: usize,
     row: usize,
 }
@@ -50,14 +51,8 @@ pub struct ReversiMove {
 }
 impl GameMove for ReversiMove {}
 
-fn opponent(piece: ReversiPiece) -> ReversiPiece {
-    match piece {
-        ReversiPiece::Black => ReversiPiece::White,
-        ReversiPiece::White => ReversiPiece::Black,
-    }
-}
-
-type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
+pub(super) type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
+pub(super) type PiecePos = (ReversiPiece, BoardPosition);
 
 #[derive(Clone)]
 pub struct ReversiState {
@@ -85,7 +80,7 @@ impl ReversiState {
     /// Given an (x,y) coord within range of the board, return the ReversiPiece
     /// present on that spot, or None if the position is empty.
     /// Note: (0,0) is the bottom-left position.
-    fn get_piece(&self, position: BoardPosition) -> Option<ReversiPiece> {
+    pub(super) fn get_piece(&self, position: BoardPosition) -> Option<ReversiPiece> {
         let (col_p, row_p) = ReversiState::transform_coords(position);
 
         self.board[row_p][col_p]
@@ -118,6 +113,14 @@ impl ReversiState {
 
     fn within_board_bounds(position: BoardPosition) -> bool {
         position.col < BOARD_SIZE && position.row < BOARD_SIZE
+    }
+
+    fn traverse_from(
+        &self,
+        origin: BoardPosition,
+        direction: Directions,
+    ) -> impl Iterator<Item = PiecePos> + '_ {
+        util::BoardDirectionIter::new(&self, origin, direction)
     }
 
     /// Given a position of a piece on the board,
@@ -178,7 +181,7 @@ impl ReversiState {
                 if piece.is_none() {
                     // This direction is not valid, since it did not end in a piece of our color.
                     return None;
-                } else if piece.unwrap() == opponent(origin_color) {
+                } else if piece.unwrap() == util::opponent(origin_color) {
                     // We are still in the 'opponent' segment, so keep going.
                     continue;
                 } else if piece.unwrap() == origin_color {
