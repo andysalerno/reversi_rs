@@ -150,51 +150,16 @@ impl ReversiState {
         &self,
         origin: BoardPosition,
         origin_color: ReversiPiece,
-        directions: Directions,
+        direction: Directions,
     ) -> Option<BoardPosition> {
-        // 'Same' for both directions means we are not checking anything
-        if directions.col_dir == SAME && directions.row_dir == SAME {
-            return None;
-        }
+        for position in ReversiState::traverse_from(origin, direction) {
+            let piece = self.get_piece(position);
 
-        // Distance: For every given direction, check every distance away in that direction for the terminating position.
-        //      We can stop when we exceed the board range, or find another piece of our own color, as those are not valid flip directions.
-        //      A legal terminating point is one where we encounter only opponent pieces, ending with an empty position.
-        for col_dist in 1..BOARD_SIZE as i32 {
-            let col_pos = (origin.col as i32) + (col_dist * directions.col_dir);
-
-            if col_pos < 0 || col_pos >= BOARD_SIZE as i32 {
-                // We reached the boundaries without encountering a sibling piece.
-                return None;
-            }
-
-            for row_dist in 1..BOARD_SIZE as i32 {
-                let row_pos = (origin.row as i32) + (row_dist * directions.row_dir);
-
-                if row_pos < 0 || row_pos >= BOARD_SIZE as i32 {
-                    // We reached the boundaries without encountering a sibling piece.
-                    return None;
-                }
-
-                // Invariant: (col_pos, row_pos) must now be a position in range of the board.
-                let piece = self.get_piece(BoardPosition::new(col_pos as usize, row_pos as usize));
-
-                if piece.is_none() {
-                    // This direction is not valid, since it did not end in a piece of our color.
-                    return None;
-                } else if piece.unwrap() == util::opponent(origin_color) {
-                    // We are still in the 'opponent' segment, so keep going.
-                    continue;
-                } else if piece.unwrap() == origin_color {
-                    // We've found another piece of our own color.
-                    // But it is only a sibling piece if it traps an enemy piece (must be >1 piece away).
-                    if row_dist > 1 || col_dist > 1 {
-                        return Some(BoardPosition {
-                            col: col_pos as usize,
-                            row: row_pos as usize,
-                        });
-                    } else {
-                        return None;
+            match piece {
+                None => return None,
+                Some(piece) => {
+                    if piece == origin_color {
+                        return Some(position);
                     }
                 }
             }
@@ -304,14 +269,6 @@ impl GameState for ReversiState {
                     ReversiState::traverse_from(origin, direction)
                         .take_while(|p| *p != sibling)
                         .for_each(|p| self.flip_piece(p));
-
-                    // fn traverse_from(
-                    //     &self,
-                    //     origin: BoardPosition,
-                    //     direction: Directions,
-                    // ) -> impl Iterator<Item = PiecePos> + '_ {
-                    //     util::BoardDirectionIter::new(&self, origin, direction)
-                    // }
                 }
             }
         }
