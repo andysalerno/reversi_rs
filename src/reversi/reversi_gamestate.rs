@@ -152,14 +152,26 @@ impl ReversiState {
         origin_color: ReversiPiece,
         direction: Directions,
     ) -> Option<BoardPosition> {
-        for position in ReversiState::traverse_from(origin, direction) {
+        // Start by walking across every piece in the given direction...
+        for (index, position) in ReversiState::traverse_from(origin, direction).enumerate() {
             let piece = self.get_piece(position);
 
             match piece {
+                // ...if that position is empty, there was no sibling piece.
                 None => return None,
                 Some(piece) => {
-                    if piece == origin_color {
+                    // ...if the piece was of the original color, but it's the very first piece we checked,
+                    // then this is not a valid direction, since it is directly next to the origin piece
+                    // and therefore does not "trap" any enemy pieces.
+                    if piece == origin_color && index == 0 {
+                        return None;
+                    } else if piece == origin_color && index > 0 {
+                        // ..but if the piece was the original color and we made it past the first index,
+                        // then it must have trapped enemy pieces.
                         return Some(position);
+                    } else {
+                        // ..otherwise, it was the enemy color, so we continue walking.
+                        continue;
                     }
                 }
             }
