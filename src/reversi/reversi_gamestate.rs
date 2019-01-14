@@ -131,16 +131,16 @@ impl ReversiState {
     /// combined with the current piece, traps enemies in the given direction.
     ///
     /// Examples:
-    ///     In the below case, the pieces at 'a' and 'b'
-    ///     are siblings, since together they surrouned the 3 enemy pieces.
-    ///         X O O O X
-    ///         a       b
+    ///    In the below case, the pieces at 'a' and 'b'
+    ///    are siblings, since together they surrouned the 3 enemy pieces.
+    ///        X O O O X
+    ///        a       b
     ///
-    ///     In the below case, the pieces at 'a' and 'b'
-    ///     are NOT siblings, since there is a gap (empty space) at 'x' preventing them
-    ///     from trapping the other pieces.
-    ///         X O _ O X
-    ///         a   x   b
+    ///    In the below case, the pieces at 'a' and 'b'
+    ///    are NOT siblings, since there is a gap (empty space) at 'x' preventing them
+    ///    from trapping the other pieces.
+    ///        X O _ O X
+    ///        a   x   b
     ///
     /// This function only checks for a sibling in the given direction.
     ///
@@ -270,6 +270,11 @@ impl GameState for ReversiState {
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
         for col_dir in all_directions.iter() {
             for row_dir in all_directions.iter() {
+                if *col_dir == SAME && *row_dir == SAME {
+                    // staying in the same row and col means not moving at all, so skip this scenario
+                    continue;
+                }
+
                 let direction = Directions {
                     col_dir: *col_dir,
                     row_dir: *row_dir,
@@ -280,7 +285,9 @@ impl GameState for ReversiState {
                 if let Some(sibling) = sibling {
                     ReversiState::traverse_from(origin, direction)
                         .take_while(|p| *p != sibling)
-                        .for_each(|p| self.flip_piece(p));
+                        .for_each(|p| {
+                            self.flip_piece(p);
+                        });
                 }
             }
         }
