@@ -1,7 +1,5 @@
-[package]
-name = "reversi_rs"
-version = "0.1.0"
-authors = ["andy salerno <andysalerno@gmail.com>"]
-edition = "2018"
-
-[dependencies]
+[workspace]
+members = [
+   "lib_reversi",
+   "game_runner" 
+]
