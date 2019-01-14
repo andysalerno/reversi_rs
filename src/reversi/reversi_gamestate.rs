@@ -3,7 +3,7 @@ use crate::game_primitives::{GameMove, GameState, PlayerColor};
 
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
-const BOARD_SIZE: usize = 8;
+pub(super) const BOARD_SIZE: usize = 8;
 
 /// When traversing pieces on the board,
 /// a positive direction indicates increasing values for col or row,
@@ -19,8 +19,8 @@ const SAME: Direction = 0;
 
 #[derive(Copy, Clone)]
 pub(super) struct Directions {
-    col_dir: Direction,
-    row_dir: Direction,
+    pub(super) col_dir: Direction,
+    pub(super) row_dir: Direction,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -29,14 +29,14 @@ pub(super) enum ReversiPiece {
     White,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub(super) struct BoardPosition {
-    col: usize,
-    row: usize,
+    pub(super) col: usize,
+    pub(super) row: usize,
 }
 
 impl BoardPosition {
-    fn new(col: usize, row: usize) -> Self {
+    pub(super) fn new(col: usize, row: usize) -> Self {
         Self { col, row }
     }
 }
@@ -64,6 +64,8 @@ pub struct ReversiState {
 }
 
 impl ReversiState {
+    pub const BoardSize: usize = BOARD_SIZE;
+
     fn new() -> Self {
         let board: Board = [[None; BOARD_SIZE]; BOARD_SIZE];
 
@@ -116,11 +118,10 @@ impl ReversiState {
     }
 
     fn traverse_from(
-        &self,
         origin: BoardPosition,
         direction: Directions,
-    ) -> impl Iterator<Item = PiecePos> + '_ {
-        util::BoardDirectionIter::new(&self, origin, direction)
+    ) -> impl Iterator<Item = BoardPosition> {
+        util::BoardDirectionIter::new(origin, direction)
     }
 
     /// Given a position of a piece on the board,
@@ -292,16 +293,25 @@ impl GameState for ReversiState {
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
         for col_dir in all_directions.iter() {
             for row_dir in all_directions.iter() {
-                let directions = Directions {
+                let direction = Directions {
                     col_dir: *col_dir,
                     row_dir: *row_dir,
                 };
                 let origin = action.position;
-                let sibling = self.find_sibling_piece_pos(origin, action.piece, directions);
+                let sibling = self.find_sibling_piece_pos(origin, action.piece, direction);
 
-                if sibling.is_some() {
-                    // have an iterator for getting pieces in a direction directions
-                    // like: for piece in self.traverse_from(origin: (col, row), direction: (dir, dir), distance: usize) { /* flip */}
+                if let Some(sibling) = sibling {
+                    ReversiState::traverse_from(origin, direction)
+                        .take_while(|p| *p != sibling)
+                        .for_each(|p| self.flip_piece(p));
+
+                    // fn traverse_from(
+                    //     &self,
+                    //     origin: BoardPosition,
+                    //     direction: Directions,
+                    // ) -> impl Iterator<Item = PiecePos> + '_ {
+                    //     util::BoardDirectionIter::new(&self, origin, direction)
+                    // }
                 }
             }
         }
