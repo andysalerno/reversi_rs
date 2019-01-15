@@ -1,5 +1,5 @@
 [package]
-name = "reversi_rs"
+name = "lib_reversi"
 version = "0.1.0"
 authors = ["andy salerno <andysalerno@gmail.com>"]
 edition = "2018"

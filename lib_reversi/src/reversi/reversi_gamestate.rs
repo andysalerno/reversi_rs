@@ -66,7 +66,7 @@ pub struct ReversiState {
 impl ReversiState {
     pub const BoardSize: usize = BOARD_SIZE;
 
-    fn new() -> Self {
+    pub fn new() -> Self {
         let board: Board = [[None; BOARD_SIZE]; BOARD_SIZE];
 
         ReversiState {

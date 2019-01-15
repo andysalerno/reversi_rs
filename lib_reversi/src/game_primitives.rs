@@ -58,7 +58,7 @@ where
     fn game_state(&self) -> &Self::State;
 
     /// The game's current state.
-    fn game_state_mut(&self) -> &mut Self::State;
+    fn game_state_mut(&mut self) -> &mut Self::State;
 
     /// True if the the game has ended, either due to a forced win,
     /// draw, or forfeit.
@@ -70,12 +70,14 @@ where
     /// Invokes the current player agent to pick a move,
     /// then updates the game state and gives control to the next player.
     fn player_take_turn(&mut self, player: PlayerColor) {
-        let state = self.game_state_mut();
+        let state = self.game_state();
 
         let picked_move = match player {
             PlayerColor::Black => self.black_agent().pick_move(state),
             PlayerColor::White => self.white_agent().pick_move(state),
         };
+
+        let state = self.game_state_mut();
 
         state.apply_move(picked_move);
     }
