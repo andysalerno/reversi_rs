@@ -1,57 +1,7 @@
-use super::util;
-use lib_boardgame::game_primitives::{GameMove, GameState, PlayerColor};
-
-/// The size of the board.
-/// E.x., if this is 8, the Reversi board is 8x8 spaces large.
-pub(super) const BOARD_SIZE: usize = 8;
-
-/// When traversing pieces on the board,
-/// a positive direction indicates increasing values for col or row,
-/// a negative direction indicates decreasing values for col or row,
-/// and a 'same' direction indicates no movement for col or row.
-/// Example: if we ask to traverse as 'col: positive, row: negative',
-/// our traversal will increment with increasing col values, whereas row will be decremented.
-/// (I.e., down and to the right.)
-type Direction = i32;
-const POSITIVE: Direction = 1;
-const NEGATIVE: Direction = -1;
-const SAME: Direction = 0;
-
-#[derive(Copy, Clone)]
-pub(super) struct Directions {
-    pub(super) col_dir: Direction,
-    pub(super) row_dir: Direction,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(super) enum ReversiPiece {
-    Black,
-    White,
-}
-
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub(super) struct BoardPosition {
-    pub(super) col: usize,
-    pub(super) row: usize,
-}
-
-impl BoardPosition {
-    pub(super) fn new(col: usize, row: usize) -> Self {
-        Self { col, row }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct ReversiMove {
-    /// The piece to be placed at the given location.
-    piece: ReversiPiece,
-
-    /// The position at which to place the piece.
-    position: BoardPosition,
-}
-impl GameMove for ReversiMove {}
-
-pub(super) type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
+use crate::util::BoardDirectionIter;
+use crate::board_directions::*;
+use crate::{Board, BoardPosition, Directions, ReversiMove, ReversiPiece, BOARD_SIZE};
+use lib_boardgame::game_primitives::{GameState, PlayerColor};
 
 #[derive(Clone)]
 pub struct ReversiState {
@@ -152,7 +102,7 @@ impl ReversiState {
         origin: BoardPosition,
         direction: Directions,
     ) -> impl Iterator<Item = BoardPosition> {
-        util::BoardDirectionIter::new(origin, direction)
+        BoardDirectionIter::new(origin, direction)
     }
 
     /// Given a position of a piece on the board,

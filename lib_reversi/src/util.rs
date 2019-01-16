@@ -1,16 +1,6 @@
-use super::reversi_gamestate::BoardPosition;
-use super::reversi_gamestate::Directions;
-use super::reversi_gamestate::ReversiPiece;
-use super::reversi_gamestate::ReversiState;
+use crate::{reversi_gamestate::ReversiState, BoardPosition, Directions};
 
-pub(super) fn opponent(piece: ReversiPiece) -> ReversiPiece {
-    match piece {
-        ReversiPiece::Black => ReversiPiece::White,
-        ReversiPiece::White => ReversiPiece::Black,
-    }
-}
-
-pub(super) struct BoardDirectionIter {
+pub(crate) struct BoardDirectionIter {
     direction: Directions,
     board_size: usize,
 

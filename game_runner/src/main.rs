@@ -1,6 +1,6 @@
-use lib_reversi::agents::random_agent::RandomAgent;
 use lib_boardgame::game_primitives::{Game, PlayerColor};
-use lib_reversi::reversi::reversi::Reversi;
+use lib_reversi::agents::random_agent::RandomAgent;
+use lib_reversi::reversi::Reversi;
 
 fn main() {
     let white = RandomAgent::new(PlayerColor::White);
