@@ -1,4 +1,4 @@
-use crate::game_primitives::{GameAgent, GameState, PlayerColor};
+use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
 
 pub struct RandomAgent {
     color: PlayerColor,

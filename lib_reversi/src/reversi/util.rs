@@ -28,7 +28,7 @@ impl BoardDirectionIter {
         BoardDirectionIter {
             origin,
             direction,
-            board_size: ReversiState::BoardSize,
+            board_size: ReversiState::BOARD_SIZE,
 
             cursor: origin,
         }

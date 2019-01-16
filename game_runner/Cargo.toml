@@ -6,3 +6,4 @@ edition = "2018"
 
 [dependencies]
 lib_reversi = { path = "../lib_reversi" }
+lib_boardgame = { path = "../lib_boardgame" }

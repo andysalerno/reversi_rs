@@ -1,5 +1,7 @@
-use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, GameState, PlayerColor};
 use crate::reversi::reversi_gamestate::{ReversiState, BOARD_SIZE};
+use lib_boardgame::game_primitives::{
+    Game, GameAgent, GameMove, GameResult, GameState, PlayerColor,
+};
 
 pub struct Reversi<WhiteAgent, BlackAgent>
 where

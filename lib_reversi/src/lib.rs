@@ -1,11 +1,10 @@
 pub mod agents;
-pub mod game_primitives;
 pub mod reversi;
 
 #[cfg(test)]
 mod tests {
     use crate::agents::random_agent::RandomAgent;
-    use crate::game_primitives::{Game, PlayerColor};
+    use lib_boardgame::game_primitives::{Game, PlayerColor};
     use crate::reversi::reversi::Reversi;
 
     #[test]

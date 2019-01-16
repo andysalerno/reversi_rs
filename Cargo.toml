@@ -1,5 +1,6 @@
 [workspace]
 members = [
    "lib_reversi",
-   "game_runner" 
+   "game_runner",
+   "lib_boardgame",
 ]

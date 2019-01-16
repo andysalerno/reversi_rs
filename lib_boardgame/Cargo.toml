@@ -1,0 +1,7 @@
+[package]
+name = "lib_boardgame"
+version = "0.1.0"
+authors = ["andy <andysalerno@gmail.com>"]
+edition = "2018"
+
+[dependencies]

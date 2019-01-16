@@ -1,5 +1,5 @@
 use super::util;
-use crate::game_primitives::{GameMove, GameState, PlayerColor};
+use lib_boardgame::game_primitives::{GameMove, GameState, PlayerColor};
 
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
@@ -52,7 +52,6 @@ pub struct ReversiMove {
 impl GameMove for ReversiMove {}
 
 pub(super) type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
-pub(super) type PiecePos = (ReversiPiece, BoardPosition);
 
 #[derive(Clone)]
 pub struct ReversiState {
@@ -70,7 +69,7 @@ pub struct ReversiState {
 }
 
 impl ReversiState {
-    pub const BoardSize: usize = BOARD_SIZE;
+    pub const BOARD_SIZE: usize = BOARD_SIZE;
 
     pub fn new() -> Self {
         let board: Board = [[None; BOARD_SIZE]; BOARD_SIZE];
