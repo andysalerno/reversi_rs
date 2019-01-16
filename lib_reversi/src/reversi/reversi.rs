@@ -1,5 +1,5 @@
-use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, PlayerColor};
-use crate::reversi::reversi_gamestate::ReversiState;
+use crate::game_primitives::{Game, GameAgent, GameMove, GameResult, GameState, PlayerColor};
+use crate::reversi::reversi_gamestate::{ReversiState, BOARD_SIZE};
 
 pub struct Reversi<WhiteAgent, BlackAgent>
 where
@@ -52,7 +52,24 @@ where
     /// True if the the game has ended, either due to a forced win,
     /// draw, or forfeit.
     fn is_game_over(&self) -> bool {
-        unimplemented!()
+        let gamestate = self.game_state();
+
+        if gamestate.white_pieces_count() + gamestate.black_pieces_count()
+            == BOARD_SIZE * BOARD_SIZE
+        {
+            // if the board is full, no player has a legal move by definition, so the game is over.
+            return true;
+        }
+
+        let white_legal_moves = gamestate.legal_moves(PlayerColor::White);
+        let black_legal_moves = gamestate.legal_moves(PlayerColor::Black);
+
+        // if neither player has a legal move to play, the game is over.
+        if white_legal_moves.len() == 0 && black_legal_moves.len() == 0 {
+            return true;
+        }
+
+        false
     }
 
     /// The GameResult, or None if the game is not yet over.

@@ -61,6 +61,12 @@ pub struct ReversiState {
 
     /// The player whose turn it currently is.
     current_player_turn: PlayerColor,
+
+    /// The count of white pieces on the board.
+    white_pieces_count: usize,
+
+    /// The count of black pieces on the board.
+    black_pieces_count: usize,
 }
 
 impl ReversiState {
@@ -72,6 +78,8 @@ impl ReversiState {
         ReversiState {
             board,
             current_player_turn: PlayerColor::Black,
+            white_pieces_count: 0,
+            black_pieces_count: 0,
         }
     }
 
@@ -88,9 +96,33 @@ impl ReversiState {
         self.board[row_p][col_p]
     }
 
+    /// A count of how many white pieces exist on the board.
+    pub(super) fn white_pieces_count(&self) -> usize {
+        self.white_pieces_count
+    }
+
+    /// A count of how many black pieces exist on the board.
+    pub(super) fn black_pieces_count(&self) -> usize {
+        self.black_pieces_count
+    }
+
     /// Set the piece at the coordinates to the given piece.
     fn set_piece(&mut self, position: BoardPosition, piece: Option<ReversiPiece>) {
         let (col_p, row_p) = ReversiState::transform_coords(position);
+
+        let existing = self.board[row_p][col_p];
+
+        match existing {
+            Some(ReversiPiece::White) => self.white_pieces_count -= 1,
+            Some(ReversiPiece::Black) => self.black_pieces_count -= 1,
+            _ => {}
+        };
+
+        match piece {
+            Some(ReversiPiece::White) => self.white_pieces_count += 1,
+            Some(ReversiPiece::Black) => self.black_pieces_count += 1,
+            _ => {}
+        };
 
         self.board[row_p][col_p] = piece;
     }
