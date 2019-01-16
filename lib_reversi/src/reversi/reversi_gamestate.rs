@@ -288,7 +288,10 @@ impl GameState for ReversiState {
         }
 
         if self.get_piece(action.position).is_some() {
-            panic!("Cannot place a piece at a location that already contains a piece. Position: ({},{})");
+            panic!(
+                "Cannot place a piece at a location that already contains a piece. Position: {:?}",
+                action.position
+            );
         }
 
         self.set_piece(action.position, Some(action.piece));

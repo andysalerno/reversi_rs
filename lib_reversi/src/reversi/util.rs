@@ -11,7 +11,6 @@ pub(super) fn opponent(piece: ReversiPiece) -> ReversiPiece {
 }
 
 pub(super) struct BoardDirectionIter {
-    origin: BoardPosition,
     direction: Directions,
     board_size: usize,
 
@@ -26,7 +25,6 @@ impl BoardDirectionIter {
         }
 
         BoardDirectionIter {
-            origin,
             direction,
             board_size: ReversiState::BOARD_SIZE,
 

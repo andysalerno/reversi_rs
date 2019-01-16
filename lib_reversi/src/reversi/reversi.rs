@@ -1,6 +1,6 @@
 use crate::reversi::reversi_gamestate::{ReversiState, BOARD_SIZE};
 use lib_boardgame::game_primitives::{
-    Game, GameAgent, GameMove, GameResult, GameState, PlayerColor,
+    Game, GameAgent, GameResult, GameState, PlayerColor,
 };
 
 pub struct Reversi<WhiteAgent, BlackAgent>
@@ -67,7 +67,7 @@ where
         let black_legal_moves = gamestate.legal_moves(PlayerColor::Black);
 
         // if neither player has a legal move to play, the game is over.
-        if white_legal_moves.len() == 0 && black_legal_moves.len() == 0 {
+        if white_legal_moves.is_empty() && black_legal_moves.is_empty() {
             return true;
         }
 
