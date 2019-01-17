@@ -1,5 +1,5 @@
-use crate::util::BoardDirectionIter;
 use crate::board_directions::*;
+use crate::util::BoardDirectionIter;
 use crate::{Board, BoardPosition, Directions, ReversiMove, ReversiPiece, BOARD_SIZE};
 use lib_boardgame::game_primitives::{GameState, PlayerColor};
 
@@ -212,7 +212,45 @@ impl GameState for ReversiState {
 
     /// Returns the possible moves the given player can make for the current state.
     fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move> {
-        Vec::new()
+        let piece_color = match player {
+            PlayerColor::Black => ReversiPiece::Black,
+            PlayerColor::White => ReversiPiece::White,
+        };
+
+        let mut moves = Vec::new();
+
+        let all_directions = [POSITIVE, NEGATIVE, SAME];
+
+        for col in 0..Self::BOARD_SIZE {
+            for row in 0..Self::BOARD_SIZE {
+                let origin = BoardPosition::new(col, row);
+
+                for col_dir in all_directions.iter() {
+                    for row_dir in all_directions.iter() {
+                        if *col_dir == SAME && *row_dir == SAME {
+                            continue;
+                        }
+
+                        let direction = Directions {
+                            col_dir: *col_dir,
+                            row_dir: *row_dir,
+                        };
+
+                        if self
+                            .find_sibling_piece_pos(origin, piece_color, direction)
+                            .is_some()
+                        {
+                            moves.push(ReversiMove {
+                                piece: piece_color,
+                                position: origin,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        moves
     }
 
     /// Apply the given move (or 'action') to this state, mutating this state
@@ -280,6 +318,14 @@ impl GameState for ReversiState {
     /// Returns the current player whose turn it currently is.
     fn current_player_turn(&self) -> PlayerColor {
         self.current_player_turn
+    }
+
+    fn initialize_board(&mut self) {
+        self.set_piece(BoardPosition::new(3, 4), Some(ReversiPiece::White));
+        self.set_piece(BoardPosition::new(4, 4), Some(ReversiPiece::Black));
+
+        self.set_piece(BoardPosition::new(3, 3), Some(ReversiPiece::Black));
+        self.set_piece(BoardPosition::new(4, 3), Some(ReversiPiece::White));
     }
 }
 

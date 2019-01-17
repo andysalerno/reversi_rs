@@ -24,6 +24,10 @@ pub trait GameState: Clone {
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String;
 
+    /// Gives the implementation a chance to initialize the starting state of a game
+    /// before gameplay begins.
+    fn initialize_board(&mut self);
+
     /// Returns the possible moves the given player can make for the current state.
     fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move>;
 
@@ -85,7 +89,10 @@ where
     /// Applies each player's turn one at a time until the game is over,
     /// and returns the game result.
     fn play_to_end(&mut self) -> GameResult {
+        self.game_state_mut().initialize_board();
+
         while !self.is_game_over() {
+            println!("{}", self.game_state().human_friendly());
             let cur_player_color = self.game_state().current_player_turn();
             self.player_take_turn(cur_player_color);
         }
