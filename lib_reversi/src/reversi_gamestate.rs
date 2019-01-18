@@ -224,6 +224,10 @@ impl GameState for ReversiState {
         for col in 0..Self::BOARD_SIZE {
             for row in 0..Self::BOARD_SIZE {
                 let origin = BoardPosition::new(col, row);
+                if self.get_piece(origin).is_some() {
+                    // this position can't be legal if it already contains a piece
+                    continue;
+                }
 
                 for col_dir in all_directions.iter() {
                     for row_dir in all_directions.iter() {

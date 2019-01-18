@@ -62,8 +62,8 @@ where
             return true;
         }
 
-        let white_legal_moves = dbg!(gamestate.legal_moves(PlayerColor::White));
-        let black_legal_moves = dbg!(gamestate.legal_moves(PlayerColor::Black));
+        let white_legal_moves = gamestate.legal_moves(PlayerColor::White);
+        let black_legal_moves = gamestate.legal_moves(PlayerColor::Black);
 
         // if neither player has a legal move to play, the game is over.
         if white_legal_moves.is_empty() && black_legal_moves.is_empty() {

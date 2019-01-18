@@ -4,6 +4,7 @@ pub mod reversi_gamestate;
 mod util;
 
 use lib_boardgame::game_primitives::GameMove;
+use std::fmt;
 
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
@@ -50,7 +51,7 @@ impl BoardPosition {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct ReversiMove {
     /// The piece to be placed at the given location.
     piece: ReversiPiece,
@@ -59,6 +60,11 @@ pub struct ReversiMove {
     position: BoardPosition,
 }
 impl GameMove for ReversiMove {}
+impl fmt::Debug for ReversiMove {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({},{},{:?})", self.position.col, self.position.row, self.piece)
+    }
+}
 
 #[cfg(test)]
 mod tests {

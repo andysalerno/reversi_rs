@@ -14,6 +14,8 @@ impl RandomAgent {
 impl<TState: GameState> GameAgent<TState> for RandomAgent {
     fn pick_move(&self, state: &TState) -> TState::Move {
         // not very random yet :)
-        state.legal_moves(self.color)[0]
+        let legal_moves = dbg!(state.legal_moves(self.color));
+
+        legal_moves[0]
     }
 }
