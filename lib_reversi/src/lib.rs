@@ -50,7 +50,7 @@ impl BoardPosition {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ReversiMove {
     /// The piece to be placed at the given location.
     piece: ReversiPiece,

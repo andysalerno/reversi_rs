@@ -1,4 +1,5 @@
 use crate::{reversi_gamestate::ReversiState, BoardPosition, Directions};
+use lib_boardgame::game_primitives::PlayerColor;
 
 pub(crate) struct BoardDirectionIter {
     direction: Directions,
@@ -6,6 +7,13 @@ pub(crate) struct BoardDirectionIter {
 
     /// for iteration -- what position are we currently at?
     cursor: BoardPosition,
+}
+
+pub(crate) fn opponent(player: PlayerColor) -> PlayerColor {
+    match player {
+        PlayerColor::Black => PlayerColor::White,
+        PlayerColor::White => PlayerColor::Black,
+    }
 }
 
 impl BoardDirectionIter {

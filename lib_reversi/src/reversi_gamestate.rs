@@ -1,5 +1,5 @@
 use crate::board_directions::*;
-use crate::util::BoardDirectionIter;
+use crate::util::{opponent, BoardDirectionIter};
 use crate::{Board, BoardPosition, Directions, ReversiMove, ReversiPiece, BOARD_SIZE};
 use lib_boardgame::game_primitives::{GameState, PlayerColor};
 
@@ -109,7 +109,7 @@ impl ReversiState {
     /// find its sibling piece in a given direction.
     ///
     /// A sibling piece is defined as a piece of the same color that,
-    /// combined with the current piece, traps enemies in the given direction.
+    /// combined with the current piece, traps one or more enemies in a straight line.
     ///
     /// Examples:
     ///    In the below case, the pieces at 'a' and 'b'
@@ -313,6 +313,9 @@ impl GameState for ReversiState {
                 }
             }
         }
+
+        // advance the player turn to the next player
+        self.current_player_turn = opponent(self.current_player_turn);
     }
 
     /// Returns the current player whose turn it currently is.

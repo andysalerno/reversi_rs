@@ -7,6 +7,18 @@
         {
             "type": "lldb",
             "request": "launch",
+            "name": "Cargo run",
+            "cargo": {
+                "args": [
+                    "run"
+                ]
+            },
+            "program": "${cargo:program}",
+            "args": []
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
             "name": "Debug unit tests in library 'reversi_rs'",
             "cargo": {
                 "args": [

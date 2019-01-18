@@ -1,4 +1,6 @@
-#[derive(Copy, Clone)]
+use std::fmt;
+
+#[derive(Copy, Clone, Debug)]
 pub enum PlayerColor {
     Black,
     White,
@@ -13,7 +15,7 @@ pub enum GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy {}
+pub trait GameMove: Copy + fmt::Debug {}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
@@ -81,6 +83,8 @@ where
             PlayerColor::White => self.white_agent().pick_move(state),
         };
 
+        dbg!(format!("Player {:?} picked move {:?}", player, picked_move));
+
         let state = self.game_state_mut();
 
         state.apply_move(picked_move);
@@ -90,6 +94,7 @@ where
     /// and returns the game result.
     fn play_to_end(&mut self) -> GameResult {
         self.game_state_mut().initialize_board();
+        println!("Board initialized.");
 
         while !self.is_game_over() {
             println!("{}", self.game_state().human_friendly());

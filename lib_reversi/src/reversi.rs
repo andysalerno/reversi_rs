@@ -57,15 +57,17 @@ where
         if gamestate.white_pieces_count() + gamestate.black_pieces_count()
             == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
         {
+            println!("Game over because board is full.");
             // if the board is full, no player has a legal move by definition, so the game is over.
             return true;
         }
 
-        let white_legal_moves = gamestate.legal_moves(PlayerColor::White);
-        let black_legal_moves = gamestate.legal_moves(PlayerColor::Black);
+        let white_legal_moves = dbg!(gamestate.legal_moves(PlayerColor::White));
+        let black_legal_moves = dbg!(gamestate.legal_moves(PlayerColor::Black));
 
         // if neither player has a legal move to play, the game is over.
         if white_legal_moves.is_empty() && black_legal_moves.is_empty() {
+            println!("Game over because neither player has a valid legal move.");
             return true;
         }
 
