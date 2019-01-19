@@ -1,6 +1,6 @@
 use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
-use crate::{Board, BoardPosition, Directions, ReversiMove, ReversiPiece, BOARD_SIZE};
+use crate::{Board, BoardPosition, Directions, ReversiAction, ReversiPiece, BOARD_SIZE};
 use lib_boardgame::game_primitives::{GameState, PlayerColor};
 
 #[derive(Clone)]
@@ -163,7 +163,7 @@ impl ReversiState {
 }
 
 impl GameState for ReversiState {
-    type Move = ReversiMove;
+    type Move = ReversiAction;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
@@ -244,7 +244,7 @@ impl GameState for ReversiState {
                             .find_sibling_piece_pos(origin, piece_color, direction)
                             .is_some()
                         {
-                            moves.push(ReversiMove {
+                            moves.push(ReversiAction::Move {
                                 piece: piece_color,
                                 position: origin,
                             });
@@ -275,18 +275,27 @@ impl GameState for ReversiState {
     ///        O   X
     ///            X
     fn apply_move(&mut self, action: Self::Move) {
-        if !ReversiState::within_board_bounds(action.position) {
-            panic!("Provided position exceeds bounds: {:?}", action.position);
+        let (piece, position) = match action {
+            ReversiAction::PassTurn => {
+                // Passing a turn implies giving control to the other player, and doing nothing else.
+                self.current_player_turn = opponent(self.current_player_turn);
+                return;
+            }
+            ReversiAction::Move { piece, position } => (piece, position),
+        };
+
+        if !ReversiState::within_board_bounds(position) {
+            panic!("Provided position exceeds bounds: {:?}", position);
         }
 
-        if self.get_piece(action.position).is_some() {
+        if self.get_piece(position).is_some() {
             panic!(
                 "Cannot place a piece at a location that already contains a piece. Position: {:?}",
-                action.position
+                position
             );
         }
 
-        self.set_piece(action.position, Some(action.piece));
+        self.set_piece(position, Some(piece));
 
         let all_directions = [POSITIVE, NEGATIVE, SAME];
 
@@ -305,8 +314,8 @@ impl GameState for ReversiState {
                     col_dir: *col_dir,
                     row_dir: *row_dir,
                 };
-                let origin = action.position;
-                let sibling = self.find_sibling_piece_pos(origin, action.piece, direction);
+                let origin = position;
+                let sibling = self.find_sibling_piece_pos(origin, piece, direction);
 
                 if let Some(sibling) = sibling {
                     ReversiState::traverse_from(origin, direction)
@@ -339,7 +348,7 @@ impl GameState for ReversiState {
 #[cfg(test)]
 mod tests {
     use super::{
-        Board, BoardPosition, GameState, PlayerColor, ReversiMove, ReversiPiece, ReversiState,
+        Board, BoardPosition, GameState, PlayerColor, ReversiAction, ReversiPiece, ReversiState,
         BOARD_SIZE,
     };
 
@@ -417,7 +426,7 @@ mod tests {
 
         // We place a white piece at the asterisk:
         // O X *
-        let action = ReversiMove {
+        let action = ReversiAction::Move {
             piece: ReversiPiece::White,
             position: pos(4, 2),
         };
@@ -449,7 +458,7 @@ mod tests {
         state.set_piece(pos(4, 5), Some(ReversiPiece::Black));
 
         // We place a black piece at the asterisk:
-        let action = ReversiMove {
+        let action = ReversiAction::Move {
             piece: ReversiPiece::Black,
             position: pos(1, 2),
         };

@@ -34,13 +34,13 @@ struct Directions {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum ReversiPiece {
+pub enum ReversiPiece {
     Black,
     White,
 }
 
 #[derive(Copy, Clone, PartialEq, Debug)]
-struct BoardPosition {
+pub struct BoardPosition {
     col: usize,
     row: usize,
 }
@@ -51,18 +51,26 @@ impl BoardPosition {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct ReversiMove {
-    /// The piece to be placed at the given location.
-    piece: ReversiPiece,
-
-    /// The position at which to place the piece.
-    position: BoardPosition,
+#[derive(Copy, Clone, PartialEq)]
+pub enum ReversiAction {
+    PassTurn,
+    Move {
+        piece: ReversiPiece,
+        position: BoardPosition,
+    },
 }
-impl GameMove for ReversiMove {}
-impl fmt::Debug for ReversiMove {
+
+impl GameMove for ReversiAction {}
+impl fmt::Debug for ReversiAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({},{},{:?})", self.position.col, self.position.row, self.piece)
+        let msg = match self {
+            ReversiAction::PassTurn => "(player passes turn)".to_owned(),
+            ReversiAction::Move { piece, position } => {
+                format!("({}, {}, {:?})", position.col, position.row, piece)
+            }
+        };
+
+        write!(f, "{}", msg)
     }
 }
 

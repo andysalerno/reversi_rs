@@ -74,13 +74,14 @@ where
     fn game_result(&self) -> Option<GameResult>;
 
     /// Invokes the current player agent to pick a move,
-    /// then updates the game state and gives control to the next player.
+    /// then updates the game state with the result.
     fn player_take_turn(&mut self, player: PlayerColor) {
         let state = self.game_state();
+        let legal_moves = state.legal_moves(player);
 
         let picked_move = match player {
-            PlayerColor::Black => self.black_agent().pick_move(state),
-            PlayerColor::White => self.white_agent().pick_move(state),
+            PlayerColor::Black => self.black_agent().pick_move(state, &legal_moves),
+            PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
         };
 
         dbg!(format!("Player {:?} picked move {:?}", player, picked_move));
@@ -109,5 +110,5 @@ where
 /// A trait representing the functionality of a GameAgent.
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
-    fn pick_move(&self, state: &TState) -> TState::Move;
+    fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
 }
