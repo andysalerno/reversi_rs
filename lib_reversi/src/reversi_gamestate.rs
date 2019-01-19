@@ -254,6 +254,11 @@ impl GameState for ReversiState {
             }
         }
 
+        if moves.is_empty() {
+            // There's always at least one legal choice: pass the turn
+            moves.push(ReversiAction::PassTurn);
+        }
+
         moves
     }
 

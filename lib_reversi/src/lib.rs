@@ -78,12 +78,12 @@ impl fmt::Debug for ReversiAction {
 mod tests {
     use crate::agents::random_agent::RandomAgent;
     use crate::reversi::Reversi;
-    use lib_boardgame::game_primitives::{Game, PlayerColor};
+    use lib_boardgame::game_primitives::{Game};
 
     #[test]
     fn create_game() {
-        let white = RandomAgent::new(PlayerColor::White);
-        let black = RandomAgent::new(PlayerColor::Black);
+        let white = RandomAgent;
+        let black = RandomAgent;
 
         let mut game = Reversi::new(white, black);
         game.play_to_end();

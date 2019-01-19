@@ -79,16 +79,16 @@ where
         let state = self.game_state();
         let legal_moves = state.legal_moves(player);
 
-        let picked_move = match player {
+        let picked_action = match player {
             PlayerColor::Black => self.black_agent().pick_move(state, &legal_moves),
             PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
         };
 
-        dbg!(format!("Player {:?} picked move {:?}", player, picked_move));
+        dbg!(format!("Player {:?} picked move {:?}", player, picked_action));
 
         let state = self.game_state_mut();
 
-        state.apply_move(picked_move);
+        state.apply_move(picked_action);
     }
 
     /// Applies each player's turn one at a time until the game is over,
