@@ -6,7 +6,7 @@ pub enum PlayerColor {
     White,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub enum GameResult {
     Tie,
     WhiteWins,
@@ -84,7 +84,10 @@ where
             PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
         };
 
-        dbg!(format!("Player {:?} picked move {:?}", player, picked_action));
+        dbg!(format!(
+            "Player {:?} picked move {:?}",
+            player, picked_action
+        ));
 
         let state = self.game_state_mut();
 
@@ -103,7 +106,8 @@ where
             self.player_take_turn(cur_player_color);
         }
 
-        GameResult::BlackWins
+        self.game_result()
+            .expect("The game is over, so there must be a game result.")
     }
 }
 

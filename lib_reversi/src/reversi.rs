@@ -76,6 +76,17 @@ where
 
     /// The GameResult, or None if the game is not yet over.
     fn game_result(&self) -> Option<GameResult> {
-        unimplemented!()
+        let white_count = self.game_state().white_pieces_count();
+        let black_count = self.game_state().black_pieces_count();
+
+        if !self.is_game_over() {
+            None
+        } else if white_count > black_count {
+            Some(GameResult::WhiteWins)
+        } else if black_count > white_count {
+            Some(GameResult::BlackWins)
+        } else {
+            Some(GameResult::Tie)
+        }
     }
 }

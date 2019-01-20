@@ -8,5 +8,6 @@ fn main() {
 
     let mut game = Reversi::new(white, black);
 
-    game.play_to_end();
+    let game_result = game.play_to_end();
+    println!("Result: {:?}", game_result);
 }
