@@ -10,22 +10,40 @@ impl HumanAgent {
     fn get_user_move(color: ReversiPiece) -> Action {
         use std::io::stdin;
 
-        println!("Enter move x,y: ");
-        let mut input = String::new();
-        stdin()
-            .read_line(&mut input)
-            .expect("Couldn't capture user input.");
+        let position = loop {
+            println!("Enter move x,y: ");
 
-        let nums: Vec<_> = dbg!(input.split(',').map(|x| x.trim()).collect());
+            let mut input = String::new();
 
-        let col = nums[0]
-            .parse::<usize>()
-            .expect(&format!("illegal col: {}", nums[0]));
-        let row = nums[1]
-            .parse::<usize>()
-            .expect(&format!("illegal row: {}", nums[1]));
+            stdin()
+                .read_line(&mut input)
+                .expect("Couldn't capture user input.");
 
-        let position = BoardPosition::new(col, row);
+            let nums: Vec<_> = dbg!(input.split(',').map(|x| x.trim()).collect());
+
+            if nums.len() != 2 {
+                println!("Invalid input: {} -- expected format: col,row", input);
+                continue;
+            }
+
+            let col = nums[0].parse::<usize>();
+            let row = nums[1].parse::<usize>();
+
+            if let (Ok(col), Ok(row)) = (col, row) {
+                let board_pos = BoardPosition::new(col, row);
+                if col > ReversiState::BOARD_SIZE || row >= ReversiState::BOARD_SIZE {
+                    println!(
+                        "Position out of bounds of board. Input: {:?}, actual board size: {}",
+                        board_pos,
+                        ReversiState::BOARD_SIZE
+                    );
+                } else {
+                    break board_pos;
+                }
+            } else {
+                println!("Didn't recognize input as a board position: {}", input);
+            }
+        };
 
         ReversiAction::Move {
             piece: color,
