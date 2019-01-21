@@ -1,9 +1,10 @@
 use lib_boardgame::game_primitives::Game;
+use lib_reversi::agents::human::HumanAgent;
 use lib_reversi::agents::random_agent::RandomAgent;
 use lib_reversi::reversi::Reversi;
 
 fn main() {
-    let white = RandomAgent;
+    let white = HumanAgent;
     let black = RandomAgent;
 
     let mut game = Reversi::new(white, black);
