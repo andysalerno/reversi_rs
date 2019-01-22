@@ -1,31 +1,31 @@
 use lib_boardgame::game_primitives::GameState;
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 pub struct RcNode<T: GameState> {
     state: T,
     action: Option<T::Move>,
     parent: Weak<RcNode<T>>,
-    children: Vec<Rc<Self>>,
+    children: RefCell<Vec<Rc<Self>>>,
 
-    plays: usize,
-    wins: usize,
-    losses: usize,
+    plays: Cell<usize>,
+    wins: Cell<usize>,
 }
 
 impl<T: GameState> RcNode<T> {
     fn new_child(parent: &mut Rc<Self>, action: T::Move, state: &T) -> Rc<Self> {
         let child = Rc::new(Self {
             parent: Rc::downgrade(parent),
-            children: Vec::new(),
+            children: RefCell::new(Vec::new()),
             state: state.clone(),
             action: Some(action),
-            plays: 0,
-            wins: 0,
-            losses: 0,
+            plays: Cell::new(0),
+            wins: Cell::new(0),
         });
 
         dbg!(Rc::get_mut(parent)
-            .expect("Couldn't access parent of new child as mutable.")
+            .expect("Couldn't access parent of new child as mutable to add a child.")
             .add_child(&child));
 
         child
@@ -34,32 +34,28 @@ impl<T: GameState> RcNode<T> {
     fn new_root(state: &T) -> Self {
         Self {
             parent: Weak::new(),
-            children: Vec::new(),
+            children: RefCell::new(Vec::new()),
             state: state.clone(),
             action: None,
-            plays: 0,
-            wins: 0,
-            losses: 0,
+            plays: Cell::new(0),
+            wins: Cell::new(0),
         }
     }
 
     fn plays(&self) -> usize {
-        self.plays
+        self.plays.get()
     }
     fn wins(&self) -> usize {
-        self.wins
-    }
-    fn losses(&self) -> usize {
-        self.losses
+        self.wins.get()
     }
     fn parent(&self) -> Weak<Self> {
         self.parent.clone()
     }
     fn children(&self) -> &[Rc<Self>] {
-        &self.children
+        self.children.borrow()
     }
     fn add_child(&mut self, child: &Rc<Self>) {
-        self.children.push(child.clone());
+        self.children.borrow_mut().push(child.clone());
     }
     fn action(&self) -> T::Move {
         self.action.unwrap()
@@ -69,9 +65,9 @@ impl<T: GameState> RcNode<T> {
         &self.state
     }
 
-    fn update_visit(&mut self, delta: usize) {
-        self.plays += 1;
-        self.wins += delta;
+    fn update_visit(&self, delta: usize) {
+        self.plays.set(self.plays.get() + 1);
+        self.wins.set(self.wins.get() + delta);
     }
 }
 
@@ -104,7 +100,7 @@ impl<T: GameState> BoxTree<T> {
     /// From the set of child nodes of the current node,
     /// select the one whose subtree we will explore.
     fn select(&self) -> Rc<RcNode<T>> {
-        let selected = &self.root.children[0];
+        let selected = &self.root.children.borrow()[0];
         selected.clone()
     }
 
@@ -112,10 +108,8 @@ impl<T: GameState> BoxTree<T> {
         node.update_visit(delta);
 
         loop {
-            if let Some(mut n) = node.parent().upgrade() {
-                Rc::get_mut(&mut n)
-                    .expect("couldn't get mutable reference to parent node")
-                    .update_visit(delta);
+            if let Some(n) = node.parent().upgrade() {
+                n.update_visit(delta);
             } else {
                 // If we can't get the parent, we must be at the root.
                 break;
