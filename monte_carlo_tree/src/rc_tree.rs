@@ -6,6 +6,10 @@ struct BoxNode<T: GameState> {
     state: T,
     parent: Weak<BoxNode<T>>,
     children: Vec<Rc<BoxNode<T>>>,
+
+    plays: usize,
+    wins: usize,
+    losses: usize,
 }
 
 impl<T: GameState> BoxNode<T> {
@@ -14,6 +18,9 @@ impl<T: GameState> BoxNode<T> {
             parent: Rc::downgrade(parent),
             children: Vec::new(),
             state: state.clone(),
+            plays: 0,
+            wins: 0,
+            losses: 0,
         }
     }
 
@@ -22,17 +29,20 @@ impl<T: GameState> BoxNode<T> {
             parent: Weak::new(),
             children: Vec::new(),
             state: state.clone(),
+            plays: 0,
+            wins: 0,
+            losses: 0,
         }
     }
 
     fn plays(&self) -> usize {
-        unimplemented!()
+        self.plays
     }
     fn wins(&self) -> usize {
-        unimplemented!()
+        self.wins
     }
     fn losses(&self) -> usize {
-        unimplemented!()
+        self.losses
     }
     fn parent(&self) -> Weak<Self> {
         self.parent.clone()
@@ -43,13 +53,23 @@ impl<T: GameState> BoxNode<T> {
 }
 
 struct BoxTree<T: GameState> {
-    root: BoxNode<T>,
+    root: Rc<BoxNode<T>>,
 }
 
 impl<T: GameState> BoxTree<T> {
     fn new(game_state: T) -> Self {
         let root = BoxNode::new_root(&game_state);
 
-        BoxTree { root }
+        BoxTree {
+            root: Rc::new(root),
+        }
+    }
+
+    /// From the set of child nodes of the current node,
+    /// select the one whose subtree we will explore.
+    fn select() {}
+
+    fn set_root(&mut self, new_root: Rc<BoxNode<T>>) {
+        self.root = new_root.clone();
     }
 }
