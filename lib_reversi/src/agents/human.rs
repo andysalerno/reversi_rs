@@ -47,7 +47,7 @@ impl HumanAgent {
 
         ReversiAction::Move {
             piece: color,
-            position: position,
+            position,
         }
     }
 }
@@ -59,8 +59,7 @@ impl GameAgent<ReversiState> for HumanAgent {
                 return legal_moves[0];
             }
             ReversiAction::Move {
-                piece: piece_color,
-                position: _,
+                piece: piece_color, ..
             } => piece_color,
         };
 
