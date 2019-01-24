@@ -64,8 +64,8 @@ impl<T: GameState> RcNode<T> {
     }
 
     fn update_visit(&self, delta: usize) {
-        self.plays.set(self.plays.get() + 1);
-        self.wins.set(self.wins.get() + delta);
+        self.plays.set(self.plays() + 1);
+        self.wins.set(self.wins() + delta);
     }
 
     fn backprop(&self, delta: usize) {
@@ -185,18 +185,18 @@ mod test {
         let tree = BoxTree::new(state);
         let root_node = tree.root();
 
-        assert_eq!(0, root_node.wins.get());
-        assert_eq!(0, root_node.plays.get());
+        assert_eq!(0, root_node.wins());
+        assert_eq!(0, root_node.plays());
 
         root_node.update_visit(1);
 
-        assert_eq!(1, root_node.wins.get());
-        assert_eq!(1, root_node.plays.get());
+        assert_eq!(1, root_node.wins());
+        assert_eq!(1, root_node.plays());
 
         root_node.update_visit(0);
 
-        assert_eq!(1, root_node.wins.get());
-        assert_eq!(2, root_node.plays.get());
+        assert_eq!(1, root_node.wins());
+        assert_eq!(2, root_node.plays());
     }
 
     #[test]
@@ -217,31 +217,31 @@ mod test {
         let left_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
         let right_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
 
-        assert_eq!(0, child_1.wins.get());
-        assert_eq!(0, child_2.wins.get());
-        assert_eq!(0, child_3.wins.get());
-        assert_eq!(0, child_4.wins.get());
-        assert_eq!(0, left_5.wins.get());
-        assert_eq!(0, right_5.wins.get());
+        assert_eq!(0, child_1.wins());
+        assert_eq!(0, child_2.wins());
+        assert_eq!(0, child_3.wins());
+        assert_eq!(0, child_4.wins());
+        assert_eq!(0, left_5.wins());
+        assert_eq!(0, right_5.wins());
 
         right_5.backprop(1);
 
-        assert_eq!(1, right_5.wins.get());
-        assert_eq!(1, right_5.plays.get());
+        assert_eq!(1, right_5.wins());
+        assert_eq!(1, right_5.plays());
 
-        assert_eq!(0, left_5.wins.get());
-        assert_eq!(0, left_5.plays.get());
+        assert_eq!(0, left_5.wins());
+        assert_eq!(0, left_5.plays());
 
-        assert_eq!(1, child_4.wins.get());
-        assert_eq!(1, child_4.plays.get());
-        assert_eq!(1, child_3.wins.get());
-        assert_eq!(1, child_3.plays.get());
-        assert_eq!(1, child_2.wins.get());
-        assert_eq!(1, child_2.plays.get());
-        assert_eq!(1, child_1.wins.get());
-        assert_eq!(1, child_1.plays.get());
-        assert_eq!(1, tree.root().wins.get());
-        assert_eq!(1, tree.root().plays.get());
+        assert_eq!(1, child_4.wins());
+        assert_eq!(1, child_4.plays());
+        assert_eq!(1, child_3.wins());
+        assert_eq!(1, child_3.plays());
+        assert_eq!(1, child_2.wins());
+        assert_eq!(1, child_2.plays());
+        assert_eq!(1, child_1.wins());
+        assert_eq!(1, child_1.plays());
+        assert_eq!(1, tree.root().wins());
+        assert_eq!(1, tree.root().plays());
     }
 
     #[test]
