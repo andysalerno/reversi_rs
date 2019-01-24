@@ -24,9 +24,7 @@ impl<T: GameState> RcNode<T> {
             wins: Cell::new(0),
         });
 
-        dbg!(Rc::get_mut(parent)
-            .expect("Couldn't access parent of new child as mutable to add a child.")
-            .add_child(&child));
+        dbg!(parent.add_child(&child));
 
         child
     }
@@ -51,10 +49,10 @@ impl<T: GameState> RcNode<T> {
     fn parent(&self) -> Weak<Self> {
         self.parent.clone()
     }
-    fn children(&self) -> &[Rc<Self>] {
-        self.children.borrow()
+    fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
+        &self.children
     }
-    fn add_child(&mut self, child: &Rc<Self>) {
+    fn add_child(&self, child: &Rc<Self>) {
         self.children.borrow_mut().push(child.clone());
     }
     fn action(&self) -> T::Move {
@@ -68,6 +66,28 @@ impl<T: GameState> RcNode<T> {
     fn update_visit(&self, delta: usize) {
         self.plays.set(self.plays.get() + 1);
         self.wins.set(self.wins.get() + delta);
+    }
+
+    fn backprop(&self, delta: usize) {
+        // update this node's values
+        self.update_visit(delta);
+
+        let mut node = if let Some(n) = self.parent().upgrade() {
+            n
+        } else {
+            return;
+        };
+
+        loop {
+            node.update_visit(delta);
+
+            if let Some(n) = node.parent().upgrade() {
+                node = n.clone();
+            } else {
+                // If we can't get the parent, we must be at the root.
+                break;
+            }
+        }
     }
 }
 
@@ -91,6 +111,7 @@ impl<T: GameState> BoxTree<T> {
     pub fn choose_best_action(&self) -> T::Move {
         self.root
             .children()
+            .borrow()
             .iter()
             .max_by_key(|c| c.wins())
             .unwrap()
@@ -102,19 +123,6 @@ impl<T: GameState> BoxTree<T> {
     fn select(&self) -> Rc<RcNode<T>> {
         let selected = &self.root.children.borrow()[0];
         selected.clone()
-    }
-
-    fn backprop(node: &mut RcNode<T>, delta: usize) {
-        node.update_visit(delta);
-
-        loop {
-            if let Some(n) = node.parent().upgrade() {
-                n.update_visit(delta);
-            } else {
-                // If we can't get the parent, we must be at the root.
-                break;
-            }
-        }
     }
 
     fn set_root(&mut self, new_root: Rc<RcNode<T>>) {
@@ -169,6 +177,28 @@ mod test {
         }
     }
 
+    /// Test that update_visit will update the wins
+    /// and plays count of the same node it is called on.
+    #[test]
+    fn test_update_visit() {
+        let state = TestGameState;
+        let tree = BoxTree::new(state);
+        let root_node = tree.root();
+
+        assert_eq!(0, root_node.wins.get());
+        assert_eq!(0, root_node.plays.get());
+
+        root_node.update_visit(1);
+
+        assert_eq!(1, root_node.wins.get());
+        assert_eq!(1, root_node.plays.get());
+
+        root_node.update_visit(0);
+
+        assert_eq!(1, root_node.wins.get());
+        assert_eq!(2, root_node.plays.get());
+    }
+
     #[test]
     fn back_prop_works() {
         let state = TestGameState;
@@ -186,5 +216,31 @@ mod test {
         // add two children directly to the bottom-most child
         let left_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
         let right_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
+
+        assert_eq!(0, child_1.wins.get());
+        assert_eq!(0, child_2.wins.get());
+        assert_eq!(0, child_3.wins.get());
+        assert_eq!(0, child_4.wins.get());
+        assert_eq!(0, left_5.wins.get());
+        assert_eq!(0, right_5.wins.get());
+
+        right_5.backprop(1);
+
+        assert_eq!(1, right_5.wins.get());
+        assert_eq!(1, right_5.plays.get());
+
+        assert_eq!(0, left_5.wins.get());
+        assert_eq!(0, left_5.plays.get());
+
+        assert_eq!(1, child_4.wins.get());
+        assert_eq!(1, child_4.plays.get());
+        assert_eq!(1, child_3.wins.get());
+        assert_eq!(1, child_3.plays.get());
+        assert_eq!(1, child_2.wins.get());
+        assert_eq!(1, child_2.plays.get());
+        assert_eq!(1, child_1.wins.get());
+        assert_eq!(1, child_1.plays.get());
+        assert_eq!(1, tree.root().wins.get());
+        assert_eq!(1, tree.root().plays.get());
     }
 }
