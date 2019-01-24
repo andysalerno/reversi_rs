@@ -125,7 +125,7 @@ impl<T: GameState> BoxTree<T> {
         selected.clone()
     }
 
-    fn set_root(&mut self, new_root: Rc<RcNode<T>>) {
+    fn set_root(&mut self, new_root: &Rc<RcNode<T>>) {
         self.root = new_root.clone();
     }
 
@@ -242,5 +242,41 @@ mod test {
         assert_eq!(1, child_1.plays.get());
         assert_eq!(1, tree.root().wins.get());
         assert_eq!(1, tree.root().plays.get());
+    }
+
+    #[test]
+    fn set_root_frees_unused_nodes() {
+        let state = TestGameState;
+        let mut tree = BoxTree::new(state);
+
+        let state_p = TestGameState;
+        let action = TestGameAction;
+
+        // We create three levels of children, and capture the node
+        // at the third level, but the two higher-level nodes go out of scope...
+        let distant_child = {
+            let mut child_1 =
+                RcNode::<TestGameState>::new_child(&mut tree.root(), action, &state_p);
+            let mut child_2 = RcNode::<TestGameState>::new_child(&mut child_1, action, &state_p);
+            let mut child_3 = RcNode::<TestGameState>::new_child(&mut child_2, action, &state_p);
+
+            // In this scope, upgrading to get the parent of child_3 should work.
+            assert!(child_3.parent().upgrade().is_some());
+
+            child_3
+        };
+
+        // In this scope, upgrading to get the parent of child_3 should STILL work,
+        // thanks to the magic of reference-counted storage.
+        assert!(distant_child.parent().upgrade().is_some());
+
+        // However, if we set distant_child as the new root of the tree,
+        // we should free up the nodes that are above distant_child (since it is the new root),
+        // and therefore we should not be able to upgrade to its parent anymore (since it doesn't exist).
+        tree.set_root(&distant_child);
+
+        // In this scope, upgrading to get the parent of child_3 should STILL work,
+        // thanks to the magic of reference-counted storage.
+        assert!(distant_child.parent().upgrade().is_none());
     }
 }
