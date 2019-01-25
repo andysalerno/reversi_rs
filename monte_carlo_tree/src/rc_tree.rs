@@ -40,21 +40,26 @@ impl<T: GameState> RcNode<T> {
         }
     }
 
-    fn plays(&self) -> usize {
+    pub fn plays(&self) -> usize {
         self.plays.get()
     }
-    fn wins(&self) -> usize {
+
+    pub fn wins(&self) -> usize {
         self.wins.get()
     }
-    fn parent(&self) -> Weak<Self> {
+
+    pub fn parent(&self) -> Weak<Self> {
         self.parent.clone()
     }
+
     fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
         &self.children
     }
+
     fn add_child(&self, child: &Rc<Self>) {
         self.children.borrow_mut().push(child.clone());
     }
+
     fn action(&self) -> T::Move {
         self.action.unwrap()
     }
@@ -91,15 +96,15 @@ impl<T: GameState> RcNode<T> {
     }
 }
 
-pub struct BoxTree<T: GameState> {
+pub struct RcTree<T: GameState> {
     root: Rc<RcNode<T>>,
 }
 
-impl<T: GameState> BoxTree<T> {
+impl<T: GameState> RcTree<T> {
     pub fn new(game_state: T) -> Self {
         let root = RcNode::new_root(&game_state);
 
-        BoxTree {
+        Self {
             root: Rc::new(root),
         }
     }
@@ -182,7 +187,7 @@ mod test {
     #[test]
     fn test_update_visit() {
         let state = TestGameState;
-        let tree = BoxTree::new(state);
+        let tree = RcTree::new(state);
         let root_node = tree.root();
 
         assert_eq!(0, root_node.wins());
@@ -202,7 +207,7 @@ mod test {
     #[test]
     fn back_prop_works() {
         let state = TestGameState;
-        let tree = BoxTree::new(state);
+        let tree = RcTree::new(state);
 
         let state_p = TestGameState;
         let action = TestGameAction;
@@ -247,7 +252,7 @@ mod test {
     #[test]
     fn set_root_frees_unused_nodes() {
         let state = TestGameState;
-        let mut tree = BoxTree::new(state);
+        let mut tree = RcTree::new(state);
 
         let state_p = TestGameState;
         let action = TestGameAction;

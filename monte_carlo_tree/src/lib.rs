@@ -1,4 +1,4 @@
-mod rc_tree;
+pub mod rc_tree;
 
 trait Node<'a> {
     fn plays(&self) -> usize;

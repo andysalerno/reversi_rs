@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 lib_boardgame = { path = "../lib_boardgame" }
 rand = "0.6"
+monte_carlo_tree = { path = "../monte_carlo_tree" }
