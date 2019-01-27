@@ -52,7 +52,7 @@ impl<T: GameState> RcNode<T> {
         self.parent.clone()
     }
 
-    fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
+    pub fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
         &self.children
     }
 
@@ -134,7 +134,7 @@ impl<T: GameState> RcTree<T> {
         self.root = new_root.clone();
     }
 
-    fn root(&self) -> Rc<RcNode<T>> {
+    pub fn root(&self) -> Rc<RcNode<T>> {
         self.root.clone()
     }
 }

@@ -10,6 +10,17 @@ impl<TState: GameState> GameAgent<TState> for MCTSAgent<TState> {
         unimplemented!();
 
         // select
+        let children_ptrs = self.tree.root().children().borrow();
+        let children = {
+            let c = Vec::new();
+            for child in children_ptrs.iter() {
+                let r = **child;
+                c.push(r);
+            }
+
+            c
+        }; 
+        let selected_child = Self::select(children.as_slice());
 
         // expand
 
