@@ -20,9 +20,10 @@ impl<TState: GameState> GameAgent<TState> for MCTSAgent<TState> {
 
             c
         }; 
-        let selected_child = Self::select(children.as_slice());
+        let selected_child = Self::select(children.as_slice().iter());
 
         // expand
+        let state = selected_child.unwrap().state();
 
         // simulate
 
@@ -40,10 +41,19 @@ impl<TState: GameState> MCTSAgent<TState> {
     /// Given a slice of nodes, select the node we should explore
     /// in such a way that balances exploration and exploitation
     /// of our state space.
-    fn select(nodes: &[RcNode<TState>]) -> Option<&RcNode<TState>> {
+    // fn select(nodes: &[RcNode<TState>]) -> Option<&RcNode<TState>> {
+    fn select<'a>(nodes: impl Iterator<Item=&'a RcNode<TState>>) -> Option<&'a RcNode<TState>> {
         nodes
-            .iter()
             .max_by(|a, b| Self::rank_node(a).partial_cmp(&Self::rank_node(b)).unwrap())
+    }
+
+    fn select_to_leaf(node: &RcNode<TState>) -> Option<&RcNode<TState>> {
+        let children_ptrs = node.children().borrow();
+        let children = children_ptrs.iter().map(|c| &**c);
+
+        let selected = Self::select(children);
+
+        None
     }
 
     /// Given a node, score it in such a way that encourages

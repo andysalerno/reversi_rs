@@ -64,7 +64,7 @@ impl<T: GameState> RcNode<T> {
         self.action.unwrap()
     }
 
-    fn state(&self) -> &T {
+    pub fn state(&self) -> &T {
         &self.state
     }
 
