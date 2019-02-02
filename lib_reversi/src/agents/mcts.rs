@@ -19,7 +19,7 @@ impl<TState: GameState> GameAgent<TState> for MCTSAgent<TState> {
             }
 
             c
-        }; 
+        };
         let selected_child = Self::select(children.as_slice().iter());
 
         // expand
@@ -42,18 +42,23 @@ impl<TState: GameState> MCTSAgent<TState> {
     /// in such a way that balances exploration and exploitation
     /// of our state space.
     // fn select(nodes: &[RcNode<TState>]) -> Option<&RcNode<TState>> {
-    fn select<'a>(nodes: impl Iterator<Item=&'a RcNode<TState>>) -> Option<&'a RcNode<TState>> {
-        nodes
-            .max_by(|a, b| Self::rank_node(a).partial_cmp(&Self::rank_node(b)).unwrap())
+    fn select<'a>(nodes: impl Iterator<Item = &'a RcNode<TState>>) -> Option<&'a RcNode<TState>> {
+        nodes.max_by(|a, b| Self::rank_node(a).partial_cmp(&Self::rank_node(b)).unwrap())
     }
 
-    fn select_to_leaf(node: &RcNode<TState>) -> Option<&RcNode<TState>> {
-        let children_ptrs = node.children().borrow();
-        let children = children_ptrs.iter().map(|c| &**c);
+    fn select_to_leaf(node: &RcNode<TState>) -> Option<RcNode<TState>> {
+        let mut current_node_visiting = node;
+        let cur_ptr = None;
 
-        let selected = Self::select(children);
+        while current_node_visiting.children().borrow().len() > 0 {
+            let children_ptrs = current_node_visiting.children().borrow();
+            let children = children_ptrs.iter().map(|c| *c);
 
-        None
+            let selected = Self::select(children).unwrap();
+            current_node_visiting = selected;
+        }
+
+        Some((*current_node_visiting).clone())
     }
 
     /// Given a node, score it in such a way that encourages

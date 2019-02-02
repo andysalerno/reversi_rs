@@ -1,16 +1,32 @@
+use crate::{Data, MakeNode, Node};
 use lib_boardgame::game_primitives::GameState;
 use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 pub struct RcNode<T: GameState> {
-    state: T,
-    action: Option<T::Move>,
+    data: Data<T>,
     parent: Weak<RcNode<T>>,
     children: RefCell<Vec<Rc<Self>>>,
+}
 
-    plays: Cell<usize>,
-    wins: Cell<usize>,
+impl<'a, T: GameState> Node<'a, T> for RcNode<T>
+where
+    Self: Sized,
+{
+    fn data(&self) -> &Data<T> {
+        &self.data
+    }
+
+    // this doesn't work, we don't want to do dyn...
+    fn parent(&self) -> Option<MakeNode<'a, T>> {
+        unimplemented!()
+        // self.parent.upgrade();
+    }
+
+    fn children(&self) -> &[Self] {
+        unimplemented!()
+    }
 }
 
 impl<T: GameState> RcNode<T> {
@@ -18,13 +34,13 @@ impl<T: GameState> RcNode<T> {
         let child = Rc::new(Self {
             parent: Rc::downgrade(parent),
             children: RefCell::new(Vec::new()),
-            state: state.clone(),
-            action: Some(action),
-            plays: Cell::new(0),
-            wins: Cell::new(0),
+            data: Data {
+                state: state.clone(),
+                action: Some(action),
+                plays: Cell::new(0),
+                wins: Cell::new(0),
+            },
         });
-
-        dbg!(parent.add_child(&child));
 
         child
     }
@@ -33,19 +49,21 @@ impl<T: GameState> RcNode<T> {
         Self {
             parent: Weak::new(),
             children: RefCell::new(Vec::new()),
-            state: state.clone(),
-            action: None,
-            plays: Cell::new(0),
-            wins: Cell::new(0),
+            data: Data {
+                state: state.clone(),
+                action: None,
+                plays: Cell::new(0),
+                wins: Cell::new(0),
+            },
         }
     }
 
     pub fn plays(&self) -> usize {
-        self.plays.get()
+        self.data.plays.get()
     }
 
     pub fn wins(&self) -> usize {
-        self.wins.get()
+        self.data.wins.get()
     }
 
     pub fn parent(&self) -> Weak<Self> {
@@ -61,16 +79,16 @@ impl<T: GameState> RcNode<T> {
     }
 
     fn action(&self) -> T::Move {
-        self.action.unwrap()
+        self.data.action.unwrap()
     }
 
     pub fn state(&self) -> &T {
-        &self.state
+        &self.data.state
     }
 
     fn update_visit(&self, delta: usize) {
-        self.plays.set(self.plays() + 1);
-        self.wins.set(self.wins() + delta);
+        self.data.plays.set(self.plays() + 1);
+        self.data.wins.set(self.wins() + delta);
     }
 
     fn backprop(&self, delta: usize) {
