@@ -1,130 +1,113 @@
-use crate::{Data, MakeNode, Node};
+use crate::{Data, Node, NodeData};
 use lib_boardgame::game_primitives::GameState;
-use std::cell::Cell;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-pub struct RcNode<T: GameState> {
-    data: Data<T>,
-    parent: Weak<RcNode<T>>,
-    children: RefCell<Vec<Rc<Self>>>,
+type RcNode<T, TData: Data<T>> = Rc<NodeContent<T, TData>>;
+
+pub struct NodeContent<T: GameState, TData: Data<T>> {
+    data: TData,
+    parent: Weak<Self>,
+    children: RefCell<Vec<RcNode<T, TData>>>,
 }
 
-impl<'a, T: GameState> Node<'a, T> for RcNode<T>
+impl<T: GameState, TIter, TData: Data<T>> Node<T, TIter, TData> for RcNode<T, TData>
 where
+    TIter: Iterator<Item = Self>,
     Self: Sized,
 {
-    fn data(&self) -> &Data<T> {
+    fn data(&self) -> &TData {
         &self.data
     }
 
-    // this doesn't work, we don't want to do dyn...
-    fn parent(&self) -> Option<MakeNode<'a, T>> {
-        unimplemented!()
-        // self.parent.upgrade();
+    fn parent(&self) -> Option<&Self> {
+        self.parent.upgrade().as_ref()
     }
 
-    fn children(&self) -> &[Self] {
-        unimplemented!()
-    }
-}
-
-impl<T: GameState> RcNode<T> {
-    fn new_child(parent: &mut Rc<Self>, action: T::Move, state: &T) -> Rc<Self> {
-        let child = Rc::new(Self {
-            parent: Rc::downgrade(parent),
-            children: RefCell::new(Vec::new()),
-            data: Data {
-                state: state.clone(),
-                action: Some(action),
-                plays: Cell::new(0),
-                wins: Cell::new(0),
-            },
-        });
-
-        child
+    fn children(&self) -> TIter {
+        self.children.borrow().iter().map(|n| n.clone())
     }
 
-    fn new_root(state: &T) -> Self {
-        Self {
-            parent: Weak::new(),
-            children: RefCell::new(Vec::new()),
-            data: Data {
-                state: state.clone(),
-                action: None,
-                plays: Cell::new(0),
-                wins: Cell::new(0),
-            },
-        }
-    }
-
-    pub fn plays(&self) -> usize {
-        self.data.plays.get()
-    }
-
-    pub fn wins(&self) -> usize {
-        self.data.wins.get()
-    }
-
-    pub fn parent(&self) -> Weak<Self> {
-        self.parent.clone()
-    }
-
-    pub fn children(&self) -> &RefCell<Vec<Rc<Self>>> {
-        &self.children
-    }
-
-    fn add_child(&self, child: &Rc<Self>) {
+    fn add_child(&mut self, child: Self) {
         self.children.borrow_mut().push(child.clone());
     }
+}
 
-    fn action(&self) -> T::Move {
-        self.data.action.unwrap()
+trait RcNodeHelpers<T: GameState, TData: Data<T>> {
+    fn new_child(&self, action: T::Move, state: &T) -> RcNode<T, TData>;
+    fn new_root(state: &T) -> RcNode<T, TData>;
+}
+
+impl<T: GameState, TData: Data<T>> RcNodeHelpers<T, TData> for RcNode<T, TData> {
+    fn new_child(&self, action: T::Move, state: &T) -> RcNode<T, TData> {
+        Rc::new(NodeContent {
+            parent: Rc::downgrade(self),
+            children: RefCell::default(),
+            data: TData::new(&state, 0, 0, Some(action)),
+        })
     }
 
-    pub fn state(&self) -> &T {
-        &self.data.state
-    }
-
-    fn update_visit(&self, delta: usize) {
-        self.data.plays.set(self.plays() + 1);
-        self.data.wins.set(self.wins() + delta);
-    }
-
-    fn backprop(&self, delta: usize) {
-        // update this node's values
-        self.update_visit(delta);
-
-        let mut node = if let Some(n) = self.parent().upgrade() {
-            n
-        } else {
-            return;
-        };
-
-        loop {
-            node.update_visit(delta);
-
-            if let Some(n) = node.parent().upgrade() {
-                node = n.clone();
-            } else {
-                // If we can't get the parent, we must be at the root.
-                break;
-            }
-        }
+    fn new_root(state: &T) -> RcNode<T, TData> {
+        Rc::new(NodeContent {
+            parent: Weak::new(),
+            children: RefCell::default(),
+            data: TData::new(state, 0, 0, None),
+        })
     }
 }
 
-pub struct RcTree<T: GameState> {
-    root: Rc<RcNode<T>>,
+// impl<T: GameState> RcNode<T> {
+//     fn new_child(parent: &mut Rc<Self>, action: T::Move, state: &T) -> Rc<Self> {
+
+//     fn add_child(&self, child: &Rc<Self>) {
+//         self.children.borrow_mut().push(child.clone());
+//     }
+
+//     fn action(&self) -> T::Move {
+//         self.data.action.unwrap()
+//     }
+
+//     pub fn state(&self) -> &T {
+//         &self.data.state
+//     }
+
+//     fn update_visit(&self, delta: usize) {
+//         self.data.plays.set(self.plays() + 1);
+//         self.data.wins.set(self.wins() + delta);
+//     }
+
+//     fn backprop(&self, delta: usize) {
+//         // update this node's values
+//         self.update_visit(delta);
+
+//         let mut node = if let Some(n) = self.parent().upgrade() {
+//             n
+//         } else {
+//             return;
+//         };
+
+//         loop {
+//             node.update_visit(delta);
+
+//             if let Some(n) = node.parent().upgrade() {
+//                 node = n.clone();
+//             } else {
+//                 // If we can't get the parent, we must be at the root.
+//                 break;
+//             }
+//         }
+//     }
+//}
+
+pub struct RcTree<T: GameState, TData: Data<T>> {
+    root: RcNode<T, TData>,
 }
 
-impl<T: GameState> RcTree<T> {
-    pub fn new(game_state: T) -> Self {
-        let root = RcNode::new_root(&game_state);
+impl<T: GameState, TData: Data<T>> RcTree<T, TData> {
+    pub fn new(game_state: &T) -> Self {
+        let root = RcNode::new_root(game_state);
 
-        Self {
-            root: Rc::new(root),
-        }
+        Self { root }
     }
 
     /// Returns the MCTS herustic's top choice for
@@ -134,25 +117,26 @@ impl<T: GameState> RcTree<T> {
     pub fn choose_best_action(&self) -> T::Move {
         self.root
             .children()
-            .borrow()
             .iter()
-            .max_by_key(|c| c.wins())
+            .max_by_key(|c| c.data.wins())
             .unwrap()
+            .data
             .action()
+            .unwrap()
     }
 
     /// From the set of child nodes of the current node,
     /// select the one whose subtree we will explore.
-    fn select(&self) -> Rc<RcNode<T>> {
+    fn select(&self) -> RcNode<T, TData> {
         let selected = &self.root.children.borrow()[0];
         selected.clone()
     }
 
-    fn set_root(&mut self, new_root: &Rc<RcNode<T>>) {
+    fn set_root(&mut self, new_root: &RcNode<T, TData>) {
         self.root = new_root.clone();
     }
 
-    pub fn root(&self) -> Rc<RcNode<T>> {
+    pub fn root(&self) -> RcNode<T, TData> {
         self.root.clone()
     }
 }
