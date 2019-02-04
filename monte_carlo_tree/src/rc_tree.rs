@@ -13,7 +13,7 @@ pub struct NodeContent<T: GameState, TData: Data<T>> {
 
 impl<T: GameState, TIter, TData: Data<T>> Node<T, TIter, TData> for RcNode<T, TData>
 where
-    TIter: Iterator<Item = Self>,
+    TIter: IntoIterator<Item = Self>,
     Self: Sized,
 {
     fn data(&self) -> &TData {
@@ -25,7 +25,10 @@ where
     }
 
     fn children(&self) -> TIter {
-        self.children.borrow().iter().map(|n| n.clone())
+        let c: Vec<Self> = self.children.borrow().iter().map(|n| n.clone()).collect();
+        // let i = c.into_iter();
+
+        c
     }
 
     fn add_child(&mut self, child: Self) {

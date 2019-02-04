@@ -49,7 +49,7 @@ impl<T: GameState> Data<T> for NodeData<T> {
 
 trait Node<T: GameState, TIter, TData: Data<T> = NodeData<T>>
 where
-    TIter: Iterator<Item = Self>,
+    TIter: IntoIterator<Item = Self>,
     Self: Sized,
 {
     fn data(&self) -> &TData;
