@@ -3,7 +3,7 @@ use lib_boardgame::game_primitives::GameState;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-type RcNode<T, TData: Data<T>> = Rc<NodeContent<T, TData>>;
+pub type RcNode<T, TData: Data<T> = NodeData<T>> = Rc<NodeContent<T, TData>>;
 
 pub struct NodeContent<T: GameState, TData: Data<T>> {
     data: TData,
@@ -11,24 +11,17 @@ pub struct NodeContent<T: GameState, TData: Data<T>> {
     children: RefCell<Vec<RcNode<T, TData>>>,
 }
 
-impl<T: GameState, TIter, TData: Data<T>> Node<T, TIter, TData> for RcNode<T, TData>
-where
-    TIter: IntoIterator<Item = Self>,
-    Self: Sized,
-{
+impl<T: GameState, TData: Data<T>> Node<T, TData> for RcNode<T, TData> {
     fn data(&self) -> &TData {
         &self.data
     }
 
-    fn parent(&self) -> Option<&Self> {
-        self.parent.upgrade().as_ref()
+    fn parent(&self) -> Option<Self> {
+        self.parent.upgrade()
     }
 
-    fn children(&self) -> TIter {
-        let c: Vec<Self> = self.children.borrow().iter().map(|n| n.clone()).collect();
-        // let i = c.into_iter();
-
-        c
+    fn children(&self) -> Vec<Self> {
+        self.children.borrow().iter().map(|n| n.clone()).collect()
     }
 
     fn add_child(&mut self, child: Self) {
@@ -102,7 +95,7 @@ impl<T: GameState, TData: Data<T>> RcNodeHelpers<T, TData> for RcNode<T, TData> 
 //     }
 //}
 
-pub struct RcTree<T: GameState, TData: Data<T>> {
+pub struct RcTree<T: GameState, TData: Data<T> = NodeData<T>> {
     root: RcNode<T, TData>,
 }
 

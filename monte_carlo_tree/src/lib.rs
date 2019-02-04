@@ -13,7 +13,7 @@ pub trait Data<T: GameState> {
 
 /// MCTS-related data that every Node will have.
 #[derive(Default)]
-struct NodeData<T: GameState> {
+pub struct NodeData<T: GameState> {
     state: T,
     plays: Cell<usize>,
     wins: Cell<usize>,
@@ -47,14 +47,13 @@ impl<T: GameState> Data<T> for NodeData<T> {
     }
 }
 
-trait Node<T: GameState, TIter, TData: Data<T> = NodeData<T>>
+trait Node<T: GameState, TData: Data<T> = NodeData<T>>
 where
-    TIter: IntoIterator<Item = Self>,
     Self: Sized,
 {
     fn data(&self) -> &TData;
-    fn parent(&self) -> Option<&Self>;
-    fn children(&self) -> TIter;
+    fn parent(&self) -> Option<Self>;
+    fn children(&self) -> Vec<Self>;
     fn add_child(&mut self, child: Self);
 }
 
