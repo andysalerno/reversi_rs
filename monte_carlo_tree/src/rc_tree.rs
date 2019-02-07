@@ -3,30 +3,34 @@ use lib_boardgame::game_primitives::GameState;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-type RcNode<T, TData: Data<T>> = Rc<NodeContent<T, TData>>;
-
-pub struct NodeContent<T: GameState, TData: Data<T>> {
-    data: TData,
+pub struct NodeContent<T: GameState> {
+    data: NodeData<T>,
     parent: Weak<Self>,
-    children: RefCell<Vec<RcNode<T, TData>>>,
+    children: RefCell<Vec<RcNode<T>>>,
 }
 
-impl<T: GameState, TIter, TData: Data<T>> Node<T, TIter, TData> for RcNode<T, TData>
+/// Wraps a NodeContent with a reference-counted owner.
+type RcNode<T> = Rc<NodeContent<T>>;
+
+impl<TState> Node for RcNode<TState>
 where
-    TIter: IntoIterator<Item = Self>,
     Self: Sized,
+    TState: GameState,
 {
-    fn data(&self) -> &TData {
+    type ChildrenIter = Vec<Self>;
+    type ParentBorrow = Self;
+    type TState = TState;
+
+    fn data(&self) -> &NodeData<TState> {
         &self.data
     }
 
-    fn parent(&self) -> Option<&Self> {
-        self.parent.upgrade().as_ref()
+    fn parent(&self) -> Option<Self::ParentBorrow> {
+        self.parent.upgrade().clone() // todo: clone() maybe not necessary?
     }
 
-    fn children(&self) -> TIter {
+    fn children(&self) -> Self::ChildrenIter {
         let c: Vec<Self> = self.children.borrow().iter().map(|n| n.clone()).collect();
-        // let i = c.into_iter();
 
         c
     }
@@ -34,27 +38,20 @@ where
     fn add_child(&mut self, child: Self) {
         self.children.borrow_mut().push(child.clone());
     }
-}
 
-trait RcNodeHelpers<T: GameState, TData: Data<T>> {
-    fn new_child(&self, action: T::Move, state: &T) -> RcNode<T, TData>;
-    fn new_root(state: &T) -> RcNode<T, TData>;
-}
-
-impl<T: GameState, TData: Data<T>> RcNodeHelpers<T, TData> for RcNode<T, TData> {
-    fn new_child(&self, action: T::Move, state: &T) -> RcNode<T, TData> {
+    fn new_child(&self, action: TState::Move, state: &TState) -> RcNode<TState> {
         Rc::new(NodeContent {
             parent: Rc::downgrade(self),
             children: RefCell::default(),
-            data: TData::new(&state, 0, 0, Some(action)),
+            data: NodeData::new(&state, 0, 0, Some(action)),
         })
     }
 
-    fn new_root(state: &T) -> RcNode<T, TData> {
+    fn new_root(state: &TState) -> RcNode<TState> {
         Rc::new(NodeContent {
             parent: Weak::new(),
             children: RefCell::default(),
-            data: TData::new(state, 0, 0, None),
+            data: NodeData::new(state, 0, 0, None),
         })
     }
 }
@@ -101,48 +98,6 @@ impl<T: GameState, TData: Data<T>> RcNodeHelpers<T, TData> for RcNode<T, TData> 
 //         }
 //     }
 //}
-
-pub struct RcTree<T: GameState, TData: Data<T>> {
-    root: RcNode<T, TData>,
-}
-
-impl<T: GameState, TData: Data<T>> RcTree<T, TData> {
-    pub fn new(game_state: &T) -> Self {
-        let root = RcNode::new_root(game_state);
-
-        Self { root }
-    }
-
-    /// Returns the MCTS herustic's top choice for
-    /// which action to take while in the current root node's
-    /// state.  TODO: currently, this is chosen by most wins,
-    /// which is not optimal MCTS heuristic.
-    pub fn choose_best_action(&self) -> T::Move {
-        self.root
-            .children()
-            .iter()
-            .max_by_key(|c| c.data.wins())
-            .unwrap()
-            .data
-            .action()
-            .unwrap()
-    }
-
-    /// From the set of child nodes of the current node,
-    /// select the one whose subtree we will explore.
-    fn select(&self) -> RcNode<T, TData> {
-        let selected = &self.root.children.borrow()[0];
-        selected.clone()
-    }
-
-    fn set_root(&mut self, new_root: &RcNode<T, TData>) {
-        self.root = new_root.clone();
-    }
-
-    pub fn root(&self) -> RcNode<T, TData> {
-        self.root.clone()
-    }
-}
 
 #[cfg(test)]
 mod test {

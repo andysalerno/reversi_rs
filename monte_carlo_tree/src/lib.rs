@@ -1,4 +1,5 @@
 use lib_boardgame::game_primitives::GameState;
+use std::borrow::Borrow;
 use std::cell::Cell;
 
 pub mod rc_tree;
@@ -13,7 +14,7 @@ pub trait Data<T: GameState> {
 
 /// MCTS-related data that every Node will have.
 #[derive(Default)]
-struct NodeData<T: GameState> {
+pub struct NodeData<T: GameState> {
     state: T,
     plays: Cell<usize>,
     wins: Cell<usize>,
@@ -47,20 +48,62 @@ impl<T: GameState> Data<T> for NodeData<T> {
     }
 }
 
-trait Node<T: GameState, TIter, TData: Data<T> = NodeData<T>>
+pub trait Node
 where
-    TIter: IntoIterator<Item = Self>,
     Self: Sized,
 {
-    fn data(&self) -> &TData;
-    fn parent(&self) -> Option<&Self>;
-    fn children(&self) -> TIter;
+    type ChildrenIter: IntoIterator<Item = Self>;
+    type ParentBorrow: Borrow<Self>;
+    type TState: GameState;
+
+    fn data(&self) -> &NodeData<Self::TState>;
+    fn parent(&self) -> Option<Self::ParentBorrow>;
+    fn children(&self) -> Self::ChildrenIter;
     fn add_child(&mut self, child: Self);
+
+    fn new_child(
+        &self,
+        action: <<Self as Node>::TState as GameState>::Move,
+        state: &Self::TState,
+    ) -> Self;
+    fn new_root(state: &Self::TState) -> Self;
 }
 
-trait MonteCarloTree {
-    fn select_child();
-    fn expand();
-    fn simulate();
-    fn backprop();
+pub struct MonteCarloTree<N: Node> {
+    root: N,
+}
+
+impl<N: Node> MonteCarloTree<N> {
+    pub fn new(game_state: &N::TState) -> Self {
+        Self {
+            root: N::new_root(game_state),
+        }
+    }
+
+    pub fn select_child() {
+        unimplemented!()
+    }
+
+    pub fn expand() {
+        unimplemented!()
+    }
+
+    pub fn simulate() {
+        unimplemented!()
+    }
+
+    pub fn backprop() {
+        unimplemented!()
+    }
+
+    fn choose_best_action() {
+        // self.root
+        //     .children()
+        //     .iter()
+        //     .max_by_key(|c| c.data.wins())
+        //     .unwrap()
+        //     .data
+        //     .action()
+        //     .unwrap()
+    }
 }
