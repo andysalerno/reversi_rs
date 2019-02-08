@@ -25,7 +25,7 @@ where
     }
 
     fn parent(&self) -> Option<Self::ParentBorrow> {
-        self.parent.upgrade().clone() // todo: clone() maybe not necessary?
+        self.parent.upgrade().clone()
     }
 
     fn children(&self) -> Self::ChildrenIter {
