@@ -1,10 +1,10 @@
-use crate::{Data, Node, NodeData};
-use lib_boardgame::game_primitives::GameState;
+/// This is a simple, generic reference-counted implementation of the Node trait.
+use crate::tree::Node;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-pub struct NodeContent<T: GameState> {
-    data: NodeData<T>,
+pub struct NodeContent<T> {
+    data: T,
     parent: Weak<Self>,
     children: RefCell<Vec<RcNode<T>>>,
 }
@@ -12,16 +12,15 @@ pub struct NodeContent<T: GameState> {
 /// Wraps a NodeContent with a reference-counted owner.
 type RcNode<T> = Rc<NodeContent<T>>;
 
-impl<TState> Node for RcNode<TState>
+impl<T: Clone> Node for RcNode<T>
 where
     Self: Sized,
-    TState: GameState,
 {
     type ChildrenIter = Vec<Self>;
     type ParentBorrow = Self;
-    type TState = TState;
+    type Data = T;
 
-    fn data(&self) -> &NodeData<TState> {
+    fn data(&self) -> &T {
         &self.data
     }
 
@@ -39,209 +38,165 @@ where
         self.children.borrow_mut().push(child.clone());
     }
 
-    fn new_child(&self, action: TState::Move, state: &TState) -> RcNode<TState> {
+    fn new_child(&self, data: &T) -> RcNode<T> {
         Rc::new(NodeContent {
             parent: Rc::downgrade(self),
             children: RefCell::default(),
-            data: NodeData::new(&state, 0, 0, Some(action)),
+            data: data.clone(),
         })
     }
 
-    fn new_root(state: &TState) -> RcNode<TState> {
+    fn new_root(data: Self::Data) -> RcNode<T> {
         Rc::new(NodeContent {
             parent: Weak::new(),
             children: RefCell::default(),
-            data: NodeData::new(state, 0, 0, None),
+            data,
         })
     }
 }
 
-// impl<T: GameState> RcNode<T> {
-//     fn new_child(parent: &mut Rc<Self>, action: T::Move, state: &T) -> Rc<Self> {
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+//     use lib_boardgame::game_primitives::{GameMove, PlayerColor};
 
-//     fn add_child(&self, child: &Rc<Self>) {
-//         self.children.borrow_mut().push(child.clone());
-//     }
+//     #[derive(Clone)]
+//     struct TestGameState;
 
-//     fn action(&self) -> T::Move {
-//         self.data.action.unwrap()
-//     }
+//     #[derive(Copy, Clone, Debug)]
+//     struct TestGameAction;
+//     impl GameMove for TestGameAction {}
 
-//     pub fn state(&self) -> &T {
-//         &self.data.state
-//     }
+//     impl GameState for TestGameState {
+//         type Move = TestGameAction;
 
-//     fn update_visit(&self, delta: usize) {
-//         self.data.plays.set(self.plays() + 1);
-//         self.data.wins.set(self.wins() + delta);
-//     }
+//         /// Returns a human-friendly string for representing the state.
+//         fn human_friendly(&self) -> String {
+//             unimplemented!()
+//         }
 
-//     fn backprop(&self, delta: usize) {
-//         // update this node's values
-//         self.update_visit(delta);
+//         /// Gives the implementation a chance to initialize the starting state of a game
+//         /// before gameplay begins.
+//         fn initialize_board(&mut self) {
+//             unimplemented!()
+//         }
 
-//         let mut node = if let Some(n) = self.parent().upgrade() {
-//             n
-//         } else {
-//             return;
-//         };
+//         /// Returns the possible moves the given player can make for the current state.
+//         fn legal_moves(&self, _player: PlayerColor) -> Vec<Self::Move> {
+//             unimplemented!()
+//         }
 
-//         loop {
-//             node.update_visit(delta);
+//         /// Apply the given move (or 'action') to this state, mutating this state
+//         /// and advancing it to the resulting state.
+//         fn apply_move(&mut self, _action: Self::Move) {
+//             unimplemented!()
+//         }
 
-//             if let Some(n) = node.parent().upgrade() {
-//                 node = n.clone();
-//             } else {
-//                 // If we can't get the parent, we must be at the root.
-//                 break;
-//             }
+//         /// Returns the current player whose turn it currently is.
+//         fn current_player_turn(&self) -> PlayerColor {
+//             unimplemented!()
 //         }
 //     }
-//}
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use lib_boardgame::game_primitives::{GameMove, PlayerColor};
+//     /// Test that update_visit will update the wins
+//     /// and plays count of the same node it is called on.
+//     #[test]
+//     fn test_update_visit() {
+//         let state = TestGameState;
+//         let root_node = RcNode::new_root(&state);
 
-    #[derive(Clone)]
-    struct TestGameState;
+//         assert_eq!(0, root_node.data.wins());
+//         assert_eq!(0, root_node.data.plays());
 
-    #[derive(Copy, Clone, Debug)]
-    struct TestGameAction;
-    impl GameMove for TestGameAction {}
+//         root_node.update_visit(1);
 
-    impl GameState for TestGameState {
-        type Move = TestGameAction;
+//         assert_eq!(1, root_node.data.wins());
+//         assert_eq!(1, root_node.data.plays());
 
-        /// Returns a human-friendly string for representing the state.
-        fn human_friendly(&self) -> String {
-            unimplemented!()
-        }
+//         root_node.update_visit(0);
 
-        /// Gives the implementation a chance to initialize the starting state of a game
-        /// before gameplay begins.
-        fn initialize_board(&mut self) {
-            unimplemented!()
-        }
+//         assert_eq!(1, root_node.data.wins());
+//         assert_eq!(2, root_node.data.plays());
+//     }
 
-        /// Returns the possible moves the given player can make for the current state.
-        fn legal_moves(&self, _player: PlayerColor) -> Vec<Self::Move> {
-            unimplemented!()
-        }
+//     #[test]
+//     fn back_prop_works() {
+//         let state = TestGameState;
+//         let tree = RcTree::new(state);
 
-        /// Apply the given move (or 'action') to this state, mutating this state
-        /// and advancing it to the resulting state.
-        fn apply_move(&mut self, _action: Self::Move) {
-            unimplemented!()
-        }
+//         let state_p = TestGameState;
+//         let action = TestGameAction;
 
-        /// Returns the current player whose turn it currently is.
-        fn current_player_turn(&self) -> PlayerColor {
-            unimplemented!()
-        }
-    }
+//         // add some descendants to the parent root
+//         let mut child_1 = RcNode::<TestGameState>::new_child(&mut tree.root(), action, &state_p);
+//         let mut child_2 = RcNode::<TestGameState>::new_child(&mut child_1, action, &state_p);
+//         let mut child_3 = RcNode::<TestGameState>::new_child(&mut child_2, action, &state_p);
+//         let mut child_4 = RcNode::<TestGameState>::new_child(&mut child_3, action, &state_p);
 
-    /// Test that update_visit will update the wins
-    /// and plays count of the same node it is called on.
-    #[test]
-    fn test_update_visit() {
-        let state = TestGameState;
-        let tree = RcTree::new(state);
-        let root_node = tree.root();
+//         // add two children directly to the bottom-most child
+//         let left_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
+//         let right_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
 
-        assert_eq!(0, root_node.wins());
-        assert_eq!(0, root_node.plays());
+//         assert_eq!(0, child_1.wins());
+//         assert_eq!(0, child_2.wins());
+//         assert_eq!(0, child_3.wins());
+//         assert_eq!(0, child_4.wins());
+//         assert_eq!(0, left_5.wins());
+//         assert_eq!(0, right_5.wins());
 
-        root_node.update_visit(1);
+//         right_5.backprop(1);
 
-        assert_eq!(1, root_node.wins());
-        assert_eq!(1, root_node.plays());
+//         assert_eq!(1, right_5.wins());
+//         assert_eq!(1, right_5.plays());
 
-        root_node.update_visit(0);
+//         assert_eq!(0, left_5.wins());
+//         assert_eq!(0, left_5.plays());
 
-        assert_eq!(1, root_node.wins());
-        assert_eq!(2, root_node.plays());
-    }
+//         assert_eq!(1, child_4.wins());
+//         assert_eq!(1, child_4.plays());
+//         assert_eq!(1, child_3.wins());
+//         assert_eq!(1, child_3.plays());
+//         assert_eq!(1, child_2.wins());
+//         assert_eq!(1, child_2.plays());
+//         assert_eq!(1, child_1.wins());
+//         assert_eq!(1, child_1.plays());
+//         assert_eq!(1, tree.root().wins());
+//         assert_eq!(1, tree.root().plays());
+//     }
 
-    #[test]
-    fn back_prop_works() {
-        let state = TestGameState;
-        let tree = RcTree::new(state);
+//     #[test]
+//     fn set_root_frees_unused_nodes() {
+//         let state = TestGameState;
+//         let mut tree = RcTree::new(state);
 
-        let state_p = TestGameState;
-        let action = TestGameAction;
+//         let state_p = TestGameState;
+//         let action = TestGameAction;
 
-        // add some descendants to the parent root
-        let mut child_1 = RcNode::<TestGameState>::new_child(&mut tree.root(), action, &state_p);
-        let mut child_2 = RcNode::<TestGameState>::new_child(&mut child_1, action, &state_p);
-        let mut child_3 = RcNode::<TestGameState>::new_child(&mut child_2, action, &state_p);
-        let mut child_4 = RcNode::<TestGameState>::new_child(&mut child_3, action, &state_p);
+//         // We create three levels of children, and capture the node
+//         // at the third level, but the two higher-level nodes go out of scope...
+//         let distant_child = {
+//             let mut child_1 =
+//                 RcNode::<TestGameState>::new_child(&mut tree.root(), action, &state_p);
+//             let mut child_2 = RcNode::<TestGameState>::new_child(&mut child_1, action, &state_p);
+//             let mut child_3 = RcNode::<TestGameState>::new_child(&mut child_2, action, &state_p);
 
-        // add two children directly to the bottom-most child
-        let left_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
-        let right_5 = RcNode::<TestGameState>::new_child(&mut child_4, action, &state_p);
+//             // In this scope, upgrading to get the parent of child_3 should work.
+//             assert!(child_3.parent().upgrade().is_some());
 
-        assert_eq!(0, child_1.wins());
-        assert_eq!(0, child_2.wins());
-        assert_eq!(0, child_3.wins());
-        assert_eq!(0, child_4.wins());
-        assert_eq!(0, left_5.wins());
-        assert_eq!(0, right_5.wins());
+//             child_3
+//         };
 
-        right_5.backprop(1);
+//         // In this scope, upgrading to get the parent of child_3 should STILL work,
+//         // thanks to the magic of reference-counted storage.
+//         assert!(distant_child.parent().upgrade().is_some());
 
-        assert_eq!(1, right_5.wins());
-        assert_eq!(1, right_5.plays());
+//         // However, if we set distant_child as the new root of the tree,
+//         // we should free up the nodes that are above distant_child (since it is the new root),
+//         // and therefore we should not be able to upgrade to its parent anymore (since it doesn't exist).
+//         tree.set_root(&distant_child);
 
-        assert_eq!(0, left_5.wins());
-        assert_eq!(0, left_5.plays());
-
-        assert_eq!(1, child_4.wins());
-        assert_eq!(1, child_4.plays());
-        assert_eq!(1, child_3.wins());
-        assert_eq!(1, child_3.plays());
-        assert_eq!(1, child_2.wins());
-        assert_eq!(1, child_2.plays());
-        assert_eq!(1, child_1.wins());
-        assert_eq!(1, child_1.plays());
-        assert_eq!(1, tree.root().wins());
-        assert_eq!(1, tree.root().plays());
-    }
-
-    #[test]
-    fn set_root_frees_unused_nodes() {
-        let state = TestGameState;
-        let mut tree = RcTree::new(state);
-
-        let state_p = TestGameState;
-        let action = TestGameAction;
-
-        // We create three levels of children, and capture the node
-        // at the third level, but the two higher-level nodes go out of scope...
-        let distant_child = {
-            let mut child_1 =
-                RcNode::<TestGameState>::new_child(&mut tree.root(), action, &state_p);
-            let mut child_2 = RcNode::<TestGameState>::new_child(&mut child_1, action, &state_p);
-            let mut child_3 = RcNode::<TestGameState>::new_child(&mut child_2, action, &state_p);
-
-            // In this scope, upgrading to get the parent of child_3 should work.
-            assert!(child_3.parent().upgrade().is_some());
-
-            child_3
-        };
-
-        // In this scope, upgrading to get the parent of child_3 should STILL work,
-        // thanks to the magic of reference-counted storage.
-        assert!(distant_child.parent().upgrade().is_some());
-
-        // However, if we set distant_child as the new root of the tree,
-        // we should free up the nodes that are above distant_child (since it is the new root),
-        // and therefore we should not be able to upgrade to its parent anymore (since it doesn't exist).
-        tree.set_root(&distant_child);
-
-        // In this scope, upgrading to get the parent of child_3 should STILL work,
-        // thanks to the magic of reference-counted storage.
-        assert!(distant_child.parent().upgrade().is_none());
-    }
-}
+//         // In this scope, upgrading to get the parent of child_3 should STILL work,
+//         // thanks to the magic of reference-counted storage.
+//         assert!(distant_child.parent().upgrade().is_none());
+//     }
+// }
