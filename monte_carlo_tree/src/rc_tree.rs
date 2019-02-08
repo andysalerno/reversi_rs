@@ -29,7 +29,7 @@ where
     }
 
     fn children(&self) -> Self::ChildrenIter {
-        let c: Vec<Self> = self.children.borrow().iter().map(|n| n.clone()).collect();
+        let c: Vec<Self> = self.children.borrow().iter().cloned().collect();
 
         c
     }

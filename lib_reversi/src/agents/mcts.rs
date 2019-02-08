@@ -1,34 +1,35 @@
-// use lib_boardgame::game_primitives::{GameAgent, GameState};
+mod tree_search;
 
-// pub struct MCTSAgent<TState: GameState> {
-//     tree: MonteCarloTree,
-// }
+use lib_boardgame::game_primitives::{GameAgent, GameState};
+use monte_carlo_tree::Node;
+use tree_search::{Data, MctsData};
 
-// impl<TState: GameState> GameAgent<TState> for MCTSAgent<TState> {
-//     fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
-//         unimplemented!();
+pub struct MCTSAgent<TTree: Node> {
+    tree_root: TTree,
+}
 
-//         // select
-//         let children_ptrs = self.tree.root().children().borrow();
-//         let children = {
-//             let c = Vec::new();
-//             for child in children_ptrs.iter() {
-//                 let r = **child;
-//                 c.push(r);
-//             }
+impl<TTree, TState> GameAgent<TState> for MCTSAgent<TTree>
+where
+    TTree: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
+        unimplemented!();
 
-//             c
-//         };
-//         let selected_child = Self::select(children.as_slice().iter());
+        // select
+        let children = self.tree_root.children();
+        let child: TTree = children.into_iter().collect::<Vec<_>>()[0];
+        let _state = child.data().state();
+        // let selected_child = Self::select(children.as_slice().iter());
 
-//         // expand
-//         let state = selected_child.unwrap().state();
+        // expand
+        // let state = selected_child.unwrap().state();
 
-//         // simulate
+        // simulate
 
-//         // backprop
-//     }
-// }
+        // backprop
+    }
+}
 
 // impl<TState: GameState, TTree: MonteCarloTree> MCTSAgent<TState, TTree> {
 //     pub fn new(game_state: &TState) -> Self {

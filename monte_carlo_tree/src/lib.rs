@@ -1,49 +1,64 @@
-use lib_boardgame::game_primitives::GameState;
-use std::cell::Cell;
+use std::borrow::Borrow;
 
-pub mod rc_tree;
-mod tree;
+pub trait Node
+where
+    Self: Sized,
+{
+    type ChildrenIter: IntoIterator<Item = Self>;
+    type ParentBorrow: Borrow<Self>;
+    type Data;
 
-pub trait Data<T: GameState> {
-    fn state(&self) -> &T;
-    fn plays(&self) -> usize;
-    fn wins(&self) -> usize;
-    fn action(&self) -> Option<T::Move>;
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
+    fn data(&self) -> &Self::Data;
+    fn parent(&self) -> Option<Self::ParentBorrow>;
+    fn children(&self) -> Self::ChildrenIter;
+    fn add_child(&mut self, child: Self);
+
+    fn new_child(&self, state: &Self::Data) -> Self;
+    fn new_root(state: Self::Data) -> Self;
 }
 
-/// MCTS-related data that every Node will have.
-#[derive(Default)]
-pub struct MctsData<T: GameState> {
-    state: T,
-    plays: Cell<usize>,
-    wins: Cell<usize>,
-    action: Option<T::Move>,
-}
+#[cfg(test)]
+mod test {
 
-impl<T: GameState> Data<T> for MctsData<T> {
-    fn state(&self) -> &T {
-        &self.state
-    }
+    use super::*;
 
-    fn plays(&self) -> usize {
-        self.plays.get()
-    }
+    struct TestNode;
 
-    fn wins(&self) -> usize {
-        self.wins.get()
-    }
+    impl Node for TestNode {
+        type ChildrenIter = Vec<Self>;
+        type ParentBorrow = Self;
+        type Data = Option<()>;
 
-    fn action(&self) -> Option<T::Move> {
-        self.action
-    }
-
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
-        Self {
-            state: state.clone(),
-            plays: Cell::new(plays),
-            wins: Cell::new(wins),
-            action: action.clone(),
+        fn data(&self) -> &Self::Data {
+            unimplemented!()
+        }
+        fn parent(&self) -> Option<Self::ParentBorrow> {
+            unimplemented!()
+        }
+        fn children(&self) -> Self::ChildrenIter {
+            Vec::new()
+        }
+        fn add_child(&mut self, child: Self) {
+            unimplemented!()
+        }
+        fn new_child(&self, state: &Self::Data) -> Self {
+            unimplemented!()
+        }
+        fn new_root(state: Self::Data) -> Self {
+            unimplemented!()
         }
     }
+
+    fn stub() -> impl Node {
+        TestNode
+    }
+
+    #[test]
+    fn can_use_it() {
+        let test_node = stub();
+        let children = test_node.children();
+
+        for _child in children {}
+    }
+
 }

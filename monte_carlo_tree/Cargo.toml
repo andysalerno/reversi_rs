@@ -3,6 +3,3 @@ name = "monte_carlo_tree"
 version = "0.1.0"
 authors = ["andy <andysalerno@gmail.com>"]
 edition = "2018"
-
-[dependencies]
-lib_boardgame = { path = "../lib_boardgame" }
