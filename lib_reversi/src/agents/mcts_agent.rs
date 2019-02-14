@@ -87,21 +87,27 @@ mod tests {
     use crate::reversi_gamestate::ReversiState;
     use monte_carlo_tree::rc_tree::RcNode;
 
+    // to ensure clean testing, we get our nodes from this function which gives an anonymous 'impl' type.
+    // this way, we know we can behave generically over different impls of the same trait.
+    fn make_node(data: MctsData<ReversiState>) -> impl Node<Data = MctsData<ReversiState>> {
+        RcNode::new_root(data)
+    }
+
     #[test]
     fn new_child_works() {
         let data = MctsData::new(ReversiState::new());
-        let tree_root = RcNode::new_root(data.clone());
+        let tree_root = make_node(data.clone());
         let child = tree_root.new_child(&data);
 
-        assert_eq!(1, tree_root.children().len());
+        assert_eq!(1, tree_root.children().into_iter().count());
         assert!(child.parent().is_some());
         assert!(tree_root.parent().is_none());
     }
 
     #[test]
     fn backprop_works_one_node() {
-        let state = ReversiState::new();
-        let tree_root = RcNode::new_root(MctsData::new(state));
+        let data = MctsData::new(ReversiState::new());
+        let tree_root = make_node(data.clone());
 
         backprop(&tree_root, GameResult::BlackWins);
 
@@ -112,7 +118,7 @@ mod tests {
     fn backprop_works_several_nodes() {
         let data = MctsData::new(ReversiState::new());
 
-        let tree_root = RcNode::new_root(data.clone());
+        let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(&data);
         let child_level_2 = child_level_1.new_child(&data);
         let child_level_3 = child_level_2.new_child(&data);
@@ -131,7 +137,7 @@ mod tests {
     fn select_child_works() {
         let data = MctsData::new(ReversiState::new());
 
-        let tree_root = RcNode::new_root(data.clone());
+        let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(&data);
         let child_level_2 = child_level_1.new_child(&data);
         let child_level_3 = child_level_2.new_child(&data);
@@ -150,7 +156,7 @@ mod tests {
     fn score_child_works() {
         let data = MctsData::new(ReversiState::new());
 
-        let tree_root = RcNode::new_root(data.clone());
+        let tree_root = make_node(data.clone());
 
         // all children of the same parent
         let child_a = tree_root.new_child(&data);
