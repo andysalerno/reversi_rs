@@ -10,15 +10,15 @@ pub struct MCTSAgent<TTree: Node> {
     tree_root: TTree,
 }
 
-impl<TTree, TState> GameAgent<TState> for MCTSAgent<TTree>
+impl<TNode, TState> GameAgent<TState> for MCTSAgent<TNode>
 where
-    TTree: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
         // select
         let children = self.tree_root.children();
-        let selected_child = Self::select_child(children).unwrap();
+        let selected_child: TNode = select_child(children).unwrap();
         let _state = selected_child.data().state();
 
         // expand
@@ -27,45 +27,23 @@ where
         // simulate
 
         // backprop
+        backprop(&selected_child, GameResult::BlackWins);
+
         legal_moves[0]
     }
 }
 
-impl<TNode, TState> MCTSAgent<TNode>
+fn select_child<TNode, TState>(nodes: TNode::ChildrenIter) -> Option<TNode>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    fn select_child(nodes: TNode::ChildrenIter) -> Option<TNode> {
-        nodes.into_iter().max_by(|a, b| {
-            Self::score_node(a)
-                .partial_cmp(&Self::score_node(b))
-                .unwrap()
-        })
-    }
-
-    /// Given a node, score it in such a way that encourages
-    /// both exploration and exploitation of the state space.
-    fn score_node(node: &TNode) -> f32
-    where
-        TNode: Node<Data = MctsData<TState>>,
-        TState: GameState,
-    {
-        let plays = node.data().plays() as f32;
-
-        if plays == 0f32 {
-            return std::f32::MAX;
-        }
-
-        let wins = node.data().wins() as f32;
-        let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-        let bias = 2 as f32;
-
-        (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
-    }
+    nodes
+        .into_iter()
+        .max_by(|a, b| score_node(a).partial_cmp(&score_node(b)).unwrap())
 }
 
-fn backprop<TNode, TState>(node: &TNode, result: GameResult)
+fn backprop<TNode, TState>(node: &TNode, _result: GameResult)
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -81,6 +59,26 @@ where
         parent.data().increment_wins();
         parent_node = parent.parent();
     }
+}
+
+/// Given a node, score it in such a way that encourages
+/// both exploration and exploitation of the state space.
+fn score_node<TNode, TState>(node: &TNode) -> f32
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let plays = node.data().plays() as f32;
+
+    if plays == 0f32 {
+        return std::f32::MAX;
+    }
+
+    let wins = node.data().wins() as f32;
+    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+    let bias = 2 as f32;
+
+    (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
 }
 
 #[cfg(test)]
@@ -127,6 +125,56 @@ mod tests {
         assert_eq!(1, child_level_1.data().plays());
         assert_eq!(1, tree_root.data().plays());
         assert_eq!(0, child_level_4.data().plays());
+    }
+
+    #[test]
+    fn select_child_works() {
+        let data = MctsData::new(ReversiState::new());
+
+        let tree_root = RcNode::new_root(data.clone());
+        let child_level_1 = tree_root.new_child(&data);
+        let child_level_2 = child_level_1.new_child(&data);
+        let child_level_3 = child_level_2.new_child(&data);
+        let child_level_4 = child_level_3.new_child(&data);
+
+        backprop(&child_level_3, GameResult::BlackWins);
+
+        assert_eq!(1, child_level_3.data().plays());
+        assert_eq!(1, child_level_2.data().plays());
+        assert_eq!(1, child_level_1.data().plays());
+        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(0, child_level_4.data().plays());
+    }
+
+    #[test]
+    fn score_child_works() {
+        let data = MctsData::new(ReversiState::new());
+
+        let tree_root = RcNode::new_root(data.clone());
+
+        // all children of the same parent
+        let child_a = tree_root.new_child(&data);
+        let child_b = tree_root.new_child(&data);
+        let child_c = tree_root.new_child(&data);
+        let child_d = tree_root.new_child(&data);
+
+        // "visit" each child a different amount of times
+        backprop(&child_a, GameResult::BlackWins);
+        backprop(&child_a, GameResult::BlackWins);
+        backprop(&child_a, GameResult::BlackWins);
+
+        backprop(&child_b, GameResult::BlackWins);
+        backprop(&child_b, GameResult::BlackWins);
+
+        backprop(&child_c, GameResult::BlackWins);
+
+        assert_eq!(2.545643f32, score_node(&child_a));
+        assert_eq!(2.8930185f32, score_node(&child_b));
+        assert_eq!(3.6771324f32, score_node(&child_c));
+        assert_eq!(
+            340282350000000000000000000000000000000f32,
+            score_node(&child_d)
+        );
     }
 }
 
