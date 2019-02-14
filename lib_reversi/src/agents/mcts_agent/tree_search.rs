@@ -10,12 +10,31 @@ pub trait Data<T: GameState> {
 }
 
 /// MCTS-related data that every Node will have.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MctsData<T: GameState> {
     state: T,
     plays: Cell<usize>,
     wins: Cell<usize>,
     action: Option<T::Move>,
+}
+
+impl<T: GameState> MctsData<T> {
+    pub fn increment_plays(&self) {
+        self.plays.set(self.plays.get() + 1);
+    }
+
+    pub fn increment_wins(&self) {
+        self.wins.set(self.wins.get() + 1);
+    }
+
+    pub fn new(state: T) -> Self {
+        Self {
+            state,
+            plays: Cell::default(),
+            wins: Cell::default(),
+            action: None,
+        }
+    }
 }
 
 impl<T: GameState> Data<T> for MctsData<T> {

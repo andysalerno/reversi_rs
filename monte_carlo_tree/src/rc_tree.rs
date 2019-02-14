@@ -1,5 +1,5 @@
 /// This is a simple, generic reference-counted implementation of the Node trait.
-use crate::tree::Node;
+use crate::Node;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
@@ -10,7 +10,7 @@ pub struct NodeContent<T> {
 }
 
 /// Wraps a NodeContent with a reference-counted owner.
-type RcNode<T> = Rc<NodeContent<T>>;
+pub type RcNode<T> = Rc<NodeContent<T>>;
 
 impl<T: Clone> Node for RcNode<T>
 where
@@ -32,10 +32,6 @@ where
         let c: Vec<Self> = self.children.borrow().iter().cloned().collect();
 
         c
-    }
-
-    fn add_child(&mut self, child: Self) {
-        self.children.borrow_mut().push(child.clone());
     }
 
     fn new_child(&self, data: &T) -> RcNode<T> {

@@ -1,0 +1,163 @@
+mod tree_search;
+
+use lib_boardgame::game_primitives::GameResult;
+use lib_boardgame::game_primitives::{GameAgent, GameState};
+use monte_carlo_tree::Node;
+use std::borrow::Borrow;
+use tree_search::{Data, MctsData};
+
+pub struct MCTSAgent<TTree: Node> {
+    tree_root: TTree,
+}
+
+impl<TTree, TState> GameAgent<TState> for MCTSAgent<TTree>
+where
+    TTree: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
+        // select
+        let children = self.tree_root.children();
+        let selected_child = Self::select_child(children).unwrap();
+        let _state = selected_child.data().state();
+
+        // expand
+        // let state = selected_child.unwrap().state();
+
+        // simulate
+
+        // backprop
+        legal_moves[0]
+    }
+}
+
+impl<TNode, TState> MCTSAgent<TNode>
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    fn select_child(nodes: TNode::ChildrenIter) -> Option<TNode> {
+        nodes.into_iter().max_by(|a, b| {
+            Self::score_node(a)
+                .partial_cmp(&Self::score_node(b))
+                .unwrap()
+        })
+    }
+
+    /// Given a node, score it in such a way that encourages
+    /// both exploration and exploitation of the state space.
+    fn score_node(node: &TNode) -> f32
+    where
+        TNode: Node<Data = MctsData<TState>>,
+        TState: GameState,
+    {
+        let plays = node.data().plays() as f32;
+
+        if plays == 0f32 {
+            return std::f32::MAX;
+        }
+
+        let wins = node.data().wins() as f32;
+        let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+        let bias = 2 as f32;
+
+        (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    }
+}
+
+fn backprop<TNode, TState>(node: &TNode, result: GameResult)
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    node.data().increment_plays();
+    node.data().increment_wins();
+
+    let mut parent_node = node.parent();
+
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        parent.data().increment_plays();
+        parent.data().increment_wins();
+        parent_node = parent.parent();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::reversi_gamestate::ReversiState;
+    use monte_carlo_tree::rc_tree::RcNode;
+
+    #[test]
+    fn new_child_works() {
+        let data = MctsData::new(ReversiState::new());
+        let tree_root = RcNode::new_root(data.clone());
+        let child = tree_root.new_child(&data);
+
+        assert_eq!(1, tree_root.children().len());
+        assert!(child.parent().is_some());
+        assert!(tree_root.parent().is_none());
+    }
+
+    #[test]
+    fn backprop_works_one_node() {
+        let state = ReversiState::new();
+        let tree_root = RcNode::new_root(MctsData::new(state));
+
+        backprop(&tree_root, GameResult::BlackWins);
+
+        assert_eq!(1, tree_root.data().plays());
+    }
+
+    #[test]
+    fn backprop_works_several_nodes() {
+        let data = MctsData::new(ReversiState::new());
+
+        let tree_root = RcNode::new_root(data.clone());
+        let child_level_1 = tree_root.new_child(&data);
+        let child_level_2 = child_level_1.new_child(&data);
+        let child_level_3 = child_level_2.new_child(&data);
+        let child_level_4 = child_level_3.new_child(&data);
+
+        backprop(&child_level_3, GameResult::BlackWins);
+
+        assert_eq!(1, child_level_3.data().plays());
+        assert_eq!(1, child_level_2.data().plays());
+        assert_eq!(1, child_level_1.data().plays());
+        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(0, child_level_4.data().plays());
+    }
+}
+
+// impl<TState: GameState, TTree: MonteCarloTree> MCTSAgent<TState, TTree> {
+//     pub fn new(game_state: &TState) -> Self {
+//         Self {
+//             tree: TTree::new(game_state),
+//         }
+//     }
+
+//     /// Given a slice of nodes, select the node we should explore
+//     /// in such a way that balances exploration and exploitation
+//     /// of our state space.
+//     // fn select(nodes: &[RcNode<TState>]) -> Option<&RcNode<TState>> {
+//     fn select<'a>(nodes: impl Iterator<Item = &'a RcNode<TState>>) -> Option<&'a RcNode<TState>> {
+//         nodes.max_by(|a, b| Self::rank_node(a).partial_cmp(&Self::rank_node(b)).unwrap())
+//     }
+
+//     fn select_to_leaf(node: &RcNode<TState>) -> Option<RcNode<TState>> {
+//         let mut current_node_visiting = node;
+//         let cur_ptr = None;
+
+//         while current_node_visiting.children().borrow().len() > 0 {
+//             let children_ptrs = current_node_visiting.children().borrow();
+//             let children = children_ptrs.iter().map(|c| *c);
+
+//             let selected = Self::select(children).unwrap();
+//             current_node_visiting = selected;
+//         }
+
+//         Some((*current_node_visiting).clone())
+//     }
+
+// }
