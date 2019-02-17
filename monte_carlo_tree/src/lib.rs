@@ -5,6 +5,7 @@ use std::borrow::Borrow;
 pub trait Node
 where
     Self: Sized,
+    Self: Clone
 {
     type ChildrenIter: IntoIterator<Item = Self>;
     type ParentBorrow: Borrow<Self>;
@@ -23,6 +24,7 @@ mod test {
 
     use super::*;
 
+    #[derive(Clone)]
     struct TestNode;
 
     impl Node for TestNode {

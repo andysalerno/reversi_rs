@@ -43,6 +43,24 @@ where
         .max_by(|a, b| score_node(a).partial_cmp(&score_node(b)).unwrap())
 }
 
+fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let cur_node = root;
+
+    loop {
+        let selected_child: Option<TNode> = select_child(root.children());
+
+        if selected_child.is_none() {
+            return cur_node.clone();
+        }
+
+        cur_node = selected_child.unwrap().clone();
+    }
+}
+
 fn backprop<TNode, TState>(node: &TNode, _result: GameResult)
 where
     TNode: Node<Data = MctsData<TState>>,
