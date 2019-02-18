@@ -17,14 +17,18 @@ where
     Self: Sized,
 {
     type ChildrenIter = Vec<Self>;
-    type ParentBorrow = Self;
+    type Borrowable = Self;
     type Data = T;
 
     fn data(&self) -> &T {
         &self.data
     }
 
-    fn parent(&self) -> Option<Self::ParentBorrow> {
+    fn make_borrowable(&self) -> Self::Borrowable {
+        self.clone()
+    }
+
+    fn parent(&self) -> Option<Self::Borrowable> {
         self.parent.upgrade().clone()
     }
 

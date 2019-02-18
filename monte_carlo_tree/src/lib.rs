@@ -8,11 +8,12 @@ where
     Self: Clone
 {
     type ChildrenIter: IntoIterator<Item = Self>;
-    type ParentBorrow: Borrow<Self>;
+    type Borrowable: Borrow<Self>;
     type Data;
 
     fn data(&self) -> &Self::Data;
-    fn parent(&self) -> Option<Self::ParentBorrow>;
+    fn parent(&self) -> Option<Self::Borrowable>;
+    fn make_borrowable(&self) -> Self::Borrowable;
     fn children(&self) -> Self::ChildrenIter;
 
     fn new_child(&self, state: &Self::Data) -> Self;
@@ -29,13 +30,16 @@ mod test {
 
     impl Node for TestNode {
         type ChildrenIter = Vec<Self>;
-        type ParentBorrow = Self;
+        type Borrowable = Self;
         type Data = Option<()>;
 
         fn data(&self) -> &Self::Data {
             unimplemented!()
         }
-        fn parent(&self) -> Option<Self::ParentBorrow> {
+        fn parent(&self) -> Option<Self::Borrowable> {
+            unimplemented!()
+        }
+        fn make_borrowable(&self) -> Self::Borrowable {
             unimplemented!()
         }
         fn children(&self) -> Self::ChildrenIter {

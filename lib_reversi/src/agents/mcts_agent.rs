@@ -43,21 +43,21 @@ where
         .max_by(|a, b| score_node(a).partial_cmp(&score_node(b)).unwrap())
 }
 
-fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode
+fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode::Borrowable
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let cur_node = root;
+    let mut cur_node = root.make_borrowable();
 
     loop {
         let selected_child: Option<TNode> = select_child(root.children());
 
         if selected_child.is_none() {
-            return cur_node.clone();
+            return cur_node;
         }
 
-        cur_node = selected_child.unwrap().clone();
+        cur_node = selected_child.unwrap().make_borrowable();
     }
 }
 
