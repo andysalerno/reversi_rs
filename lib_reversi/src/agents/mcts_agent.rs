@@ -79,19 +79,19 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    let children_iter = node.children().into_iter();
+    let children: Vec<_> = children_iter.collect();
+    if !children.is_empty() {
+        panic!("wtf? we expanded a node that was already expanded.");
+    }
+
     let state = node.data().state();
     let legal_actions = state.legal_moves(PlayerColor::Black);
 
     for action in legal_actions {
         let resulting_state = state.next_state(action);
         let data = MctsData::new(resulting_state);
-        let child_node = node.new_child(data);
-    }
-
-    let children_iter = node.children().into_iter();
-    let children: Vec<_> = children_iter.collect();
-    if !children.is_empty() {
-        panic!("wtf?");
+        let _child_node = node.new_child(data);
     }
 
     node.children()
@@ -174,6 +174,23 @@ mod tests {
         backprop(&tree_root, GameResult::BlackWins);
 
         assert_eq!(1, tree_root.data().plays());
+    }
+
+    #[test]
+    fn expand_works() {
+        let mut initial_state = ReversiState::new();
+
+        // default Reversi initial configuration
+        initial_state.initialize_board();
+
+        let data = MctsData::new(initial_state);
+        let tree_root = RcNode::new_root(data);
+
+        let expanded_children = expand::<RcNode<MctsData<ReversiState>>, ReversiState>(&tree_root)
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        assert_eq!(4, expanded_children.len());
     }
 
     #[test]
@@ -274,35 +291,3 @@ mod tests {
         );
     }
 }
-
-// impl<TState: GameState, TTree: MonteCarloTree> MCTSAgent<TState, TTree> {
-//     pub fn new(game_state: &TState) -> Self {
-//         Self {
-//             tree: TTree::new(game_state),
-//         }
-//     }
-
-//     /// Given a slice of nodes, select the node we should explore
-//     /// in such a way that balances exploration and exploitation
-//     /// of our state space.
-//     // fn select(nodes: &[RcNode<TState>]) -> Option<&RcNode<TState>> {
-//     fn select<'a>(nodes: impl Iterator<Item = &'a RcNode<TState>>) -> Option<&'a RcNode<TState>> {
-//         nodes.max_by(|a, b| Self::rank_node(a).partial_cmp(&Self::rank_node(b)).unwrap())
-//     }
-
-//     fn select_to_leaf(node: &RcNode<TState>) -> Option<RcNode<TState>> {
-//         let mut current_node_visiting = node;
-//         let cur_ptr = None;
-
-//         while current_node_visiting.children().borrow().len() > 0 {
-//             let children_ptrs = current_node_visiting.children().borrow();
-//             let children = children_ptrs.iter().map(|c| *c);
-
-//             let selected = Self::select(children).unwrap();
-//             current_node_visiting = selected;
-//         }
-
-//         Some((*current_node_visiting).clone())
-//     }
-
-// }
