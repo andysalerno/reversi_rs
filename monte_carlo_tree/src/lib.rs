@@ -16,7 +16,7 @@ where
     fn make_borrowable(&self) -> Self::Borrowable;
     fn children(&self) -> Self::ChildrenIter;
 
-    fn new_child(&self, state: &Self::Data) -> Self;
+    fn new_child(&self, state: Self::Data) -> Self;
     fn new_root(state: Self::Data) -> Self;
 }
 
@@ -45,7 +45,7 @@ mod test {
         fn children(&self) -> Self::ChildrenIter {
             Vec::new()
         }
-        fn new_child(&self, state: &Self::Data) -> Self {
+        fn new_child(&self, state: Self::Data) -> Self {
             unimplemented!()
         }
         fn new_root(state: Self::Data) -> Self {

@@ -1,7 +1,7 @@
 mod tree_search;
 
 use lib_boardgame::game_primitives::GameResult;
-use lib_boardgame::game_primitives::{GameAgent, GameState};
+use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 use tree_search::{Data, MctsData};
@@ -16,25 +16,18 @@ where
     TState: GameState,
 {
     fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
-        loop {
+        for _ in 0..1000 {
             // select
-            let children = self.tree_root.children();
-            let child_borrowable = select_child::<TNode, TState>(children).unwrap();
+            let child_borrowable = select_to_leaf::<TNode, TState>(&self.tree_root);
             let selected = child_borrowable.borrow();
 
             // expand
-            expand(selected);
-            let selected_children_iter = selected.children().into_iter();
-            let selected_children: Vec<_> = selected_children_iter.collect();
-            if !selected_children.is_empty() {
-                // 'selected' had no children was was therefore a terminus node; nothing left to do
-                continue;
-            }
+            let newly_expanded_children = expand(selected).into_iter().collect::<Vec<_>>();
 
             // after we expand, all children are new, so the first one is as good as any
-            let sim_node = selected_children
+            let sim_node = newly_expanded_children
                 .get(0)
-                .expect("there must have been children.");
+                .expect("there must have been children after expanding.");
 
             // simulate
             let sim_result = simulate(sim_node);
@@ -45,29 +38,6 @@ where
 
         legal_moves[0]
     }
-}
-
-fn simulate<TNode, TState>(node: &TNode) -> GameResult
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    GameResult::WhiteWins
-}
-
-fn expand<TNode, TState>(node: &TNode)
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let mut children_iter = node.children().into_iter();
-    let children: Vec<_> = children_iter.collect();
-
-    if !children.is_empty() {
-        return;
-    }
-
-    // let legal_states =
 }
 
 fn select_child<TNode, TState>(nodes: TNode::ChildrenIter) -> Option<TNode::Borrowable>
@@ -102,6 +72,37 @@ where
 
         cur_node = selected_child.unwrap();
     }
+}
+
+fn expand<TNode, TState>(node: &TNode) -> TNode::ChildrenIter
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let state = node.data().state();
+    let legal_actions = state.legal_moves(PlayerColor::Black);
+
+    for action in legal_actions {
+        let resulting_state = state.next_state(action);
+        let data = MctsData::new(resulting_state);
+        let child_node = node.new_child(data);
+    }
+
+    let children_iter = node.children().into_iter();
+    let children: Vec<_> = children_iter.collect();
+    if !children.is_empty() {
+        panic!("wtf?");
+    }
+
+    node.children()
+}
+
+fn simulate<TNode, TState>(node: &TNode) -> GameResult
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    GameResult::WhiteWins
 }
 
 fn backprop<TNode, TState>(node: &TNode, _result: GameResult)
@@ -158,7 +159,7 @@ mod tests {
     fn new_child_works() {
         let data = MctsData::new(ReversiState::new());
         let tree_root = make_node(data.clone());
-        let child = tree_root.new_child(&data);
+        let child = tree_root.new_child(data.clone());
 
         assert_eq!(1, tree_root.children().into_iter().count());
         assert!(child.parent().is_some());
@@ -180,10 +181,10 @@ mod tests {
         let data = MctsData::new(ReversiState::new());
 
         let tree_root = make_node(data.clone());
-        let child_level_1 = tree_root.new_child(&data);
-        let child_level_2 = child_level_1.new_child(&data);
-        let child_level_3 = child_level_2.new_child(&data);
-        let child_level_4 = child_level_3.new_child(&data);
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_3 = child_level_2.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone());
 
         backprop(&child_level_3, GameResult::BlackWins);
 
@@ -199,11 +200,11 @@ mod tests {
         let data = MctsData::new(ReversiState::new());
 
         let tree_root = RcNode::new_root(data.clone());
-        let child_level_1 = tree_root.new_child(&data);
-        let child_level_2 = child_level_1.new_child(&data);
-        let child_level_3 = child_level_2.new_child(&data);
-        let child_level_4 = child_level_3.new_child(&data);
-        let child_level_4b = child_level_3.new_child(&data);
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_3 = child_level_2.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_4b = child_level_3.new_child(data.clone());
 
         backprop(&child_level_3, GameResult::BlackWins);
         backprop(&child_level_4, GameResult::BlackWins);
@@ -224,11 +225,11 @@ mod tests {
         let data = MctsData::new(ReversiState::new());
 
         let tree_root = RcNode::new_root(data.clone());
-        let child_level_1 = tree_root.new_child(&data);
-        let child_level_2 = child_level_1.new_child(&data);
-        let child_level_3 = child_level_2.new_child(&data);
-        let child_level_4 = child_level_3.new_child(&data);
-        let child_level_4b = child_level_3.new_child(&data);
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_3 = child_level_2.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_4b = child_level_3.new_child(data.clone());
 
         backprop(&child_level_3, GameResult::BlackWins);
         backprop(&child_level_4, GameResult::BlackWins);
@@ -249,10 +250,10 @@ mod tests {
         let tree_root = make_node(data.clone());
 
         // all children of the same parent
-        let child_a = tree_root.new_child(&data);
-        let child_b = tree_root.new_child(&data);
-        let child_c = tree_root.new_child(&data);
-        let child_d = tree_root.new_child(&data);
+        let child_a = tree_root.new_child(data.clone());
+        let child_b = tree_root.new_child(data.clone());
+        let child_c = tree_root.new_child(data.clone());
+        let child_d = tree_root.new_child(data.clone());
 
         // "visit" each child a different amount of times
         backprop(&child_a, GameResult::BlackWins);

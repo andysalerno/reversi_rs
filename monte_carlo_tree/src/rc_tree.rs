@@ -38,11 +38,11 @@ where
         c
     }
 
-    fn new_child(&self, data: &T) -> RcNode<T> {
+    fn new_child(&self, data: T) -> RcNode<T> {
         let child = Rc::new(NodeContent {
             parent: Rc::downgrade(self),
             children: RefCell::default(),
-            data: data.clone(),
+            data: data,
         });
 
         self.children.borrow_mut().push(child.clone());
@@ -76,7 +76,7 @@ mod test {
     #[test]
     fn node_adds_child() {
         let root = RcNode::new_root(TestData(1));
-        let child = root.new_child(&TestData(2));
+        let child = root.new_child(TestData(2));
 
         let root_children = root.children();
 
@@ -87,7 +87,7 @@ mod test {
     #[test]
     fn child_has_parent() {
         let root = RcNode::new_root(TestData(1));
-        let child = root.new_child(&TestData(2));
+        let child = root.new_child(TestData(2));
 
         assert_eq!(
             child.parent().expect("child should have a parent").data(),
@@ -105,13 +105,13 @@ mod test {
     #[test]
     fn refcells_dont_explode() {
         let root = RcNode::new_root(TestData(1));
-        let child_1 = root.new_child(&TestData(2));
-        let child_2 = root.new_child(&TestData(3));
-        let child_3 = root.new_child(&TestData(4));
+        let child_1 = root.new_child(TestData(2));
+        let child_2 = root.new_child(TestData(3));
+        let child_3 = root.new_child(TestData(4));
 
-        let child_4 = child_1.new_child(&TestData(5));
-        let child_5 = child_2.new_child(&TestData(5));
-        let child_6 = child_5.new_child(&TestData(5));
+        let child_4 = child_1.new_child(TestData(5));
+        let child_5 = child_2.new_child(TestData(5));
+        let child_6 = child_5.new_child(TestData(5));
 
         let child_1_children = child_1.children();
         let child_2_children = child_2.children();
