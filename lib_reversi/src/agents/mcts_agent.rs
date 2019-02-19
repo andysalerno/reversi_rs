@@ -16,22 +16,58 @@ where
     TState: GameState,
 {
     fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
-        // select
-        let children = self.tree_root.children();
-        let child_borrowable = select_child::<TNode, TState>(children).unwrap();
-        let selected_child = child_borrowable.borrow();
-        let _state = selected_child.data().state();
+        loop {
+            // select
+            let children = self.tree_root.children();
+            let child_borrowable = select_child::<TNode, TState>(children).unwrap();
+            let selected = child_borrowable.borrow();
 
-        // expand
-        // let state = selected_child.unwrap().state();
+            // expand
+            expand(selected);
+            let selected_children_iter = selected.children().into_iter();
+            let selected_children: Vec<_> = selected_children_iter.collect();
+            if !selected_children.is_empty() {
+                // 'selected' had no children was was therefore a terminus node; nothing left to do
+                continue;
+            }
 
-        // simulate
+            // after we expand, all children are new, so the first one is as good as any
+            let sim_node = selected_children
+                .get(0)
+                .expect("there must have been children.");
 
-        // backprop
-        backprop(selected_child, GameResult::BlackWins);
+            // simulate
+            let sim_result = simulate(sim_node);
+
+            // backprop
+            backprop(selected, sim_result);
+        }
 
         legal_moves[0]
     }
+}
+
+fn simulate<TNode, TState>(node: &TNode) -> GameResult
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    GameResult::WhiteWins
+}
+
+fn expand<TNode, TState>(node: &TNode)
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut children_iter = node.children().into_iter();
+    let children: Vec<_> = children_iter.collect();
+
+    if !children.is_empty() {
+        return;
+    }
+
+    // let legal_states =
 }
 
 fn select_child<TNode, TState>(nodes: TNode::ChildrenIter) -> Option<TNode::Borrowable>
@@ -58,7 +94,7 @@ where
 
     loop {
         let selected_child: Option<TNode::Borrowable> =
-            select_child::<TNode, TState>(root.children());
+            select_child::<TNode, TState>(cur_node.borrow().children());
 
         if selected_child.is_none() {
             return cur_node;
@@ -169,15 +205,41 @@ mod tests {
         let child_level_4 = child_level_3.new_child(&data);
         let child_level_4b = child_level_3.new_child(&data);
 
-        // set scores (the select should pick the max score)
+        backprop(&child_level_3, GameResult::BlackWins);
+        backprop(&child_level_4, GameResult::BlackWins);
+        backprop(&child_level_4, GameResult::BlackWins);
+        backprop(&child_level_4b, GameResult::BlackWins);
+
+        let selected_borrow =
+            select_child::<RcNode<MctsData<ReversiState>>, ReversiState>(child_level_3.children())
+                .expect("the child should have been selected.");
+
+        let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
+
+        assert_eq!(1, selected.data().plays());
+    }
+
+    #[test]
+    fn select_to_leaf_works() {
+        let data = MctsData::new(ReversiState::new());
+
+        let tree_root = RcNode::new_root(data.clone());
+        let child_level_1 = tree_root.new_child(&data);
+        let child_level_2 = child_level_1.new_child(&data);
+        let child_level_3 = child_level_2.new_child(&data);
+        let child_level_4 = child_level_3.new_child(&data);
+        let child_level_4b = child_level_3.new_child(&data);
 
         backprop(&child_level_3, GameResult::BlackWins);
         backprop(&child_level_4, GameResult::BlackWins);
         backprop(&child_level_4, GameResult::BlackWins);
         backprop(&child_level_4b, GameResult::BlackWins);
 
-        let selected =
-            select_child::<RcNode<MctsData<ReversiState>>, ReversiState>(child_level_3.children());
+        let leaf_borrow = select_to_leaf(&tree_root);
+
+        let leaf: &RcNode<MctsData<ReversiState>> = leaf_borrow.borrow();
+
+        assert_eq!(1, leaf.data().plays());
     }
 
     #[test]
