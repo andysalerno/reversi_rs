@@ -16,8 +16,9 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
-        for _ in 0..1000 {
+    fn pick_move(&self, _state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+        for i in 0..10 {
+            println!("Running simulation num: {}", i);
             // select
             let child_borrowable = select_to_leaf::<TNode, TState>(&self.tree_root);
             let selected = child_borrowable.borrow();
@@ -37,7 +38,14 @@ where
             backprop(selected, sim_result);
         }
 
-        legal_moves[0]
+        let state_children = self.tree_root.children();
+        state_children
+            .into_iter()
+            .max_by_key(|c| c.data().plays())
+            .unwrap()
+            .data()
+            .action()
+            .unwrap()
     }
 }
 
