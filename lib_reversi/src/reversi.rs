@@ -54,39 +54,10 @@ where
     fn is_game_over(&self) -> bool {
         let gamestate = self.game_state();
 
-        if gamestate.white_pieces_count() + gamestate.black_pieces_count()
-            == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
-        {
-            println!("Game over because board is full.");
-            // if the board is full, no player has a legal move by definition, so the game is over.
-            return true;
-        }
-
-        let white_legal_moves = gamestate.legal_moves(PlayerColor::White);
-        let black_legal_moves = gamestate.legal_moves(PlayerColor::Black);
-
-        // if neither player has a legal move to play, the game is over.
-        if white_legal_moves.is_empty() && black_legal_moves.is_empty() {
-            println!("Game over because neither player has a valid legal move.");
-            return true;
-        }
-
-        false
+        gamestate.is_game_over()
     }
 
-    /// The GameResult, or None if the game is not yet over.
     fn game_result(&self) -> Option<GameResult> {
-        let white_count = self.game_state().white_pieces_count();
-        let black_count = self.game_state().black_pieces_count();
-
-        if !self.is_game_over() {
-            None
-        } else if white_count > black_count {
-            Some(GameResult::WhiteWins)
-        } else if black_count > white_count {
-            Some(GameResult::BlackWins)
-        } else {
-            Some(GameResult::Tie)
-        }
+        self.game_state().game_result()
     }
 }

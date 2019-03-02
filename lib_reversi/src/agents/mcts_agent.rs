@@ -107,29 +107,14 @@ where
     let mut state = node.data().state().clone();
 
     loop {
-        let player = state.current_player_turn();
-        let mut legal_moves = state.legal_moves(player);
-
-        if legal_moves.len() == 0 {
-            // if original player has no moves, it becomes the opponent's turn.
-            state.skip_turn();
-            legal_moves = state.legal_moves(player.opponent());
-
-            if legal_moves.len() == 0 {
-                // if the opponent also has no legal moves, the game is over.
-                let white_score = state.player_score(PlayerColor::White);
-                let black_score = state.player_score(PlayerColor::Black);
-
-                if white_score == black_score {
-                    return GameResult::Tie;
-                } else if white_score > black_score {
-                    return GameResult::WhiteWins;
-                } else {
-                    return GameResult::BlackWins;
-                }
-            }
+        if state.is_game_over() {
+            return state
+                .game_result()
+                .expect("There must be a game result, since the game is confirmed to be over.");
         }
 
+        let player = state.current_player_turn();
+        let legal_moves = state.legal_moves(player);
         let random_action = util::random_choice(&legal_moves);
 
         state.apply_move(random_action);

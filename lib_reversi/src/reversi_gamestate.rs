@@ -360,6 +360,32 @@ impl GameState for ReversiState {
     fn skip_turn(&mut self) {
         self.current_player_turn = self.current_player_turn.opponent();
     }
+
+    /// True if the the game has ended, either due to a forced win,
+    /// draw, or forfeit.
+    fn is_game_over(&self) -> bool {
+        if self.white_pieces_count() + self.black_pieces_count()
+            == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
+        {
+            println!("Game over because board is full.");
+            // if the board is full, no player has a legal move by definition, so the game is over.
+            return true;
+        }
+
+        let white_legal_moves = self.legal_moves(PlayerColor::White);
+        let black_legal_moves = self.legal_moves(PlayerColor::Black);
+
+        if white_legal_moves.len() == 1 && black_legal_moves.len() == 1 {
+            if white_legal_moves[0] == ReversiAction::PassTurn
+                && black_legal_moves[0] == ReversiAction::PassTurn
+            {
+                println!("Game over because neither player has a valid legal move.");
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]

@@ -64,6 +64,26 @@ pub trait GameState: Clone {
     /// Skip the current player's turn without taking any action.
     /// Advances to the next player's turn.
     fn skip_turn(&mut self);
+
+    /// True if the game is over (i.e. neither player can take any further action).
+    fn is_game_over(&self) -> bool;
+
+
+    /// The GameResult, or None if the game is not yet over.
+    fn game_result(&self) -> Option<GameResult> {
+        let white_score = self.player_score(PlayerColor::White);
+        let black_score = self.player_score(PlayerColor::Black);
+
+        if !self.is_game_over() {
+            None
+        } else if white_score > black_score {
+            Some(GameResult::WhiteWins)
+        } else if black_score > white_score {
+            Some(GameResult::BlackWins)
+        } else {
+            Some(GameResult::Tie)
+        }
+    }
 }
 
 pub trait Game<WhiteAgent, BlackAgent>
