@@ -6,6 +6,15 @@ pub enum PlayerColor {
     White,
 }
 
+impl PlayerColor {
+    pub fn opponent(&self) -> Self {
+        match self {
+            PlayerColor::Black => PlayerColor::White,
+            PlayerColor::White => PlayerColor::Black,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum GameResult {
     Tie,
@@ -39,6 +48,9 @@ pub trait GameState: Clone {
 
     /// Returns the current player whose turn it currently is.
     fn current_player_turn(&self) -> PlayerColor;
+
+    /// Returns the score of the given player in this state.
+    fn player_score(&self, player: PlayerColor) -> usize;
 
     /// Given a legal move (or 'action'), return the resulting state of applying the action
     /// to this state (does not mutate this state).

@@ -86,7 +86,8 @@ where
     }
 
     let state = node.data().state();
-    let legal_actions = state.legal_moves(PlayerColor::Black);
+    let player_turn = state.current_player_turn();
+    let legal_actions = state.legal_moves(player_turn);
 
     for action in legal_actions {
         let resulting_state = state.next_state(action);
@@ -102,6 +103,30 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    let state = node.data().state().clone();
+
+    loop {
+        let player = state.current_player_turn();
+        let legal_moves = state.legal_moves(player);
+
+        if legal_moves.len() == 0 {
+            let opponent_legal_moves = state.legal_moves(player.opponent());
+            if opponent_legal_moves.len() == 0 {
+                // game is over; neither player has a legal action
+                let white_score = state.player_score(PlayerColor::White);
+                let black_score = state.player_score(PlayerColor::Black);
+
+                if white_score == black_score {
+                    return GameResult::Tie;
+                } else if white_score > black_score {
+                    return GameResult::WhiteWins;
+                } else {
+                    return GameResult::BlackWins;
+                }
+            }
+        }
+    }
+
     GameResult::WhiteWins
 }
 

@@ -341,6 +341,14 @@ impl GameState for ReversiState {
         self.current_player_turn
     }
 
+    /// Returns the score of the given player in this state.
+    fn player_score(&self, player: PlayerColor) -> usize {
+        match player {
+            PlayerColor::White => self.white_pieces_count(),
+            PlayerColor::Black => self.black_pieces_count(),
+        }
+    }
+
     fn initialize_board(&mut self) {
         self.set_piece(BoardPosition::new(3, 4), Some(ReversiPiece::White));
         self.set_piece(BoardPosition::new(4, 4), Some(ReversiPiece::Black));
