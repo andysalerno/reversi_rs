@@ -1,5 +1,5 @@
+use crate::util::random_choice;
 use lib_boardgame::game_primitives::{GameAgent, GameState};
-use rand::seq::SliceRandom;
 
 pub struct RandomAgent;
 
@@ -8,7 +8,7 @@ impl RandomAgent {
     where
         T: Copy,
     {
-        *choices.choose(&mut rand::thread_rng()).unwrap()
+        random_choice(choices)
     }
 }
 

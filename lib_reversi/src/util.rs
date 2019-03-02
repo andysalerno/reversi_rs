@@ -1,5 +1,6 @@
 use crate::{reversi_gamestate::ReversiState, BoardPosition, Directions};
 use lib_boardgame::game_primitives::PlayerColor;
+use rand::seq::SliceRandom;
 
 pub(crate) struct BoardDirectionIter {
     direction: Directions,
@@ -14,6 +15,13 @@ pub(crate) fn opponent(player: PlayerColor) -> PlayerColor {
         PlayerColor::Black => PlayerColor::White,
         PlayerColor::White => PlayerColor::Black,
     }
+}
+
+pub(crate) fn random_choice<T>(choices: &[T]) -> T
+where
+    T: Copy,
+{
+    *choices.choose(&mut rand::thread_rng()).unwrap()
 }
 
 impl BoardDirectionIter {

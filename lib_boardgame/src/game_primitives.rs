@@ -60,6 +60,10 @@ pub trait GameState: Clone {
 
         cloned
     }
+
+    /// Skip the current player's turn without taking any action.
+    /// Advances to the next player's turn.
+    fn skip_turn(&mut self);
 }
 
 pub trait Game<WhiteAgent, BlackAgent>

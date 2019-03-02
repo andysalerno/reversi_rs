@@ -1,5 +1,6 @@
 mod tree_search;
 
+use crate::util;
 use lib_boardgame::game_primitives::GameResult;
 use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::Node;
@@ -103,16 +104,19 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let state = node.data().state().clone();
+    let mut state = node.data().state().clone();
 
     loop {
         let player = state.current_player_turn();
-        let legal_moves = state.legal_moves(player);
+        let mut legal_moves = state.legal_moves(player);
 
         if legal_moves.len() == 0 {
-            let opponent_legal_moves = state.legal_moves(player.opponent());
-            if opponent_legal_moves.len() == 0 {
-                // game is over; neither player has a legal action
+            // if original player has no moves, it becomes the opponent's turn.
+            state.skip_turn();
+            legal_moves = state.legal_moves(player.opponent());
+
+            if legal_moves.len() == 0 {
+                // if the opponent also has no legal moves, the game is over.
                 let white_score = state.player_score(PlayerColor::White);
                 let black_score = state.player_score(PlayerColor::Black);
 
@@ -125,9 +129,11 @@ where
                 }
             }
         }
-    }
 
-    GameResult::WhiteWins
+        let random_action = util::random_choice(&legal_moves);
+
+        state.apply_move(random_action);
+    }
 }
 
 fn backprop<TNode, TState>(node: &TNode, _result: GameResult)
@@ -314,5 +320,16 @@ mod tests {
             340282350000000000000000000000000000000f32,
             score_node(&child_d)
         );
+    }
+
+    #[test]
+    fn simulate_runs_to_completion_and_terminates() {
+        let mut initial_state = ReversiState::new();
+        initial_state.initialize_board();
+        let data = MctsData::new(initial_state);
+
+        let tree_root = make_node(data.clone());
+
+        let _sim_result = simulate(&tree_root);
     }
 }

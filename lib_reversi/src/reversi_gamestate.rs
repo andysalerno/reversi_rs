@@ -356,6 +356,10 @@ impl GameState for ReversiState {
         self.set_piece(BoardPosition::new(3, 3), Some(ReversiPiece::Black));
         self.set_piece(BoardPosition::new(4, 3), Some(ReversiPiece::White));
     }
+
+    fn skip_turn(&mut self) {
+        self.current_player_turn = self.current_player_turn.opponent();
+    }
 }
 
 #[cfg(test)]
