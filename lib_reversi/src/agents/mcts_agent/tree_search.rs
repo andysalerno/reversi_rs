@@ -26,15 +26,6 @@ impl<T: GameState> MctsData<T> {
     pub fn increment_wins(&self) {
         self.wins.set(self.wins.get() + 1);
     }
-
-    pub fn new(state: T) -> Self {
-        Self {
-            state,
-            plays: Cell::default(),
-            wins: Cell::default(),
-            action: None,
-        }
-    }
 }
 
 impl<T: GameState> Data<T> for MctsData<T> {

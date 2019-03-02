@@ -39,6 +39,9 @@ pub trait GameState: Clone {
     /// before gameplay begins.
     fn initialize_board(&mut self);
 
+    /// Returns a fresh, ready-to-play game state for this game.
+    fn initial_state() -> Self;
+
     /// Returns the possible moves the given player can make for the current state.
     fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move>;
 
@@ -67,7 +70,6 @@ pub trait GameState: Clone {
 
     /// True if the game is over (i.e. neither player can take any further action).
     fn is_game_over(&self) -> bool;
-
 
     /// The GameResult, or None if the game is not yet over.
     fn game_result(&self) -> Option<GameResult> {

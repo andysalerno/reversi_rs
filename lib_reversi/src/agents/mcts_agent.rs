@@ -3,15 +3,36 @@ mod tree_search;
 use crate::util;
 use lib_boardgame::game_primitives::GameResult;
 use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
+use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 use tree_search::{Data, MctsData};
 
-pub struct MCTSAgent<TTree: Node> {
-    tree_root: TTree,
+pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
+
+pub struct MCTSAgent<TState, TNode>
+where
+    TState: GameState,
+    TNode: Node<Data = MctsData<TState>>,
+{
+    tree_root: TNode,
 }
 
-impl<TNode, TState> GameAgent<TState> for MCTSAgent<TNode>
+impl<TState, TNode> MCTSAgent<TState, TNode>
+where
+    TState: GameState,
+    TNode: Node<Data = MctsData<TState>>,
+{
+    pub fn new() -> Self {
+        let initial_state = TState::initial_state();
+        let data = MctsData::new(&initial_state, 0, 0, None);
+        MCTSAgent {
+            tree_root: TNode::new_root(data),
+        }
+    }
+}
+
+impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -39,13 +60,14 @@ where
         }
 
         let state_children = self.tree_root.children();
-        state_children
+        let max_child = state_children
             .into_iter()
             .max_by_key(|c| c.data().plays())
-            .unwrap()
-            .data()
-            .action()
-            .unwrap()
+            .unwrap();
+
+        let max_action = max_child.data().action().unwrap();
+
+        max_action
     }
 }
 
@@ -100,7 +122,7 @@ where
 
     for action in legal_actions {
         let resulting_state = state.next_state(action);
-        let data = MctsData::new(resulting_state);
+        let data = MctsData::new(&resulting_state, 0, 0, Some(action));
         let _child_node = node.new_child(data);
     }
 
@@ -181,7 +203,7 @@ mod tests {
 
     #[test]
     fn new_child_works() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
         let tree_root = make_node(data.clone());
         let child = tree_root.new_child(data.clone());
 
@@ -192,7 +214,7 @@ mod tests {
 
     #[test]
     fn backprop_works_one_node() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
         let tree_root = make_node(data.clone());
 
         backprop(&tree_root, GameResult::BlackWins);
@@ -207,7 +229,7 @@ mod tests {
         // default Reversi initial configuration
         initial_state.initialize_board();
 
-        let data = MctsData::new(initial_state);
+        let data = MctsData::new(&initial_state, 0, 0, None);
         let tree_root = RcNode::new_root(data);
 
         let expanded_children = expand::<RcNode<MctsData<ReversiState>>, ReversiState>(&tree_root)
@@ -219,7 +241,7 @@ mod tests {
 
     #[test]
     fn backprop_works_several_nodes() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
@@ -238,7 +260,7 @@ mod tests {
 
     #[test]
     fn select_child_works() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = RcNode::new_root(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
@@ -263,7 +285,7 @@ mod tests {
 
     #[test]
     fn select_to_leaf_works() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = RcNode::new_root(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
@@ -286,7 +308,7 @@ mod tests {
 
     #[test]
     fn score_node_works() {
-        let data = MctsData::new(ReversiState::new());
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = make_node(data.clone());
 
@@ -319,7 +341,7 @@ mod tests {
     fn simulate_runs_to_completion_and_terminates() {
         let mut initial_state = ReversiState::new();
         initial_state.initialize_board();
-        let data = MctsData::new(initial_state);
+        let data = MctsData::new(&initial_state, 0, 0, None);
 
         let tree_root = make_node(data.clone());
 

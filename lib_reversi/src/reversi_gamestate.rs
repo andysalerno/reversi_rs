@@ -349,6 +349,13 @@ impl GameState for ReversiState {
         }
     }
 
+    fn initial_state() -> Self {
+        let mut uninitialized = Self::new();
+        uninitialized.initialize_board();
+
+        uninitialized
+    }
+
     fn initialize_board(&mut self) {
         self.set_piece(BoardPosition::new(3, 4), Some(ReversiPiece::White));
         self.set_piece(BoardPosition::new(4, 4), Some(ReversiPiece::Black));
