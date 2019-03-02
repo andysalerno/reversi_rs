@@ -67,6 +67,12 @@ where
 
         let max_action = max_child.data().action().unwrap();
 
+        println!(
+            "Plays: {} Wins: {}",
+            max_child.data().plays(),
+            max_child.data().wins()
+        );
+
         max_action
     }
 }

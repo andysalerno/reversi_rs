@@ -178,7 +178,7 @@ impl GameState for ReversiState {
         result.push('\n');
 
         for row in (0..BOARD_SIZE).rev() {
-            result.push_str("| ");
+            result.push_str(&format!("{}| ", row));
 
             for col in 0..BOARD_SIZE {
                 let piece = self.get_piece(BoardPosition::new(col, row));
@@ -196,13 +196,13 @@ impl GameState for ReversiState {
             result.push('\n');
         }
 
-        result.push(' ');
+        result.push_str("  ");
         for _ in 0..BOARD_SIZE {
             result.push_str("--");
         }
 
         result.push('\n');
-        result.push_str("  ");
+        result.push_str("   ");
         for col in 0..BOARD_SIZE {
             result.push_str(&format!("{} ", col));
         }
