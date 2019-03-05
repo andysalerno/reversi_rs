@@ -91,7 +91,7 @@ impl ReversiState {
     /// might as well pre-compute it so we can reserve the space ahead of time.
     /// (A test exists to confirm this is accurate.)
     const fn friendly_print_size() -> usize {
-        189
+        199
     }
 
     fn within_board_bounds(position: BoardPosition) -> bool {
