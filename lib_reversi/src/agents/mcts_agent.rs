@@ -6,6 +6,7 @@ use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
+use std::cell::RefCell;
 use tree_search::{Data, MctsData};
 
 pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
@@ -15,7 +16,7 @@ where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
 {
-    tree_root: TNode,
+    tree_root: RefCell<TNode>,
 }
 
 impl<TState, TNode> MCTSAgent<TState, TNode>
@@ -27,7 +28,7 @@ where
         let initial_state = TState::initial_state();
         let data = MctsData::new(&initial_state, 0, 0, None);
         MCTSAgent {
-            tree_root: TNode::new_root(data),
+            tree_root: RefCell::new(TNode::new_root(data)),
         }
     }
 }
@@ -37,11 +38,13 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    fn pick_move(&self, _state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+    fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+        let turn_root = TNode::new_root(MctsData::new(state, 0, 0, None));
+
         for i in 0..10 {
             println!("Running simulation num: {}", i);
             // select
-            let child_borrowable = select_to_leaf::<TNode, TState>(&self.tree_root);
+            let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
             let selected = child_borrowable.borrow();
 
             // expand
@@ -59,7 +62,7 @@ where
             backprop(selected, sim_result);
         }
 
-        let state_children = self.tree_root.children();
+        let state_children = turn_root.children();
         let max_child = state_children
             .into_iter()
             .max_by_key(|c| c.data().plays())

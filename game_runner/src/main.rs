@@ -8,7 +8,6 @@ use lib_reversi::reversi_gamestate::ReversiState;
 fn main() {
     let white = HumanAgent;
     let black = MCTSRcAgent::<ReversiState>::new();
-    let b2 = HumanAgent;
 
     let mut game = Reversi::new(white, black);
 

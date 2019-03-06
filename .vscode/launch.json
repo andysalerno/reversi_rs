@@ -5,45 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(Windows) Launch",
-            "type": "cppvsdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/target/debug/game_runner.exe",
-            "args": [],
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": true
-        },
-        {
             "type": "lldb",
             "request": "launch",
-            "name": "Cargo run",
-            "cargo": {
-                "args": [
-                    "run"
-                ]
-            },
-            "program": "${cargo:program}",
-            "args": []
-        },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in library 'reversi_rs'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--lib",
-                    "--package=reversi_rs"
-                ],
-                "filter": {
-                    "kind": "lib"
-                }
-            },
+            "name": "Debug",
+            "program": "${workspaceRoot}/target/debug/game_runner",
             "args": [],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceRoot}/target/debug/"
         }
     ]
 }
