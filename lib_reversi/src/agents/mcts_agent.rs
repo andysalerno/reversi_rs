@@ -7,8 +7,8 @@ use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use tree_search::{Data, MctsData};
 use std::time::Instant;
+use tree_search::{Data, MctsData};
 
 pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
 
@@ -18,6 +18,7 @@ where
     TNode: Node<Data = MctsData<TState>>,
 {
     tree_root: RefCell<TNode>,
+    color: PlayerColor,
 }
 
 impl<TState, TNode> MCTSAgent<TState, TNode>
@@ -25,11 +26,37 @@ where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
 {
-    pub fn new() -> Self {
+    pub fn new(color: PlayerColor) -> Self {
         let initial_state = TState::initial_state();
         let data = MctsData::new(&initial_state, 0, 0, None);
         MCTSAgent {
             tree_root: RefCell::new(TNode::new_root(data)),
+            color,
+        }
+    }
+
+    fn backprop(&self, node: &TNode, result: GameResult) {
+        let data = node.data();
+        data.increment_plays();
+
+        let incr_wins = ((result == GameResult::BlackWins && self.color == PlayerColor::Black)
+            || (result == GameResult::WhiteWins && self.color == PlayerColor::White));
+
+        if incr_wins {
+            data.increment_wins();
+        }
+
+        let mut parent_node = node.parent();
+
+        while let Some(p) = parent_node {
+            let parent = p.borrow();
+            let data = parent.data();
+            data.increment_plays();
+
+            if incr_wins {
+                data.increment_wins();
+            }
+            parent_node = parent.parent();
         }
     }
 }
@@ -40,13 +67,12 @@ where
     TState: GameState,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-
         let turn_root = TNode::new_root(MctsData::new(state, 0, 0, None));
 
         let now = Instant::now();
 
-        const total_sims: u128 = 100;
-        for i in 0..total_sims {
+        const total_sims: u128 = 1000;
+        for _ in 0..total_sims {
             // select
             let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
             let selected = child_borrowable.borrow();
@@ -63,11 +89,15 @@ where
             let sim_result = simulate(sim_node);
 
             // backprop
-            backprop(selected, sim_result);
+            self.backprop(selected, sim_result);
         }
 
         let elapsed_micros = now.elapsed().as_micros();
-        println!("{} sims total. {} sims/sec.", total_sims, (total_sims / elapsed_micros) * 1_000_000);
+        println!(
+            "{} sims total. {} sims/sec.",
+            total_sims,
+            (total_sims / elapsed_micros) * 1_000_000
+        );
 
         let state_children = turn_root.children();
         let max_child = state_children
@@ -164,24 +194,6 @@ where
         let random_action = util::random_choice(&legal_moves);
 
         state.apply_move(random_action);
-    }
-}
-
-fn backprop<TNode, TState>(node: &TNode, _result: GameResult)
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    node.data().increment_plays();
-    node.data().increment_wins();
-
-    let mut parent_node = node.parent();
-
-    while let Some(p) = parent_node {
-        let parent = p.borrow();
-        parent.data().increment_plays();
-        parent.data().increment_wins();
-        parent_node = parent.parent();
     }
 }
 

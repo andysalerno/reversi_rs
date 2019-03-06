@@ -1,4 +1,4 @@
-use lib_boardgame::game_primitives::Game;
+use lib_boardgame::game_primitives::{Game, PlayerColor};
 use lib_reversi::agents::human::HumanAgent;
 use lib_reversi::agents::mcts_agent::{MCTSAgent, MCTSRcAgent};
 use lib_reversi::agents::random_agent::RandomAgent;
@@ -7,7 +7,7 @@ use lib_reversi::reversi_gamestate::ReversiState;
 
 fn main() {
     let white = RandomAgent;
-    let black = MCTSRcAgent::<ReversiState>::new();
+    let black = MCTSRcAgent::<ReversiState>::new(PlayerColor::Black);
 
     let mut game = Reversi::new(white, black);
 
