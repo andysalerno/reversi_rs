@@ -122,10 +122,7 @@ where
             PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
         };
 
-        dbg!(format!(
-            "Player {:?} picked move {:?}",
-            player, picked_action
-        ));
+        println!("Player {:?} picked move {:?}", player, picked_action);
 
         let state = self.game_state_mut();
 

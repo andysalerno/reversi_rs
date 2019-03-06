@@ -94,9 +94,9 @@ where
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
-            "{} sims total. {} sims/sec.",
+            "{} sims total. {:.2} sims/sec.",
             total_sims,
-            (total_sims / elapsed_micros) * 1_000_000
+            (total_sims as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
         let state_children = turn_root.children();
@@ -107,11 +107,9 @@ where
 
         let max_action = max_child.data().action().unwrap();
 
-        println!(
-            "Plays: {} Wins: {}",
-            max_child.data().plays(),
-            max_child.data().wins()
-        );
+        let plays = max_child.data().plays();
+        let wins = max_child.data().wins();
+        println!("Plays: {} Wins: {} ({:.2})", plays, wins, wins as f32 / plays as f32,);
 
         max_action
     }
