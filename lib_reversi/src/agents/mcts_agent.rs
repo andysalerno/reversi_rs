@@ -8,6 +8,7 @@ use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use tree_search::{Data, MctsData};
+use std::time::Instant;
 
 pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
 
@@ -39,9 +40,13 @@ where
     TState: GameState,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+
         let turn_root = TNode::new_root(MctsData::new(state, 0, 0, None));
 
-        for i in 0..10 {
+        let now = Instant::now();
+
+        const total_sims: u128 = 100;
+        for i in 0..total_sims {
             // select
             let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
             let selected = child_borrowable.borrow();
@@ -60,6 +65,9 @@ where
             // backprop
             backprop(selected, sim_result);
         }
+
+        let elapsed_micros = now.elapsed().as_micros();
+        println!("{} sims total. {} sims/sec.", total_sims, (total_sims / elapsed_micros) * 1_000_000);
 
         let state_children = turn_root.children();
         let max_child = state_children
