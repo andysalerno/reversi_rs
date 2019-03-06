@@ -374,7 +374,6 @@ impl GameState for ReversiState {
         if self.white_pieces_count() + self.black_pieces_count()
             == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
         {
-            println!("Game over because board is full.");
             // if the board is full, no player has a legal move by definition, so the game is over.
             return true;
         }
@@ -386,7 +385,6 @@ impl GameState for ReversiState {
             if white_legal_moves[0] == ReversiAction::PassTurn
                 && black_legal_moves[0] == ReversiAction::PassTurn
             {
-                println!("Game over because neither player has a valid legal move.");
                 return true;
             }
         }

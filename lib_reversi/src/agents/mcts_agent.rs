@@ -42,7 +42,6 @@ where
         let turn_root = TNode::new_root(MctsData::new(state, 0, 0, None));
 
         for i in 0..10 {
-            println!("Running simulation num: {}", i);
             // select
             let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
             let selected = child_borrowable.borrow();
