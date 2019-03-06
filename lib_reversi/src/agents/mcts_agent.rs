@@ -6,7 +6,7 @@ use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
-use std::cell::RefCell;
+use std::marker::PhantomData;
 use std::time::Instant;
 use tree_search::{Data, MctsData};
 
@@ -17,8 +17,9 @@ where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
 {
-    tree_root: RefCell<TNode>,
     color: PlayerColor,
+    _phantom_a: PhantomData<TState>,
+    _phantom_b: PhantomData<TNode>,
 }
 
 impl<TState, TNode> MCTSAgent<TState, TNode>
@@ -27,11 +28,10 @@ where
     TNode: Node<Data = MctsData<TState>>,
 {
     pub fn new(color: PlayerColor) -> Self {
-        let initial_state = TState::initial_state();
-        let data = MctsData::new(&initial_state, 0, 0, None);
         MCTSAgent {
-            tree_root: RefCell::new(TNode::new_root(data)),
             color,
+            _phantom_a: PhantomData,
+            _phantom_b: PhantomData,
         }
     }
 
@@ -39,8 +39,8 @@ where
         let data = node.data();
         data.increment_plays();
 
-        let incr_wins = ((result == GameResult::BlackWins && self.color == PlayerColor::Black)
-            || (result == GameResult::WhiteWins && self.color == PlayerColor::White));
+        let incr_wins = (result == GameResult::BlackWins && self.color == PlayerColor::Black)
+            || (result == GameResult::WhiteWins && self.color == PlayerColor::White);
 
         if incr_wins {
             data.increment_wins();
@@ -71,8 +71,8 @@ where
 
         let now = Instant::now();
 
-        const total_sims: u128 = 1000;
-        for _ in 0..total_sims {
+        const TOTAL_SIMS: u128 = 1000;
+        for _ in 0..TOTAL_SIMS {
             // select
             let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
             let selected = child_borrowable.borrow();
@@ -95,8 +95,8 @@ where
         let elapsed_micros = now.elapsed().as_micros();
         println!(
             "{} sims total. {:.2} sims/sec.",
-            total_sims,
-            (total_sims as f64 / elapsed_micros as f64) * 1_000_000f64
+            TOTAL_SIMS,
+            (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
         let state_children = turn_root.children();
@@ -109,7 +109,12 @@ where
 
         let plays = max_child.data().plays();
         let wins = max_child.data().wins();
-        println!("Plays: {} Wins: {} ({:.2})", plays, wins, wins as f32 / plays as f32,);
+        println!(
+            "Plays: {} Wins: {} ({:.2})",
+            plays,
+            wins,
+            wins as f32 / plays as f32,
+        );
 
         max_action
     }
