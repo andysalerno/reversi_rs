@@ -59,6 +59,59 @@ where
             parent_node = parent.parent();
         }
     }
+
+    fn select_child<T: Borrow<TNode>>(&self, root: &T) -> Option<TNode::Borrowable> {
+        let root_borrowed = root.borrow();
+
+        let is_our_turn = root_borrowed.data().state().current_player_turn() == self.color;
+
+        let child_nodes = root_borrowed.children();
+
+        let selected = if is_our_turn {
+            child_nodes
+                .into_iter()
+                .max_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap())
+        } else {
+            child_nodes
+                .into_iter()
+                .min_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap())
+        };
+
+        match selected {
+            Some(n) => Some(n.make_borrowable()),
+            None => None,
+        }
+    }
+
+    fn select_to_leaf(&self, root: &TNode) -> TNode::Borrowable {
+        let mut cur_node = root.make_borrowable();
+
+        loop {
+            let selected_child: Option<TNode::Borrowable> = self.select_child(&cur_node);
+
+            if selected_child.is_none() {
+                return cur_node;
+            }
+
+            cur_node = selected_child.unwrap();
+        }
+    }
+
+    /// Given a node, score it in such a way that encourages
+    /// both exploration and exploitation of the state space.
+    fn score_node(&self, node: &TNode) -> f32 {
+        let plays = node.data().plays() as f32;
+
+        if plays == 0f32 {
+            return std::f32::MAX;
+        }
+
+        let wins = node.data().wins() as f32;
+        let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+        let bias = 2 as f32;
+
+        (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    }
 }
 
 impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
@@ -74,7 +127,7 @@ where
         const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
             // select
-            let child_borrowable = select_to_leaf::<TNode, TState>(&turn_root);
+            let child_borrowable = self.select_to_leaf(&turn_root);
             let selected = child_borrowable.borrow();
 
             // expand
@@ -117,40 +170,6 @@ where
         );
 
         max_action
-    }
-}
-
-fn select_child<TNode, TState>(nodes: TNode::ChildrenIter) -> Option<TNode::Borrowable>
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let selected = nodes
-        .into_iter()
-        .max_by(|a, b| score_node(a).partial_cmp(&score_node(b)).unwrap());
-
-    match selected {
-        Some(n) => Some(n.make_borrowable()),
-        None => None,
-    }
-}
-
-fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode::Borrowable
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let mut cur_node = root.make_borrowable();
-
-    loop {
-        let selected_child: Option<TNode::Borrowable> =
-            select_child::<TNode, TState>(cur_node.borrow().children());
-
-        if selected_child.is_none() {
-            return cur_node;
-        }
-
-        cur_node = selected_child.unwrap();
     }
 }
 
@@ -198,26 +217,6 @@ where
 
         state.apply_move(random_action);
     }
-}
-
-/// Given a node, score it in such a way that encourages
-/// both exploration and exploitation of the state space.
-fn score_node<TNode, TState>(node: &TNode) -> f32
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let plays = node.data().plays() as f32;
-
-    if plays == 0f32 {
-        return std::f32::MAX;
-    }
-
-    let wins = node.data().wins() as f32;
-    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-    let bias = 2 as f32;
-
-    (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
 }
 
 #[cfg(test)]
