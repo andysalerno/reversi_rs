@@ -42,7 +42,7 @@ where
         let child = Rc::new(NodeContent {
             parent: Rc::downgrade(self),
             children: RefCell::default(),
-            data: data,
+            data,
         });
 
         self.children.borrow_mut().push(child.clone());

@@ -7,7 +7,7 @@ pub enum PlayerColor {
 }
 
 impl PlayerColor {
-    pub fn opponent(&self) -> Self {
+    pub fn opponent(self) -> Self {
         match self {
             PlayerColor::Black => PlayerColor::White,
             PlayerColor::White => PlayerColor::Black,

@@ -50,7 +50,7 @@ impl<T: GameState> Data<T> for MctsData<T> {
             state: state.clone(),
             plays: Cell::new(plays),
             wins: Cell::new(wins),
-            action: action.clone(),
+            action,
         }
     }
 }

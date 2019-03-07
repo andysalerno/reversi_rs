@@ -381,12 +381,12 @@ impl GameState for ReversiState {
         let white_legal_moves = self.legal_moves(PlayerColor::White);
         let black_legal_moves = self.legal_moves(PlayerColor::Black);
 
-        if white_legal_moves.len() == 1 && black_legal_moves.len() == 1 {
-            if white_legal_moves[0] == ReversiAction::PassTurn
-                && black_legal_moves[0] == ReversiAction::PassTurn
-            {
-                return true;
-            }
+        if white_legal_moves.len() == 1
+            && black_legal_moves.len() == 1
+            && white_legal_moves[0] == ReversiAction::PassTurn
+            && black_legal_moves[0] == ReversiAction::PassTurn
+        {
+            return true;
         }
 
         false
