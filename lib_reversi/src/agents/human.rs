@@ -19,7 +19,7 @@ impl HumanAgent {
                 .read_line(&mut input)
                 .expect("Couldn't capture user input.");
 
-            let nums: Vec<_> = dbg!(input.split(',').map(|x| x.trim()).collect());
+            let nums: Vec<_> = input.split(',').map(|x| x.trim()).collect();
 
             if nums.len() != 2 {
                 println!("Invalid input: {} -- expected format: col,row", input);

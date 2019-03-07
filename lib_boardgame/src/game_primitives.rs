@@ -141,6 +141,8 @@ where
             self.player_take_turn(cur_player_color);
         }
 
+        println!("{}", self.game_state().human_friendly());
+
         self.game_result()
             .expect("The game is over, so there must be a game result.")
     }

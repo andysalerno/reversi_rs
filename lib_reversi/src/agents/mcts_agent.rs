@@ -124,7 +124,7 @@ where
 
         let now = Instant::now();
 
-        const TOTAL_SIMS: u128 = 1000;
+        const TOTAL_SIMS: u128 = 30_000;
         for _ in 0..TOTAL_SIMS {
             // select
             let child_borrowable = self.select_to_leaf(&turn_root);
