@@ -6,7 +6,7 @@ use lib_reversi::reversi_gamestate::ReversiState;
 use lib_reversi::agents::human::HumanAgent;
 
 fn main() {
-    let white = RandomAgent;
+    let white = HumanAgent;
     let black = MCTSRcAgent::<ReversiState>::new(PlayerColor::Black);
 
     let mut game = Reversi::new(white, black);

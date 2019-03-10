@@ -244,10 +244,12 @@ mod tests {
 
     #[test]
     fn backprop_works_one_node() {
+        let agent = MCTSAgent::new(PlayerColor::White);
+
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
         let tree_root = make_node(data.clone());
 
-        backprop(&tree_root, GameResult::BlackWins);
+        agent.backprop(&tree_root, GameResult::BlackWins);
 
         assert_eq!(1, tree_root.data().plays());
     }
@@ -271,6 +273,8 @@ mod tests {
 
     #[test]
     fn backprop_works_several_nodes() {
+        let agent = MCTSAgent::new(PlayerColor::White);
+
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = make_node(data.clone());
@@ -279,7 +283,7 @@ mod tests {
         let child_level_3 = child_level_2.new_child(data.clone());
         let child_level_4 = child_level_3.new_child(data.clone());
 
-        backprop(&child_level_3, GameResult::BlackWins);
+        agent.backprop(&child_level_3, GameResult::BlackWins);
 
         assert_eq!(1, child_level_3.data().plays());
         assert_eq!(1, child_level_2.data().plays());
@@ -290,6 +294,7 @@ mod tests {
 
     #[test]
     fn select_child_works() {
+        let agent = MCTSAgent::new(PlayerColor::White);
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = RcNode::new_root(data.clone());
@@ -299,22 +304,23 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
-        backprop(&child_level_3, GameResult::BlackWins);
-        backprop(&child_level_4, GameResult::BlackWins);
-        backprop(&child_level_4, GameResult::BlackWins);
-        backprop(&child_level_4b, GameResult::BlackWins);
+        agent.backprop(&child_level_3, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4b, GameResult::BlackWins);
 
         let selected_borrow =
-            select_child::<RcNode<MctsData<ReversiState>>, ReversiState>(child_level_3.children())
+            agent.select_child::<RcNode<MctsData<ReversiState>>>(&child_level_3)
                 .expect("the child should have been selected.");
 
         let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
 
-        assert_eq!(1, selected.data().plays());
+        assert_eq!(2, selected.data().plays());
     }
 
     #[test]
     fn select_to_leaf_works() {
+        let agent = MCTSAgent::new(PlayerColor::White);
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = RcNode::new_root(data.clone());
@@ -324,20 +330,21 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
-        backprop(&child_level_3, GameResult::BlackWins);
-        backprop(&child_level_4, GameResult::BlackWins);
-        backprop(&child_level_4, GameResult::BlackWins);
-        backprop(&child_level_4b, GameResult::BlackWins);
+        agent.backprop(&child_level_3, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4b, GameResult::BlackWins);
 
-        let leaf_borrow = select_to_leaf(&tree_root);
+        let leaf_borrow = agent.select_to_leaf(&tree_root);
 
         let leaf: &RcNode<MctsData<ReversiState>> = leaf_borrow.borrow();
 
-        assert_eq!(1, leaf.data().plays());
+        assert_eq!(2, leaf.data().plays());
     }
 
     #[test]
     fn score_node_works() {
+        let agent = MCTSAgent::new(PlayerColor::White);
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
 
         let tree_root = make_node(data.clone());
@@ -349,21 +356,21 @@ mod tests {
         let child_d = tree_root.new_child(data.clone());
 
         // "visit" each child a different amount of times
-        backprop(&child_a, GameResult::BlackWins);
-        backprop(&child_a, GameResult::BlackWins);
-        backprop(&child_a, GameResult::BlackWins);
+        agent.backprop(&child_a, GameResult::BlackWins);
+        agent.backprop(&child_a, GameResult::BlackWins);
+        agent.backprop(&child_a, GameResult::BlackWins);
 
-        backprop(&child_b, GameResult::BlackWins);
-        backprop(&child_b, GameResult::BlackWins);
+        agent.backprop(&child_b, GameResult::BlackWins);
+        agent.backprop(&child_b, GameResult::BlackWins);
 
-        backprop(&child_c, GameResult::BlackWins);
+        agent.backprop(&child_c, GameResult::BlackWins);
 
-        assert_eq!(2.545643f32, score_node(&child_a));
-        assert_eq!(2.8930185f32, score_node(&child_b));
-        assert_eq!(3.6771324f32, score_node(&child_c));
+        assert_eq!(1.5456431, agent.score_node(&child_a));
+        assert_eq!(1.8930185, agent.score_node(&child_b));
+        assert_eq!(2.6771324, agent.score_node(&child_c));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node(&child_d)
+            agent.score_node(&child_d)
         );
     }
 
