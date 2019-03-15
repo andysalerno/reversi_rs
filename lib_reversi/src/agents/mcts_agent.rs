@@ -60,7 +60,7 @@ where
         }
     }
 
-    fn select_child<T: Borrow<TNode>>(&self, root: &T) -> Option<TNode::Borrowable> {
+    fn select_child(&self, root: &TNode::Borrowable) -> Option<TNode::Borrowable> {
         let root_borrowed = root.borrow();
 
         let is_our_turn = root_borrowed.data().state().current_player_turn() == self.color;
@@ -124,7 +124,7 @@ where
 
         let now = Instant::now();
 
-        const TOTAL_SIMS: u128 = 30_000;
+        const TOTAL_SIMS: u128 = 5;
         for _ in 0..TOTAL_SIMS {
             // select
             let child_borrowable = self.select_to_leaf(&turn_root);
@@ -310,7 +310,7 @@ mod tests {
         agent.backprop(&child_level_4b, GameResult::BlackWins);
 
         let selected_borrow =
-            agent.select_child::<RcNode<MctsData<ReversiState>>>(&child_level_3)
+            agent.select_child(&child_level_3)
                 .expect("the child should have been selected.");
 
         let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
