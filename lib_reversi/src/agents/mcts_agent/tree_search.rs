@@ -16,6 +16,7 @@ pub struct MctsData<T: GameState> {
     plays: Cell<usize>,
     wins: Cell<usize>,
     action: Option<T::Move>,
+    is_saturated: bool,
 }
 
 impl<T: GameState> MctsData<T> {
@@ -50,6 +51,7 @@ impl<T: GameState> Data<T> for MctsData<T> {
             state: state.clone(),
             plays: Cell::new(plays),
             wins: Cell::new(wins),
+            is_saturated: false,
             action,
         }
     }

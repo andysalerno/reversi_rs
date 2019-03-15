@@ -21,7 +21,11 @@ pub(crate) fn random_choice<T>(choices: &[T]) -> T
 where
     T: Copy,
 {
-    *choices.choose(&mut rand::thread_rng()).unwrap()
+    *random_pick(choices)
+}
+
+pub(crate) fn random_pick<'a, T>(choices: &'a[T]) -> &'a T {
+    choices.choose(&mut rand::thread_rng()).unwrap()
 }
 
 impl BoardDirectionIter {

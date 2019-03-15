@@ -63,19 +63,11 @@ where
     fn select_child(&self, root: &TNode::Borrowable) -> Option<TNode::Borrowable> {
         let root_borrowed = root.borrow();
 
-        let is_our_turn = root_borrowed.data().state().current_player_turn() == self.color;
-
         let child_nodes = root_borrowed.children();
 
-        let selected = if is_our_turn {
-            child_nodes
-                .into_iter()
-                .max_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap())
-        } else {
-            child_nodes
-                .into_iter()
-                .min_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap())
-        };
+        let selected = child_nodes
+            .into_iter()
+            .max_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap());
 
         match selected {
             Some(n) => Some(n.make_borrowable()),
@@ -124,19 +116,25 @@ where
 
         let now = Instant::now();
 
-        const TOTAL_SIMS: u128 = 5;
+        const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
             // select
             let child_borrowable = self.select_to_leaf(&turn_root);
             let selected = child_borrowable.borrow();
 
             // expand
-            let newly_expanded_children = expand(selected).into_iter().collect::<Vec<_>>();
+            let expanded = expand(selected);
+
+            if expanded.is_none() {
+                // there was nothing left to expand down this path
+                continue;
+            }
+
+            let newly_expanded_children = expanded.unwrap().into_iter().collect::<Vec<_>>();
 
             // after we expand, all children are new, so the first one is as good as any
-            let sim_node = newly_expanded_children
-                .get(0)
-                .expect("there must have been children after expanding.");
+            let sim_node = util::random_pick(&newly_expanded_children);
+                // .expect("there must have been children after expanding.");
 
             // simulate
             let sim_result = simulate(sim_node);
@@ -173,11 +171,12 @@ where
     }
 }
 
-fn expand<TNode, TState>(node: &TNode) -> TNode::ChildrenIter
+fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    // todo: unnecessary optimization here?
     let children_iter = node.children().into_iter();
     let children: Vec<_> = children_iter.collect();
     if !children.is_empty() {
@@ -185,6 +184,11 @@ where
     }
 
     let state = node.data().state();
+    if state.is_game_over() {
+        // if the game is over, we have nothing to expand
+        return None;
+    }
+
     let player_turn = state.current_player_turn();
     let legal_actions = state.legal_moves(player_turn);
 
@@ -194,7 +198,7 @@ where
         let _child_node = node.new_child(data);
     }
 
-    node.children()
+    Some(node.children())
 }
 
 fn simulate<TNode, TState>(node: &TNode) -> GameResult
@@ -309,9 +313,9 @@ mod tests {
         agent.backprop(&child_level_4, GameResult::BlackWins);
         agent.backprop(&child_level_4b, GameResult::BlackWins);
 
-        let selected_borrow =
-            agent.select_child(&child_level_3)
-                .expect("the child should have been selected.");
+        let selected_borrow = agent
+            .select_child(&child_level_3)
+            .expect("the child should have been selected.");
 
         let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
 
