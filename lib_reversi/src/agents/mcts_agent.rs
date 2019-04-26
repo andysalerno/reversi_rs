@@ -269,6 +269,7 @@ mod tests {
         let tree_root = RcNode::new_root(data);
 
         let expanded_children = expand::<RcNode<MctsData<ReversiState>>, ReversiState>(&tree_root)
+            .expect("must have children")
             .into_iter()
             .collect::<Vec<_>>();
 
@@ -311,6 +312,7 @@ mod tests {
         agent.backprop(&child_level_3, GameResult::BlackWins);
         agent.backprop(&child_level_4, GameResult::BlackWins);
         agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
         agent.backprop(&child_level_4b, GameResult::BlackWins);
 
         let selected_borrow = agent
@@ -319,7 +321,7 @@ mod tests {
 
         let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
 
-        assert_eq!(2, selected.data().plays());
+        assert_eq!(1, selected.data().plays());
     }
 
     #[test]
@@ -337,6 +339,9 @@ mod tests {
         agent.backprop(&child_level_3, GameResult::BlackWins);
         agent.backprop(&child_level_4, GameResult::BlackWins);
         agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4, GameResult::BlackWins);
+        agent.backprop(&child_level_4b, GameResult::BlackWins);
         agent.backprop(&child_level_4b, GameResult::BlackWins);
 
         let leaf_borrow = agent.select_to_leaf(&tree_root);
