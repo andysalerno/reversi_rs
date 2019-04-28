@@ -67,10 +67,10 @@ where
 
         let selected = child_nodes
             .into_iter()
-            .max_by(|a, b| self.score_node(a).partial_cmp(&self.score_node(b)).unwrap());
+            .max_by(|a, b| self.score_node(a.borrow()).partial_cmp(&self.score_node(b.borrow())).unwrap());
 
         match selected {
-            Some(n) => Some(n.make_borrowable()),
+            Some(n) => Some(n),
             None => None,
         }
     }
@@ -137,7 +137,7 @@ where
                 // .expect("there must have been children after expanding.");
 
             // simulate
-            let sim_result = simulate(sim_node);
+            let sim_result = simulate(sim_node.borrow());
 
             // backprop
             self.backprop(selected, sim_result);
@@ -153,13 +153,13 @@ where
         let state_children = turn_root.children();
         let max_child = state_children
             .into_iter()
-            .max_by_key(|c| c.data().plays())
+            .max_by_key(|c| c.borrow().data().plays())
             .unwrap();
 
-        let max_action = max_child.data().action().unwrap();
+        let max_action = max_child.borrow().data().action().unwrap();
 
-        let plays = max_child.data().plays();
-        let wins = max_child.data().wins();
+        let plays = max_child.borrow().data().plays();
+        let wins = max_child.borrow().data().wins();
         println!(
             "Plays: {} Wins: {} ({:.2})",
             plays,

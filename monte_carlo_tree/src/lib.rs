@@ -3,8 +3,11 @@ pub mod rc_tree;
 
 use std::borrow::Borrow;
 
+#[macro_use]
+extern crate lazy_static;
+
 pub trait Node: Sized + Clone {
-    type ChildrenIter: IntoIterator<Item = Self>;
+    type ChildrenIter: IntoIterator<Item = Self::Borrowable>;
     type Borrowable: Borrow<Self>;
     type Data;
 
@@ -28,12 +31,19 @@ mod tests {
         #[derive(Copy, Clone, Default)]
         struct ArenaIndex(usize);
 
+        impl Borrow<ArenaNode<EmptyNodeData>> for ArenaIndex {
+            fn borrow(&self) -> &ArenaNode<EmptyNodeData> {
+                ARENA.get_node(*self)
+            }
+        }
+
         #[derive(Default)]
         struct ArenaData {
             index: ArenaIndex,
             parent_idx: Option<ArenaIndex>,
         }
 
+        #[derive(Default)]
         struct Arena<T> {
             arena: Vec<ArenaNode<T>>,
         }
@@ -55,6 +65,7 @@ mod tests {
                     index,
                     data,
                     parent_index,
+                    children: Default::default(),
                 });
 
                 index
@@ -67,6 +78,7 @@ mod tests {
                     index,
                     data,
                     parent_index,
+                    children: Default::default(),
                 });
 
                 index
@@ -77,32 +89,43 @@ mod tests {
         struct ArenaNode<T> {
             index: ArenaIndex,
             parent_index: Option<ArenaIndex>,
+            children: Vec<ArenaIndex>,
             data: T,
         }
 
-        impl<T> Node for ArenaNode<T>
-        where
-            T: Clone,
-        {
-            type ChildrenIter = Vec<Self>;
-            type Borrowable = Self;
+        #[derive(Default, Clone)]
+        struct EmptyNodeData;
+
+        lazy_static! {
+            static ref ARENA: Arena<EmptyNodeData> = Default::default();
+        }
+
+        impl Node for ArenaNode<EmptyNodeData> {
+            type ChildrenIter = Vec<ArenaIndex>;
+            type Borrowable = ArenaIndex;
             type Data = Option<()>;
 
             fn data(&self) -> &Self::Data {
                 &None
             }
+
             fn parent(&self) -> Option<Self::Borrowable> {
-                unimplemented!()
+                self.parent_index
             }
+
             fn make_borrowable(&self) -> Self::Borrowable {
-                unimplemented!()
+                self.index
             }
+
             fn children(&self) -> Self::ChildrenIter {
-                Vec::new()
+                // todo: how do we avoid this clone?
+                self.children.clone()
             }
+
             fn new_child(&self, state: Self::Data) -> Self {
                 unimplemented!()
             }
+
             fn new_root(state: Self::Data) -> Self {
                 unimplemented!()
             }
