@@ -16,8 +16,8 @@ pub trait Node: Sized + Clone {
     fn make_borrowable(&self) -> Self::Borrowable;
     fn children(&self) -> Self::ChildrenIter;
 
-    fn new_child(&self, state: Self::Data) -> Self;
-    fn new_root(state: Self::Data) -> Self;
+    fn new_child(&self, state: Self::Data) -> Self::Borrowable;
+    fn new_root(state: Self::Data) -> Self::Borrowable;
 }
 
 #[cfg(test)]
@@ -103,10 +103,10 @@ mod tests {
         impl Node for ArenaNode<EmptyNodeData> {
             type ChildrenIter = Vec<ArenaIndex>;
             type Borrowable = ArenaIndex;
-            type Data = Option<()>;
+            type Data = EmptyNodeData;
 
             fn data(&self) -> &Self::Data {
-                &None
+                &EmptyNodeData
             }
 
             fn parent(&self) -> Option<Self::Borrowable> {
@@ -122,12 +122,18 @@ mod tests {
                 self.children.clone()
             }
 
-            fn new_child(&self, state: Self::Data) -> Self {
-                unimplemented!()
+            fn new_child(&self, state: Self::Data) -> ArenaIndex {
+                let child_index = ARENA.insert_node(
+                    self.parent_index
+                        .expect("must have parent to insert a child."),
+                    state,
+                );
+
+                child_index
             }
 
-            fn new_root(state: Self::Data) -> Self {
-                unimplemented!()
+            fn new_root(state: Self::Data) -> ArenaIndex {
+                ARENA.insert_root(state)
             }
         }
     }

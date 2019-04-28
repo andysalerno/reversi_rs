@@ -119,7 +119,7 @@ where
         const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
             // select
-            let child_borrowable = self.select_to_leaf(&turn_root);
+            let child_borrowable = self.select_to_leaf(turn_root.borrow());
             let selected = child_borrowable.borrow();
 
             // expand
@@ -150,7 +150,7 @@ where
             (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        let state_children = turn_root.children();
+        let state_children = turn_root.borrow().children();
         let max_child = state_children
             .into_iter()
             .max_by_key(|c| c.borrow().data().plays())
@@ -242,7 +242,7 @@ mod tests {
         let child = tree_root.new_child(data.clone());
 
         assert_eq!(1, tree_root.children().into_iter().count());
-        assert!(child.parent().is_some());
+        assert!(child.borrow().parent().is_some());
         assert!(tree_root.parent().is_none());
     }
 
@@ -284,17 +284,17 @@ mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_2 = child_level_1.new_child(data.clone());
-        let child_level_3 = child_level_2.new_child(data.clone());
-        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
 
         agent.backprop(&child_level_3, GameResult::BlackWins);
 
-        assert_eq!(1, child_level_3.data().plays());
-        assert_eq!(1, child_level_2.data().plays());
-        assert_eq!(1, child_level_1.data().plays());
+        assert_eq!(1, child_level_3.borrow().data().plays());
+        assert_eq!(1, child_level_2.borrow().data().plays());
+        assert_eq!(1, child_level_1.borrow().data().plays());
         assert_eq!(1, tree_root.data().plays());
-        assert_eq!(0, child_level_4.data().plays());
+        assert_eq!(0, child_level_4.borrow().data().plays());
     }
 
     #[test]
