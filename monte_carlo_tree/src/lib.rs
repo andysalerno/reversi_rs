@@ -48,6 +48,12 @@ mod tests {
             arena: Vec<ArenaNode<T>>,
         }
 
+        impl<T: Default> Arena<T> {
+            fn new() -> Self {
+                Self { arena: Vec::new() }
+            }
+        }
+
         impl<T> Arena<T> {
             fn get_node(&self, index: ArenaIndex) -> &ArenaNode<T> {
                 &self.arena[index.0]

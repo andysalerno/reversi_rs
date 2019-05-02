@@ -288,7 +288,7 @@ mod tests {
         let child_level_3 = child_level_2.borrow().new_child(data.clone());
         let child_level_4 = child_level_3.borrow().new_child(data.clone());
 
-        agent.backprop(&child_level_3, GameResult::BlackWins);
+        agent.backprop(child_level_3.borrow(), GameResult::BlackWins);
 
         assert_eq!(1, child_level_3.borrow().data().plays());
         assert_eq!(1, child_level_2.borrow().data().plays());
@@ -359,27 +359,27 @@ mod tests {
         let tree_root = make_node(data.clone());
 
         // all children of the same parent
-        let child_a = tree_root.new_child(data.clone());
-        let child_b = tree_root.new_child(data.clone());
-        let child_c = tree_root.new_child(data.clone());
-        let child_d = tree_root.new_child(data.clone());
+        let child_a = tree_root.borrow().new_child(data.clone());
+        let child_b = tree_root.borrow().new_child(data.clone());
+        let child_c = tree_root.borrow().new_child(data.clone());
+        let child_d = tree_root.borrow().new_child(data.clone());
 
         // "visit" each child a different amount of times
-        agent.backprop(&child_a, GameResult::BlackWins);
-        agent.backprop(&child_a, GameResult::BlackWins);
-        agent.backprop(&child_a, GameResult::BlackWins);
+        agent.backprop(child_a.borrow(), GameResult::BlackWins);
+        agent.backprop(child_a.borrow(), GameResult::BlackWins);
+        agent.backprop(child_a.borrow(), GameResult::BlackWins);
 
-        agent.backprop(&child_b, GameResult::BlackWins);
-        agent.backprop(&child_b, GameResult::BlackWins);
+        agent.backprop(child_b.borrow(), GameResult::BlackWins);
+        agent.backprop(child_b.borrow(), GameResult::BlackWins);
 
-        agent.backprop(&child_c, GameResult::BlackWins);
+        agent.backprop(child_c.borrow(), GameResult::BlackWins);
 
-        assert_eq!(1.5456431, agent.score_node(&child_a));
-        assert_eq!(1.8930185, agent.score_node(&child_b));
-        assert_eq!(2.6771324, agent.score_node(&child_c));
+        assert_eq!(1.5456431, agent.score_node(child_a.borrow()));
+        assert_eq!(1.8930185, agent.score_node(child_b.borrow()));
+        assert_eq!(2.6771324, agent.score_node(child_c.borrow()));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            agent.score_node(&child_d)
+            agent.score_node(child_d.borrow())
         );
     }
 
