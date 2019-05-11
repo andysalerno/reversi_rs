@@ -18,6 +18,8 @@ where
     TNode: Node<Data = MctsData<TState>>,
 {
     color: PlayerColor,
+
+    // todo: the fact that I require these lines must mean something is wrong...
     _phantom_a: PhantomData<TState>,
     _phantom_b: PhantomData<TNode>,
 }
@@ -35,7 +37,9 @@ where
         }
     }
 
-    fn backprop(&self, node: &TNode, result: GameResult) {
+    // TODO: this can become a function, not a method,
+    // by passing in the opinionated game result (i.e. it knows if "we" won)
+    fn backprop_sim_result(&self, node: &TNode, result: GameResult) {
         let data = node.data();
         data.increment_plays();
 
@@ -65,9 +69,11 @@ where
 
         let child_nodes = root_borrowed.children();
 
-        let selected = child_nodes
-            .into_iter()
-            .max_by(|a, b| self.score_node(a.borrow()).partial_cmp(&self.score_node(b.borrow())).unwrap());
+        let selected = child_nodes.into_iter().max_by(|a, b| {
+            self.score_node(a.borrow())
+                .partial_cmp(&self.score_node(b.borrow()))
+                .unwrap()
+        });
 
         match selected {
             Some(n) => Some(n),
@@ -118,6 +124,12 @@ where
 
         const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
+            // before we do anything, did we already saturate the entire tree?
+            // if so, we can stop early.
+            if turn_root.borrow().data().is_saturated() {
+                break;
+            }
+
             // select
             let child_borrowable = self.select_to_leaf(turn_root.borrow());
             let selected = child_borrowable.borrow();
@@ -127,6 +139,13 @@ where
 
             if expanded.is_none() {
                 // there was nothing left to expand down this path
+                // TODO: remove this sanity check
+                assert!(selected.children().into_iter().collect::<Vec<_>>().len() == 0);
+
+                // we now know we have selected a saturated node that can't be expanded,
+                // so we can update the parent's saturated child count.
+                backprop_saturation(selected);
+
                 continue;
             }
 
@@ -134,13 +153,13 @@ where
 
             // after we expand, all children are new, so the first one is as good as any
             let sim_node = util::random_pick(&newly_expanded_children);
-                // .expect("there must have been children after expanding.");
+            // .expect("there must have been children after expanding.");
 
             // simulate
             let sim_result = simulate(sim_node.borrow());
 
             // backprop
-            self.backprop(selected, sim_result);
+            self.backprop_sim_result(selected, sim_result);
         }
 
         let elapsed_micros = now.elapsed().as_micros();
@@ -177,8 +196,7 @@ where
     TState: GameState,
 {
     // todo: unnecessary optimization here?
-    let children_iter = node.children().into_iter();
-    let children: Vec<_> = children_iter.collect();
+    let children = node.children().into_iter().collect::<Vec<_>>();
     if !children.is_empty() {
         panic!("wtf? we expanded a node that was already expanded.");
     }
@@ -192,6 +210,11 @@ where
     let player_turn = state.current_player_turn();
     let legal_actions = state.legal_moves(player_turn);
 
+    // Now that we've expanded this node, update it to
+    // inform it how many children it has.
+    node.data().set_children_count(legal_actions.len());
+
+    // create a new child node for every available action->state transition
     for action in legal_actions {
         let resulting_state = state.next_state(action);
         let data = MctsData::new(&resulting_state, 0, 0, Some(action));
@@ -199,6 +222,31 @@ where
     }
 
     Some(node.children())
+}
+
+/// Increment this node's count of saturated children.
+/// If doing so results in this node itself becoming saturated,
+/// follow the same operation for its parent.
+fn backprop_saturation<TNode, TState>(node: &TNode)
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut parent_node = node.parent();
+
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        let data = parent.data();
+        data.increment_saturated_children_count();
+
+        if !data.is_saturated() {
+            // we incremented but we're still not saturated,
+            // so don't keep going.
+            return;
+        }
+
+        parent_node = parent.parent();
+    }
 }
 
 fn simulate<TNode, TState>(node: &TNode) -> GameResult
@@ -227,6 +275,7 @@ where
 mod tests {
     use super::*;
     use crate::reversi_gamestate::ReversiState;
+    use crate::ReversiPiece;
     use monte_carlo_tree::rc_tree::RcNode;
 
     // to ensure clean testing, we get our nodes from this function which gives an anonymous 'impl' type.
@@ -253,7 +302,7 @@ mod tests {
         let data = MctsData::new(&ReversiState::new(), 0, 0, None);
         let tree_root = make_node(data.clone());
 
-        agent.backprop(&tree_root, GameResult::BlackWins);
+        agent.backprop_sim_result(&tree_root, GameResult::BlackWins);
 
         assert_eq!(1, tree_root.data().plays());
     }
@@ -288,7 +337,7 @@ mod tests {
         let child_level_3 = child_level_2.borrow().new_child(data.clone());
         let child_level_4 = child_level_3.borrow().new_child(data.clone());
 
-        agent.backprop(child_level_3.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_level_3.borrow(), GameResult::BlackWins);
 
         assert_eq!(1, child_level_3.borrow().data().plays());
         assert_eq!(1, child_level_2.borrow().data().plays());
@@ -309,11 +358,11 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
-        agent.backprop(&child_level_3, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4b, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_3, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
 
         let selected_borrow = agent
             .select_child(&child_level_3)
@@ -336,19 +385,69 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
-        agent.backprop(&child_level_3, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4, GameResult::BlackWins);
-        agent.backprop(&child_level_4b, GameResult::BlackWins);
-        agent.backprop(&child_level_4b, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_3, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
+        agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
 
         let leaf_borrow = agent.select_to_leaf(&tree_root);
 
         let leaf: &RcNode<MctsData<ReversiState>> = leaf_borrow.borrow();
 
         assert_eq!(2, leaf.data().plays());
+    }
+
+    #[test]
+    fn is_saturated_expects_true_for_childless_node() {
+        let data = MctsData::new(&ReversiState::new(), 0, 0, None);
+
+        let tree_root = make_node(data);
+
+        assert!(
+            tree_root.data().is_saturated(),
+            "An empty node should be considered saturated."
+        );
+    }
+
+    #[test]
+    fn backprop_saturation_becomes_saturated() {
+        let data = {
+            let mut state = ReversiState::new();
+            state.initialize_board();
+            MctsData::new(&state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        let children = expand(tree_root.borrow())
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        assert!(
+            !tree_root.data().is_saturated(),
+            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
+        );
+
+        for child in children.iter().skip(1) {
+            backprop_saturation(child.borrow());
+        }
+
+        assert!(
+            !tree_root.data().is_saturated(),
+            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
+        );
+
+        // backprop the one remaining child.
+        backprop_saturation(children[0].borrow());
+
+        assert!(
+            tree_root.data().is_saturated(),
+            "Now that every child has had its saturation backpropagated, the parent should be considered saturated as well."
+        );
     }
 
     #[test]
@@ -365,14 +464,14 @@ mod tests {
         let child_d = tree_root.borrow().new_child(data.clone());
 
         // "visit" each child a different amount of times
-        agent.backprop(child_a.borrow(), GameResult::BlackWins);
-        agent.backprop(child_a.borrow(), GameResult::BlackWins);
-        agent.backprop(child_a.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_a.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_a.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_a.borrow(), GameResult::BlackWins);
 
-        agent.backprop(child_b.borrow(), GameResult::BlackWins);
-        agent.backprop(child_b.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_b.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_b.borrow(), GameResult::BlackWins);
 
-        agent.backprop(child_c.borrow(), GameResult::BlackWins);
+        agent.backprop_sim_result(child_c.borrow(), GameResult::BlackWins);
 
         assert_eq!(1.5456431, agent.score_node(child_a.borrow()));
         assert_eq!(1.8930185, agent.score_node(child_b.borrow()));

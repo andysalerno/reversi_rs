@@ -19,141 +19,142 @@ pub trait Node: Sized + Clone {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
 
-    mod arena_tests {
-        use super::*;
-        use std::cell::RefCell;
-        use std::rc::Rc;
+    /* unfortunately, I discovered my arena impl is terrible at the last second, so I can't use these tests for now... */
+    // mod arena_tests {
+    //     use super::*;
+    //     use std::cell::RefCell;
+    //     use std::rc::Rc;
 
-        thread_local! {
-            static ARENA: Rc<RefCell<Arena<EmptyNodeData>>> = Default::default();
-        }
+    //     thread_local! {
+    //         static ARENA: Rc<RefCell<Arena<EmptyNodeData>>> = Default::default();
+    //     }
 
-        #[derive(Copy, Clone, Default)]
-        struct ArenaIndex(usize);
+    //     #[derive(Copy, Clone, Default)]
+    //     struct ArenaIndex(usize);
 
-        impl Borrow<ArenaNode<EmptyNodeData>> for ArenaIndex {
-            fn borrow(&self) -> &ArenaNode<EmptyNodeData> {
-                ARENA.with(|a| {
-                    let refcell: &RefCell<_> = a.borrow();
-                    let arena = refcell.borrow();
+    //     impl Borrow<ArenaNode<EmptyNodeData>> for ArenaIndex {
+    //         fn borrow(&self) -> &ArenaNode<EmptyNodeData> {
+    //             ARENA.with(|a| {
+    //                 let rc_ptr: Rc<_> = a.clone();
+    //                 let refcell: &RefCell<_> = rc_ptr.borrow();
+    //                 let arena = refcell.borrow();
 
-                    arena.get_node(*self)
-                })
-            }
-        }
+    //                 unsafe { arena.value.get_node(*self) }
+    //             })
+    //         }
+    //     }
 
-        #[derive(Default)]
-        struct ArenaData {
-            index: ArenaIndex,
-            parent_idx: Option<ArenaIndex>,
-        }
+    //     #[derive(Default)]
+    //     struct ArenaData {
+    //         index: ArenaIndex,
+    //         parent_idx: Option<ArenaIndex>,
+    //     }
 
-        #[derive(Default)]
-        struct Arena<T> {
-            arena: Vec<ArenaNode<T>>,
-        }
+    //     #[derive(Default)]
+    //     struct Arena<T> {
+    //         arena: Vec<ArenaNode<T>>,
+    //     }
 
-        impl<T: Default> Arena<T> {
-            fn new() -> Self {
-                Self { arena: Vec::new() }
-            }
-        }
+    //     impl<T: Default> Arena<T> {
+    //         fn new() -> Self {
+    //             Self { arena: Vec::new() }
+    //         }
+    //     }
 
-        impl<T> Arena<T> {
-            fn get_node(&self, index: ArenaIndex) -> &ArenaNode<T> {
-                &self.arena[index.0]
-            }
+    //     impl<T> Arena<T> {
+    //         fn get_node(&self, index: ArenaIndex) -> &ArenaNode<T> {
+    //             &self.arena[index.0]
+    //         }
 
-            fn get_node_mut(&mut self, index: ArenaIndex) -> &mut ArenaNode<T> {
-                &mut self.arena[index.0]
-            }
+    //         fn get_node_mut(&mut self, index: ArenaIndex) -> &mut ArenaNode<T> {
+    //             &mut self.arena[index.0]
+    //         }
 
-            fn insert_root(&mut self, data: T) -> ArenaIndex {
-                let index = ArenaIndex(self.arena.len());
-                let parent_index = None;
+    //         fn insert_root(&mut self, data: T) -> ArenaIndex {
+    //             let index = ArenaIndex(self.arena.len());
+    //             let parent_index = None;
 
-                self.arena.push(ArenaNode {
-                    index,
-                    data,
-                    parent_index,
-                    children: Default::default(),
-                });
+    //             self.arena.push(ArenaNode {
+    //                 index,
+    //                 data,
+    //                 parent_index,
+    //                 children: Default::default(),
+    //             });
 
-                index
-            }
+    //             index
+    //         }
 
-            fn insert_node(&mut self, parent_idx: ArenaIndex, data: T) -> ArenaIndex {
-                let index = ArenaIndex(self.arena.len());
-                let parent_index = Some(parent_idx);
-                self.arena.push(ArenaNode {
-                    index,
-                    data,
-                    parent_index,
-                    children: Default::default(),
-                });
+    //         fn insert_node(&mut self, parent_idx: ArenaIndex, data: T) -> ArenaIndex {
+    //             let index = ArenaIndex(self.arena.len());
+    //             let parent_index = Some(parent_idx);
+    //             self.arena.push(ArenaNode {
+    //                 index,
+    //                 data,
+    //                 parent_index,
+    //                 children: Default::default(),
+    //             });
 
-                index
-            }
-        }
+    //             index
+    //         }
+    //     }
 
-        #[derive(Clone)]
-        struct ArenaNode<T> {
-            index: ArenaIndex,
-            parent_index: Option<ArenaIndex>,
-            children: Vec<ArenaIndex>,
-            data: T,
-        }
+    //     #[derive(Clone)]
+    //     struct ArenaNode<T> {
+    //         index: ArenaIndex,
+    //         parent_index: Option<ArenaIndex>,
+    //         children: Vec<ArenaIndex>,
+    //         data: T,
+    //     }
 
-        #[derive(Default, Clone)]
-        struct EmptyNodeData;
+    //     #[derive(Default, Clone)]
+    //     struct EmptyNodeData;
 
-        impl Node for ArenaNode<EmptyNodeData> {
-            type ChildrenIter = Vec<ArenaIndex>;
-            type Borrowable = ArenaIndex;
-            type Data = EmptyNodeData;
+    //     impl Node for ArenaNode<EmptyNodeData> {
+    //         type ChildrenIter = Vec<ArenaIndex>;
+    //         type Borrowable = ArenaIndex;
+    //         type Data = EmptyNodeData;
 
-            fn data(&self) -> &Self::Data {
-                &EmptyNodeData
-            }
+    //         fn data(&self) -> &Self::Data {
+    //             &EmptyNodeData
+    //         }
 
-            fn parent(&self) -> Option<Self::Borrowable> {
-                self.parent_index
-            }
+    //         fn parent(&self) -> Option<Self::Borrowable> {
+    //             self.parent_index
+    //         }
 
-            fn make_borrowable(&self) -> Self::Borrowable {
-                self.index
-            }
+    //         fn make_borrowable(&self) -> Self::Borrowable {
+    //             self.index
+    //         }
 
-            fn children(&self) -> Self::ChildrenIter {
-                // todo: how do we avoid this clone?
-                self.children.clone()
-            }
+    //         fn children(&self) -> Self::ChildrenIter {
+    //             // todo: how do we avoid this clone?
+    //             self.children.clone()
+    //         }
 
-            fn new_child(&self, state: Self::Data) -> ArenaIndex {
-                ARENA.with(|a| {
-                    let refcell: &RefCell<_> = a.borrow();
-                    let mut arena = refcell.borrow_mut();
+    //         fn new_child(&self, state: Self::Data) -> ArenaIndex {
+    //             ARENA.with(|a| {
+    //                 let refcell: &RefCell<_> = a.borrow();
+    //                 let mut arena = refcell.borrow_mut();
 
-                    arena.insert_node(
-                        self.parent_index
-                            .expect("must have parent to insert a child."),
-                        state,
-                    )
-                })
-            }
+    //                 arena.insert_node(
+    //                     self.parent_index
+    //                         .expect("must have parent to insert a child."),
+    //                     state,
+    //                 )
+    //             })
+    //         }
 
-            fn new_root(state: Self::Data) -> ArenaIndex {
-                ARENA.with(|a| {
-                    let refcell: &RefCell<_> = a.borrow();
-                    let mut arena = refcell.borrow_mut();
-                    arena.insert_root(state)
-                })
-            }
-        }
-    }
+    //         fn new_root(state: Self::Data) -> ArenaIndex {
+    //             ARENA.with(|a| {
+    //                 let refcell: &RefCell<_> = a.borrow();
+    //                 let mut arena = refcell.borrow_mut();
+    //                 arena.insert_root(state)
+    //             })
+    //         }
+    //     }
+    // }
 
     #[derive(Clone)]
     struct TestNode;

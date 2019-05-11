@@ -16,7 +16,9 @@ pub struct MctsData<T: GameState> {
     plays: Cell<usize>,
     wins: Cell<usize>,
     action: Option<T::Move>,
-    is_saturated: bool,
+
+    children_count: Cell<usize>,
+    children_saturated_count: Cell<usize>,
 }
 
 impl<T: GameState> MctsData<T> {
@@ -26,6 +28,26 @@ impl<T: GameState> MctsData<T> {
 
     pub fn increment_wins(&self) {
         self.wins.set(self.wins.get() + 1);
+    }
+
+    /// A node is considered saturated if:
+    ///     * it is a leaf node (has no children), OR
+    ///     * every one of its children is saturated
+    /// During MCTS, we should not traverse down saturated nodes,
+    /// since we have already seen every outcome.
+    /// Nodes should not be marked saturated until AFTER their result
+    /// has been backpropagated.
+    pub fn is_saturated(&self) -> bool {
+        self.children_count == self.children_saturated_count
+    }
+
+    pub fn set_children_count(&self, count: usize) {
+        self.children_count.set(count);
+    }
+
+    pub fn increment_saturated_children_count(&self) {
+        self.children_saturated_count
+            .set(self.children_saturated_count.get() + 1);
     }
 }
 
@@ -51,8 +73,9 @@ impl<T: GameState> Data<T> for MctsData<T> {
             state: state.clone(),
             plays: Cell::new(plays),
             wins: Cell::new(wins),
-            is_saturated: false,
             action,
+            children_count: Default::default(),
+            children_saturated_count: Default::default(),
         }
     }
 }

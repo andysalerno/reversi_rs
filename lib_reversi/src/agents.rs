@@ -1,3 +1,3 @@
 pub mod random_agent;
-pub mod human;
+pub mod human_agent;
 pub mod mcts_agent;
