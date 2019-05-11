@@ -48,6 +48,8 @@ impl<T: GameState> MctsData<T> {
     pub fn increment_saturated_children_count(&self) {
         self.children_saturated_count
             .set(self.children_saturated_count.get() + 1);
+
+        assert!(self.children_saturated_count.get() <= self.children_count.get());
     }
 }
 

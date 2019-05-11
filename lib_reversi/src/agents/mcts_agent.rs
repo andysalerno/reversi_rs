@@ -124,12 +124,6 @@ where
 
         const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
-            // before we do anything, did we already saturate the entire tree?
-            // if so, we can stop early.
-            if turn_root.borrow().data().is_saturated() {
-                break;
-            }
-
             // select
             let child_borrowable = self.select_to_leaf(turn_root.borrow());
             let selected = child_borrowable.borrow();
@@ -146,7 +140,16 @@ where
                 // so we can update the parent's saturated child count.
                 backprop_saturation(selected);
 
-                continue;
+                // did backpropagation result in our root node
+                // becoming saturated? if so, we've exhausted
+                // the entire remaining state space, so there's
+                // no more work left to do.
+                if turn_root.borrow().data().is_saturated() && self.color == PlayerColor::Black {
+                    println!("breaking!!");
+                    break;
+                } else {
+                    continue;
+                }
             }
 
             let newly_expanded_children = expanded.unwrap().into_iter().collect::<Vec<_>>();
@@ -232,6 +235,7 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    assert!(node.data().is_saturated());
     let mut parent_node = node.parent();
 
     while let Some(p) = parent_node {
@@ -448,6 +452,64 @@ mod tests {
             tree_root.data().is_saturated(),
             "Now that every child has had its saturation backpropagated, the parent should be considered saturated as well."
         );
+    }
+
+    #[test]
+    fn backprop_multi_levels_works() {
+        let data = {
+            let mut state = ReversiState::new();
+            state.initialize_board();
+            MctsData::new(&state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        let children_1 = expand(tree_root.borrow())
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let child_a = &children_1[0];
+        let child_b = &children_1[1];
+
+        let grandchildren_a = expand(child_a.borrow())
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let grandchildren_b = expand(child_b.borrow())
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(!child_a.borrow().data().is_saturated());
+        assert!(!child_b.borrow().data().is_saturated());
+
+        for grandchild in grandchildren_a {
+            backprop_saturation(grandchild.borrow());
+        }
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(!child_b.borrow().data().is_saturated());
+
+        assert!(child_a.borrow().data().is_saturated());
+
+        for grandchild in grandchildren_b {
+            backprop_saturation(grandchild.borrow());
+        }
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(child_a.borrow().data().is_saturated());
+        assert!(child_b.borrow().data().is_saturated());
+
+        for child in children_1.iter().skip(2) {
+            backprop_saturation(child.borrow());
+        }
+
+        assert!(tree_root.data().is_saturated());
+        assert!(child_a.borrow().data().is_saturated());
+        assert!(child_b.borrow().data().is_saturated());
     }
 
     #[test]
