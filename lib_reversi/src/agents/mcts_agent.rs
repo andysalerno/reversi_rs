@@ -64,31 +64,34 @@ where
         }
     }
 
+    /// For all children of the given node, assign each one a score,
+    /// and return the child with the highest score (ties broken by the first)
+    /// or None if there are no children (or if every child is already saturated).
     fn select_child(&self, root: &TNode::Borrowable) -> Option<TNode::Borrowable> {
-        let root_borrowed = root.borrow();
+        let child_nodes = root.borrow().children();
 
-        let child_nodes = root_borrowed.children();
-
-        let selected = child_nodes.into_iter().max_by(|a, b| {
+        let selected = child_nodes.into_iter()
+        .filter(|n| !n.borrow().data().is_saturated())
+        .max_by(|a, b| {
             self.score_node(a.borrow())
                 .partial_cmp(&self.score_node(b.borrow()))
                 .unwrap()
         });
 
-        match selected {
-            Some(n) => Some(n),
-            None => None,
-        }
+        selected
     }
 
-    fn select_to_leaf(&self, root: &TNode) -> TNode::Borrowable {
+    /// Repeatedly select nodes down the tree until a leaf is reached.
+    /// The leaf is returned, or None if the root node has no children,
+    /// or there is no remaining unsaturated path.
+    fn select_to_leaf(&self, root: &TNode) -> Option<TNode::Borrowable> {
         let mut cur_node = root.make_borrowable();
 
         loop {
             let selected_child: Option<TNode::Borrowable> = self.select_child(&cur_node);
 
             if selected_child.is_none() {
-                return cur_node;
+                return None;
             }
 
             cur_node = selected_child.unwrap();
@@ -125,20 +128,26 @@ where
         const TOTAL_SIMS: u128 = 1000;
         for _ in 0..TOTAL_SIMS {
             // select
-            let child_borrowable = self.select_to_leaf(turn_root.borrow());
-            let selected = child_borrowable.borrow();
+            let leaf = self.select_to_leaf(turn_root.borrow());
+
+            if leaf.is_none() {
+                break;
+            }
+
+            let leaf = leaf.unwrap();
+            let leaf = leaf.borrow();
 
             // expand
-            let expanded = expand(selected);
+            let expanded = expand(leaf);
 
             if expanded.is_none() {
                 // there was nothing left to expand down this path
                 // TODO: remove this sanity check
-                assert!(selected.children().into_iter().collect::<Vec<_>>().len() == 0);
+                assert!(leaf.children().into_iter().collect::<Vec<_>>().len() == 0);
 
                 // we now know we have selected a saturated node that can't be expanded,
                 // so we can update the parent's saturated child count.
-                backprop_saturation(selected);
+                backprop_saturation(leaf);
 
                 // did backpropagation result in our root node
                 // becoming saturated? if so, we've exhausted
@@ -154,15 +163,13 @@ where
 
             let newly_expanded_children = expanded.unwrap().into_iter().collect::<Vec<_>>();
 
-            // after we expand, all children are new, so the first one is as good as any
             let sim_node = util::random_pick(&newly_expanded_children);
-            // .expect("there must have been children after expanding.");
 
             // simulate
             let sim_result = simulate(sim_node.borrow());
 
             // backprop
-            self.backprop_sim_result(selected, sim_result);
+            self.backprop_sim_result(leaf, sim_result);
         }
 
         let elapsed_micros = now.elapsed().as_micros();
@@ -362,11 +369,19 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
+        child_level_1.data().set_children_count(1);
+        child_level_2.data().set_children_count(1);
+        child_level_3.data().set_children_count(2);
+        child_level_4.data().set_children_count(1);
+        child_level_4b.data().set_children_count(1);
+
         agent.backprop_sim_result(&child_level_3, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
+
+        assert!(!child_level_3.data().is_saturated());
 
         let selected_borrow = agent
             .select_child(&child_level_3)
@@ -389,6 +404,11 @@ mod tests {
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4b = child_level_3.new_child(data.clone());
 
+        tree_root.data().set_children_count(1);
+        child_level_1.data().set_children_count(1);
+        child_level_2.data().set_children_count(1);
+        child_level_3.data().set_children_count(2);
+
         agent.backprop_sim_result(&child_level_3, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4, GameResult::BlackWins);
@@ -397,9 +417,10 @@ mod tests {
         agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
         agent.backprop_sim_result(&child_level_4b, GameResult::BlackWins);
 
-        let leaf_borrow = agent.select_to_leaf(&tree_root);
+        let leaf = agent.select_to_leaf(&tree_root);
+        let leaf = leaf.unwrap();
 
-        let leaf: &RcNode<MctsData<ReversiState>> = leaf_borrow.borrow();
+        let leaf: &RcNode<MctsData<ReversiState>> = leaf.borrow();
 
         assert_eq!(2, leaf.data().plays());
     }
