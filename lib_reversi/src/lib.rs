@@ -1,4 +1,3 @@
-pub mod agents;
 pub mod reversi;
 pub mod reversi_gamestate;
 mod util;
@@ -76,7 +75,7 @@ impl fmt::Debug for ReversiAction {
 
 #[cfg(test)]
 mod tests {
-    use crate::agents::random_agent::RandomAgent;
+    use lib_agents::random_agent::RandomAgent;
     use crate::reversi::Reversi;
     use lib_boardgame::game_primitives::{Game};
 

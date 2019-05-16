@@ -3,5 +3,7 @@ members = [
    "lib_reversi",
    "game_runner",
    "lib_boardgame",
-   "monte_carlo_tree"
+   "monte_carlo_tree",
+   "lib_agents",
+   "util"
 ]

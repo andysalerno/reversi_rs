@@ -8,3 +8,4 @@ edition = "2018"
 lib_boardgame = { path = "../lib_boardgame" }
 rand = "0.6"
 monte_carlo_tree = { path = "../monte_carlo_tree" }
+lib_agents = { path = "../lib_agents" }
