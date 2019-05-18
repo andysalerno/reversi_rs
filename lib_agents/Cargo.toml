@@ -5,5 +5,5 @@ authors = ["andy salerno <andysalerno@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-util = { path = "../util" }
 lib_boardgame = {path = "../lib_boardgame" }
+rand = "0.6"

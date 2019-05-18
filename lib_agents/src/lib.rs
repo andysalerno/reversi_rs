@@ -1,4 +1,5 @@
 pub mod random_agent;
+mod util;
 
 #[cfg(test)]
 mod tests {
