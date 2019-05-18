@@ -73,11 +73,47 @@ impl fmt::Debug for ReversiAction {
     }
 }
 
+impl std::str::FromStr for ReversiAction {
+    type Err = usize;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let nums: Vec<_> = s.split(',').map(|x| x.trim()).collect();
+
+        if nums.len() != 2 {
+            println!("Invalid input: {} -- expected format: col,row", s);
+            return Err(9);
+        }
+
+        let col = nums[0].parse::<usize>();
+        let row = nums[1].parse::<usize>();
+
+        if let (Ok(col), Ok(row)) = (col, row) {
+            let board_pos = BoardPosition::new(col, row);
+            if col > crate::reversi_gamestate::ReversiState::BOARD_SIZE
+                || row >= crate::reversi_gamestate::ReversiState::BOARD_SIZE
+            {
+                println!(
+                    "Position out of bounds of board. Input: {:?}, actual board size: {}",
+                    board_pos,
+                    crate::reversi_gamestate::ReversiState::BOARD_SIZE
+                );
+
+                return Err(9);
+            } else {
+                return Ok(board_pos);
+            }
+        } else {
+            println!("Didn't recognize input as a board position: {}", s);
+            return Err(9);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use lib_agents::random_agent::RandomAgent;
     use crate::reversi::Reversi;
-    use lib_boardgame::game_primitives::{Game};
+    use lib_agents::random_agent::RandomAgent;
+    use lib_boardgame::game_primitives::Game;
 
     #[test]
     fn create_game() {

@@ -1,13 +1,10 @@
-use crate::reversi_gamestate::ReversiState;
-use crate::{BoardPosition, ReversiAction, ReversiPiece};
 use lib_boardgame::game_primitives::{GameAgent, GameState};
+use std::str::FromStr;
 
-pub struct HumanAgent;
+pub struct HumanAgent<TState: GameState>;
 
-type Action = <ReversiState as GameState>::Move;
-
-impl HumanAgent {
-    fn get_user_move(color: ReversiPiece) -> Action {
+impl<TState: GameState> HumanAgent<TState> {
+    fn get_user_move() -> TState::Move {
         use std::io::stdin;
 
         let position = loop {
@@ -18,6 +15,8 @@ impl HumanAgent {
             stdin()
                 .read_line(&mut input)
                 .expect("Couldn't capture user input.");
+
+            let game_move = TState::Move::from_str(&input).unwrap();
 
             let nums: Vec<_> = input.split(',').map(|x| x.trim()).collect();
 
@@ -52,24 +51,30 @@ impl HumanAgent {
     }
 }
 
-impl GameAgent<ReversiState> for HumanAgent {
-    fn pick_move(&self, _state: &ReversiState, legal_moves: &[Action]) -> Action {
-        let color = match legal_moves[0] {
-            ReversiAction::PassTurn => {
-                return legal_moves[0];
-            }
-            ReversiAction::Move {
-                piece: piece_color, ..
-            } => piece_color,
-        };
-
-        let mut user_selected_move = Self::get_user_move(color);
-
-        while !legal_moves.contains(&user_selected_move) {
-            println!("Entered move is not legal.");
-            user_selected_move = Self::get_user_move(color);
-        }
-
-        user_selected_move
+impl<TState: GameState> GameAgent<TState> for HumanAgent {
+    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
+        self.random_choice(&legal_moves)
     }
 }
+
+// impl GameAgent<ReversiState> for HumanAgent {
+//     fn pick_move(&self, _state: &ReversiState, legal_moves: &[Action]) -> Action {
+//         let color = match legal_moves[0] {
+//             ReversiAction::PassTurn => {
+//                 return legal_moves[0];
+//             }
+//             ReversiAction::Move {
+//                 piece: piece_color, ..
+//             } => piece_color,
+//         };
+
+//         let mut user_selected_move = Self::get_user_move(color);
+
+//         while !legal_moves.contains(&user_selected_move) {
+//             println!("Entered move is not legal.");
+//             user_selected_move = Self::get_user_move(color);
+//         }
+
+//         user_selected_move
+//     }
+// }
