@@ -1,6 +1,6 @@
 use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
-use crate::{Board, BoardPosition, Directions, ReversiAction, ReversiPiece, BOARD_SIZE};
+use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
 use lib_boardgame::game_primitives::{GameState, PlayerColor};
 
 #[derive(Clone)]
@@ -163,7 +163,7 @@ impl ReversiState {
 }
 
 impl GameState for ReversiState {
-    type Move = ReversiAction;
+    type Move = ReversiPlayerAction;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
@@ -244,7 +244,7 @@ impl GameState for ReversiState {
                             .find_sibling_piece_pos(origin, piece_color, direction)
                             .is_some()
                         {
-                            moves.push(ReversiAction::Move {
+                            moves.push(ReversiPlayerAction::Move {
                                 piece: piece_color,
                                 position: origin,
                             });
@@ -256,7 +256,7 @@ impl GameState for ReversiState {
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
-            moves.push(ReversiAction::PassTurn);
+            moves.push(ReversiPlayerAction::PassTurn);
         }
 
         moves
@@ -281,12 +281,12 @@ impl GameState for ReversiState {
     ///            X
     fn apply_move(&mut self, action: Self::Move) {
         let (piece, position) = match action {
-            ReversiAction::PassTurn => {
+            ReversiPlayerAction::PassTurn => {
                 // Passing a turn implies giving control to the other player, and doing nothing else.
                 self.current_player_turn = opponent(self.current_player_turn);
                 return;
             }
-            ReversiAction::Move { piece, position } => (piece, position),
+            ReversiPlayerAction::Move { piece, position } => (piece, position),
         };
 
         if !ReversiState::within_board_bounds(position) {
@@ -383,8 +383,8 @@ impl GameState for ReversiState {
 
         if white_legal_moves.len() == 1
             && black_legal_moves.len() == 1
-            && white_legal_moves[0] == ReversiAction::PassTurn
-            && black_legal_moves[0] == ReversiAction::PassTurn
+            && white_legal_moves[0] == ReversiPlayerAction::PassTurn
+            && black_legal_moves[0] == ReversiPlayerAction::PassTurn
         {
             return true;
         }
@@ -395,10 +395,7 @@ impl GameState for ReversiState {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        Board, BoardPosition, GameState, PlayerColor, ReversiAction, ReversiPiece, ReversiState,
-        BOARD_SIZE,
-    };
+    use super::{BoardPosition, GameState, ReversiPiece, ReversiPlayerAction, ReversiState};
 
     fn pos(col: usize, row: usize) -> BoardPosition {
         BoardPosition::new(col, row)
@@ -474,7 +471,7 @@ mod tests {
 
         // We place a white piece at the asterisk:
         // O X *
-        let action = ReversiAction::Move {
+        let action = ReversiPlayerAction::Move {
             piece: ReversiPiece::White,
             position: pos(4, 2),
         };
@@ -506,7 +503,7 @@ mod tests {
         state.set_piece(pos(4, 5), Some(ReversiPiece::Black));
 
         // We place a black piece at the asterisk:
-        let action = ReversiAction::Move {
+        let action = ReversiPlayerAction::Move {
             piece: ReversiPiece::Black,
             position: pos(1, 2),
         };

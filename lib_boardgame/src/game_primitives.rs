@@ -25,7 +25,7 @@ pub enum GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy + fmt::Debug + FromStr {}
+pub trait GameMove: Copy + fmt::Debug {}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,

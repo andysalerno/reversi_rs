@@ -51,7 +51,7 @@ impl BoardPosition {
 }
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum ReversiAction {
+pub enum ReversiPlayerAction {
     PassTurn,
     Move {
         piece: ReversiPiece,
@@ -59,12 +59,12 @@ pub enum ReversiAction {
     },
 }
 
-impl GameMove for ReversiAction {}
-impl fmt::Debug for ReversiAction {
+impl GameMove for ReversiPlayerAction {}
+impl fmt::Debug for ReversiPlayerAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match self {
-            ReversiAction::PassTurn => "(player passes turn)".to_owned(),
-            ReversiAction::Move { piece, position } => {
+            ReversiPlayerAction::PassTurn => "(player passes turn)".to_owned(),
+            ReversiPlayerAction::Move { piece, position } => {
                 format!("({}, {}, {:?})", position.col, position.row, piece)
             }
         };
@@ -73,10 +73,14 @@ impl fmt::Debug for ReversiAction {
     }
 }
 
-impl std::str::FromStr for ReversiAction {
+impl std::str::FromStr for ReversiPlayerAction {
     type Err = usize;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.to_lowercase() == "pass" {
+            return Ok(ReversiPlayerAction::PassTurn);
+        }
+
         let nums: Vec<_> = s.split(',').map(|x| x.trim()).collect();
 
         if nums.len() != 2 {
@@ -88,19 +92,21 @@ impl std::str::FromStr for ReversiAction {
         let row = nums[1].parse::<usize>();
 
         if let (Ok(col), Ok(row)) = (col, row) {
-            let board_pos = BoardPosition::new(col, row);
+            let position = BoardPosition::new(col, row);
             if col > crate::reversi_gamestate::ReversiState::BOARD_SIZE
                 || row >= crate::reversi_gamestate::ReversiState::BOARD_SIZE
             {
                 println!(
                     "Position out of bounds of board. Input: {:?}, actual board size: {}",
-                    board_pos,
+                    position,
                     crate::reversi_gamestate::ReversiState::BOARD_SIZE
                 );
 
                 return Err(9);
             } else {
-                return Ok(board_pos);
+                let piece = ReversiPiece::Black;
+                let action = ReversiPlayerAction::Move { piece, position };
+                return Ok(action);
             }
         } else {
             println!("Didn't recognize input as a board position: {}", s);
