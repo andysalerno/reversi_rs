@@ -1,4 +1,4 @@
-use lib_boardgame::game_primitives::{GameAgent, GameState};
+use lib_boardgame::{GameAgent, GameState};
 use std::marker::PhantomData;
 use std::str::FromStr;
 

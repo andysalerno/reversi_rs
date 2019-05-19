@@ -1,8 +1,8 @@
 mod tree_search;
 
 use crate::util;
-use lib_boardgame::game_primitives::GameResult;
-use lib_boardgame::game_primitives::{GameAgent, GameState, PlayerColor};
+use lib_boardgame::GameResult;
+use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;

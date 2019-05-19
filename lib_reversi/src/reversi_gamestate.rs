@@ -1,7 +1,7 @@
 use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
 use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
-use lib_boardgame::game_primitives::{GameState, PlayerColor};
+use lib_boardgame::{GameState, PlayerColor};
 
 #[derive(Clone)]
 pub struct ReversiState {

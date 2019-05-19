@@ -1,6 +1,6 @@
 use crate::{BoardPosition, Directions};
 use crate::reversi_gamestate::ReversiState;
-use lib_boardgame::game_primitives::PlayerColor;
+use lib_boardgame::PlayerColor;
 
 pub(crate) fn opponent(player: PlayerColor) -> PlayerColor {
     match player {

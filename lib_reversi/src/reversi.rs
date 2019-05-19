@@ -1,5 +1,5 @@
 use crate::reversi_gamestate::ReversiState;
-use lib_boardgame::game_primitives::{Game, GameAgent, GameResult, GameState};
+use lib_boardgame::{Game, GameAgent, GameResult, GameState};
 
 pub struct Reversi<WhiteAgent, BlackAgent>
 where

@@ -1,4 +1,4 @@
-use lib_boardgame::game_primitives::GameState;
+use lib_boardgame::GameState;
 use std::cell::Cell;
 
 pub trait Data<T: GameState> {

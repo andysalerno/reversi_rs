@@ -2,7 +2,7 @@ pub mod reversi;
 pub mod reversi_gamestate;
 mod util;
 
-use lib_boardgame::game_primitives::GameMove;
+use lib_boardgame::GameMove;
 use std::fmt;
 
 /// The size of the board.
@@ -119,7 +119,7 @@ impl std::str::FromStr for ReversiPlayerAction {
 mod tests {
     use crate::reversi::Reversi;
     use lib_agents::random_agent::RandomAgent;
-    use lib_boardgame::game_primitives::Game;
+    use lib_boardgame::Game;
 
     #[test]
     fn create_game() {

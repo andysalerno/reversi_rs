@@ -1,4 +1,4 @@
-use lib_boardgame::game_primitives::{GameAgent, GameState};
+use lib_boardgame::{GameAgent, GameState};
 use crate::util::random_choice;
 
 pub struct RandomAgent;
