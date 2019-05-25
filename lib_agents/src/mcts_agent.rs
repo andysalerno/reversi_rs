@@ -142,24 +142,15 @@ where
             let expanded_children = expand(leaf);
 
             if expanded_children.is_none() {
-                // there was nothing left to expand down this path
+                // we've reached a terminating node in the game
                 // TODO: remove this sanity check
                 assert!(leaf.children().into_iter().collect::<Vec<_>>().len() == 0);
 
-                // we now know we have selected a saturated node that can't be expanded,
+                // we now know we have selected a terminating node (which is saturated by definition),
                 // so we can update the parent's saturated child count.
                 backprop_saturation(leaf);
 
-                // // did backpropagation result in our root node
-                // // becoming saturated? if so, we've exhausted
-                // // the entire remaining state space, so there's
-                // // no more work left to do.
-                // if turn_root.borrow().data().is_saturated() && self.color == PlayerColor::Black {
-                //     println!("Completely saturated!");
-                //     break;
-                // } else {
-                //     continue;
-                // }
+                continue;
             }
 
             let newly_expanded_children =
@@ -290,7 +281,7 @@ mod tests {
     use super::*;
     use monte_carlo_tree::rc_tree::RcNode;
 
-    // commenting out tests for now, need to replace ReversiState with an impl for testing 
+    // commenting out tests for now, need to replace ReversiState with an impl for testing
 
     // to ensure clean testing, we get our nodes from this function which gives an anonymous 'impl' type.
     // this way, we know we can behave generically over different impls of the same trait.
