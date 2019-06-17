@@ -25,9 +25,7 @@ where
             .read_line(&mut input)
             .expect("Couldn't capture user input.");
 
-        let game_move = TState::Move::from_str(&input).unwrap();
-
-        game_move
+        TState::Move::from_str(&input).unwrap()
     }
 }
 

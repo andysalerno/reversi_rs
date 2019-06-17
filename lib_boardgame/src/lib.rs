@@ -1,4 +1,5 @@
 use std::fmt;
+pub mod test_impls;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PlayerColor {
@@ -68,7 +69,7 @@ pub trait GameState: Clone {
     /// Advances to the next player's turn.
     fn skip_turn(&mut self);
 
-    /// True if the game is over (i.e. neither player can take any further action).
+    /// True if the game is over (i.e. the win condition has been met, or neither player can take any further action).
     fn is_game_over(&self) -> bool;
 
     /// The GameResult, or None if the game is not yet over.

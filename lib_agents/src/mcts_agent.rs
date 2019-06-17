@@ -87,16 +87,14 @@ where
     fn select_child(&self, root: &TNode::Borrowable) -> Option<TNode::Borrowable> {
         let child_nodes = root.borrow().children();
 
-        let selected = child_nodes
+        child_nodes
             .into_iter()
             .filter(|n| !n.borrow().data().is_saturated())
             .max_by(|a, b| {
                 self.score_node(a.borrow())
                     .partial_cmp(&self.score_node(b.borrow()))
                     .unwrap()
-            });
-
-        selected
+            })
     }
 
     /// Given a node, score it in such a way that encourages
@@ -110,7 +108,7 @@ where
 
         let wins = node.data().wins() as f32;
         let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-        let bias = 2 as f32;
+        let bias = 2_f32;
 
         (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
     }
@@ -144,7 +142,7 @@ where
             if expanded_children.is_none() {
                 // we've reached a terminating node in the game
                 // TODO: remove this sanity check
-                assert!(leaf.children().into_iter().collect::<Vec<_>>().len() == 0);
+                assert!(leaf.children().into_iter().count() == 0);
 
                 // we now know we have selected a terminating node (which is saturated by definition),
                 // so we can update the parent's saturated child count.
@@ -279,7 +277,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use monte_carlo_tree::rc_tree::RcNode;
+    use lib_boardgame::Game;
+
+    #[test]
+    fn tree_search_always_picks_winning_move() {
+        // construct an artificial game with three states:
+        // the initial state, and two terminating states it can transition to.
+        // one terminating state is a loss, the other is a win.
+        // we should always pick the winning state.
+        type TestGameState = lib_boardgame::test_impls::game_state_test_impl::TestGameState;
+
+        let black_agent = MCTSRcAgent::<TestGameState>::new(PlayerColor::Black);
+        let white_agent = MCTSRcAgent::<TestGameState>::new(PlayerColor::White);
+
+        let mut game =
+            lib_boardgame::test_impls::game_test_impl::TestGame::new(white_agent, black_agent);
+
+        game.play_to_end();
+    }
 
     // commenting out tests for now, need to replace ReversiState with an impl for testing
 
