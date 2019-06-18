@@ -99,50 +99,11 @@ impl<T: GameState> Data<T> for MctsData<T> {
 mod tests {
     use super::*;
     use lib_boardgame::{GameMove, PlayerColor};
-
-    #[derive(Clone)]
-    struct TestGameState;
-
-    #[derive(Debug, Copy, Clone)]
-    struct TestMove;
-
-    impl GameMove for TestMove {}
-
-    impl GameState for TestGameState {
-        type Move = TestMove;
-
-        fn human_friendly(&self) -> String {
-            unimplemented!()
-        }
-        fn initialize_board(&mut self) {
-            unimplemented!()
-        }
-        fn initial_state() -> TestGameState {
-            unimplemented!()
-        }
-        fn legal_moves(&self, _player: PlayerColor) -> Vec<Self::Move> {
-            unimplemented!()
-        }
-        fn apply_move(&mut self, _action: Self::Move) {
-            unimplemented!()
-        }
-        fn current_player_turn(&self) -> PlayerColor {
-            unimplemented!()
-        }
-        fn player_score(&self, _player: PlayerColor) -> usize {
-            unimplemented!()
-        }
-        fn skip_turn(&mut self) {
-            unimplemented!()
-        }
-        fn is_game_over(&self) -> bool {
-            unimplemented!()
-        }
-    }
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
     #[test]
     fn is_saturated_expects_false_on_default_node() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
 
         assert!(
             !data.is_saturated(),
@@ -152,7 +113,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_for_expanded_childless_node() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         assert!(
@@ -163,7 +124,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_for_expanded_node_with_children() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
         data.set_children_count(7);
 
@@ -175,15 +136,14 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_after_incrementing_saturation_count_fully() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         // we mark the data as having 7 children
         data.set_children_count(7);
 
-        (0..7).for_each(|_| data.increment_saturated_children_count());
-
         // and then "increment saturation count" 7 times
+        (0..7).for_each(|_| data.increment_saturated_children_count());
 
         assert!(
             data.is_saturated(),
@@ -193,7 +153,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_after_incrementing_saturation_count_partially() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);
@@ -209,7 +169,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn increment_saturated_children_count_explodes_if_over_saturated() {
-        let data = MctsData::new(&TestGameState, 0, 0, None);
+        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);

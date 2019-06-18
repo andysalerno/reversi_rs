@@ -75,7 +75,7 @@ impl TicTacToeState {
     /// might as well pre-compute it so we can reserve the space ahead of time.
     /// (A test exists to confirm this is accurate.)
     const fn friendly_print_size() -> usize {
-        199
+        18
     }
 
     fn within_board_bounds(position: BoardPosition) -> bool {
@@ -189,8 +189,7 @@ impl GameState for TicTacToeState {
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
-        // TODO: pre-alloc exact size.
-        let mut result = String::new();
+        let mut result = String::with_capacity(Self::friendly_print_size());
 
         for y in (0..BOARD_SIZE).rev() {
             for x in 0..BOARD_SIZE {

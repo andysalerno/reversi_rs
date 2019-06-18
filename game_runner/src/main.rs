@@ -4,6 +4,7 @@ use lib_boardgame::{Game, PlayerColor};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
+use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
 fn main() {
     play_tic_tac_toe();
@@ -21,7 +22,7 @@ fn play_reversi() {
 }
 
 fn play_tic_tac_toe() {
-    let black = RandomAgent;
+    let black = MCTSRcAgent::<TicTacToeState>::new(PlayerColor::Black);
     let white = RandomAgent;
 
     let mut game = TicTacToe::new(white, black);
