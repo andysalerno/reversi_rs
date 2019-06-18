@@ -277,8 +277,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib_boardgame::{Game, GameState};
-    use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
+    use lib_boardgame::{Game, GameState, GameMove};
+    use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
 
     fn make_test_state() -> impl GameState {
         TicTacToeState::new()
@@ -288,26 +289,59 @@ mod tests {
         RcNode::new_root(data)
     }
 
-    fn make_test_data() -> MctsData<impl GameState>
-    {
+    fn make_test_data() -> MctsData<impl GameState> {
         MctsData::new(&make_test_state(), 0, 0, None)
     }
 
     #[test]
     fn tree_search_always_picks_winning_move() {
-        // construct an artificial game with three states:
-        // the initial state, and two terminating states it can transition to.
-        // one terminating state is a loss, the other is a win.
-        // we should always pick the winning state.
-        type TestGameState = lib_boardgame::test_impls::game_state_test_impl::TestGameState;
+        let black_agent = MCTSRcAgent::new(PlayerColor::Black);
+        let white_agent = MCTSRcAgent::new(PlayerColor::White);
 
-        let black_agent = MCTSRcAgent::<TestGameState>::new(PlayerColor::Black);
-        let white_agent = MCTSRcAgent::<TestGameState>::new(PlayerColor::White);
+        let mut game = TicTacToe::new(white_agent, black_agent);
 
-        let mut game =
-            lib_boardgame::test_impls::game_test_impl::TestGame::new(white_agent, black_agent);
+        let state = game.game_state_mut();
 
-        game.play_to_end();
+        // Start with black's turn
+        assert_eq!(state.current_player_turn(), PlayerColor::Black);
+
+        // Create this state:
+        // X__
+        // ___
+        // ___
+        state.apply_move(TicTacToeAction(BoardPosition::new(0, 2)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::White);
+
+        // Create this state:
+        // X__
+        // ___
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(2, 0)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::Black);
+
+        // Create this state:
+        // X_X
+        // ___
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(2, 2)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::White);
+
+        // Create this state:
+        // X_X
+        // _O_
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(1, 1)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::Black);
+        let legal_moves = state.legal_moves(PlayerColor::Black);
+
+        let test_black_agent = MCTSRcAgent::new(PlayerColor::Black);
+        let mcts_chosen_move = test_black_agent.pick_move(state, &legal_moves);
+
+        assert_eq!(TicTacToeAction(BoardPosition::new(1,2)), mcts_chosen_move);
     }
 
     #[test]

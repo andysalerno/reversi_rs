@@ -11,8 +11,8 @@ pub struct TicTacToeState {
     current_player_turn: PlayerColor,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct TicTacToeAction(BoardPosition);
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TicTacToeAction(pub BoardPosition);
 
 impl GameMove for TicTacToeAction {}
 
@@ -23,7 +23,7 @@ pub struct BoardPosition {
 }
 
 impl BoardPosition {
-    fn new(col: usize, row: usize) -> Self {
+    pub fn new(col: usize, row: usize) -> Self {
         BoardPosition { col, row }
     }
 }
