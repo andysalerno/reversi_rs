@@ -335,24 +335,16 @@ mod tests {
 
     #[test]
     fn expand_works() {
-        let mut initial_state = make_test_state();
+        let tree_root = RcNode::new_root(make_test_data());
 
-        // default Reversi initial configuration
-        initial_state.initialize_board();
-
-        let data = make_test_data();
-        let tree_root = RcNode::new_root(data);
-
-        // let expanded_children = expand::<RcNode<MctsData<ReversiState>>, ReversiState>(&tree_root)
-        //     .expect("must have children")
-        //     .into_iter()
-        //     .collect::<Vec<_>>();
         let expanded_children = expand(&tree_root)
             .expect("must have children")
             .into_iter()
             .collect::<Vec<_>>();
 
-        assert_eq!(4, expanded_children.len());
+        // The game used for testing is TicTacToe,
+        // which has nine intitial legal children positions.
+        assert_eq!(9, expanded_children.len());
     }
 
     #[test]
