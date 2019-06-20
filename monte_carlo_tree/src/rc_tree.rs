@@ -3,6 +3,7 @@ use crate::Node;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
+#[derive(Debug)]
 pub struct NodeContent<T> {
     data: T,
     parent: Weak<Self>,

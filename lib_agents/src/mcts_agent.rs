@@ -112,6 +112,23 @@ where
 
         (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
     }
+
+    /// Given a node, score it by giving it a value we can use
+    /// to rank which node should be returned by this agent
+    /// as the node to play in the game.
+    fn score_node_to_play(&self, node: &TNode) -> usize 
+    {
+        if let Some(state_result) = node.data().end_state_result() {
+            let is_win = (state_result == GameResult::BlackWins && self.color == PlayerColor::Black)
+                || (state_result == GameResult::WhiteWins && self.color == PlayerColor::White);
+            
+            if is_win {
+                return std::usize::MAX;
+            }
+        }
+
+        node.data().plays()
+    }
 }
 
 impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
@@ -144,6 +161,11 @@ where
                 // TODO: remove this sanity check
                 assert!(leaf.children().into_iter().count() == 0);
 
+                let sim_result = simulate(leaf);
+                self.backprop_sim_result(leaf, sim_result);
+
+                leaf.data().set_end_state_result(sim_result);
+
                 // we now know we have selected a terminating node (which is saturated by definition),
                 // so we can update the parent's saturated child count.
                 backprop_saturation(leaf);
@@ -155,12 +177,13 @@ where
                 expanded_children.unwrap().into_iter().collect::<Vec<_>>();
 
             let sim_node = util::random_pick(&newly_expanded_children);
+            let sim_node = sim_node.borrow();
 
             // simulate
-            let sim_result = simulate(sim_node.borrow());
+            let sim_result = simulate(sim_node);
 
             // backprop
-            self.backprop_sim_result(leaf, sim_result);
+            self.backprop_sim_result(sim_node, sim_result);
         }
 
         let elapsed_micros = now.elapsed().as_micros();
@@ -170,10 +193,11 @@ where
             (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
+        // TODO: here we should prefer any saturated child with 100% win
         let state_children = turn_root.borrow().children();
         let max_child = state_children
             .into_iter()
-            .max_by_key(|c| c.borrow().data().plays())
+            .max_by_key(|c| self.score_node_to_play(c.borrow()))
             .unwrap();
 
         let max_action = max_child.borrow().data().action().unwrap();
@@ -341,6 +365,11 @@ mod tests {
         let test_black_agent = MCTSRcAgent::new(PlayerColor::Black);
         let mcts_chosen_move = test_black_agent.pick_move(state, &legal_moves);
 
+        // The agent MUST pick the winning move:
+        //  V
+        // XXX
+        // _O_
+        // __O
         assert_eq!(TicTacToeAction(BoardPosition::new(1,2)), mcts_chosen_move);
     }
 

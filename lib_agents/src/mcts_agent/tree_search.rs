@@ -1,4 +1,4 @@
-use lib_boardgame::GameState;
+use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
 
 pub trait Data<T: GameState> {
@@ -21,6 +21,7 @@ pub struct MctsData<T: GameState> {
 
     children_count: Cell<usize>,
     children_saturated_count: Cell<usize>,
+    end_state_result: Cell<Option<GameResult>>,
 }
 
 impl<T: GameState> MctsData<T> {
@@ -30,6 +31,14 @@ impl<T: GameState> MctsData<T> {
 
     pub fn increment_wins(&self) {
         self.wins.set(self.wins.get() + 1);
+    }
+
+    pub fn end_state_result(&self) -> Option<GameResult> {
+        self.end_state_result.get()
+    }
+
+    pub fn set_end_state_result(&self, result: GameResult) {
+        self.end_state_result.set(Some(result));
     }
 
     /// A node is considered saturated if:
@@ -91,6 +100,7 @@ impl<T: GameState> Data<T> for MctsData<T> {
             children_count: Default::default(),
             children_saturated_count: Default::default(),
             is_expanded: Cell::new(false),
+            end_state_result: Default::default(),
         }
     }
 }

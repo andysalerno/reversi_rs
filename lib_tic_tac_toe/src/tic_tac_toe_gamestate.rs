@@ -3,7 +3,7 @@ use lib_boardgame::{GameMove, GameState, PlayerColor};
 
 type Board = [[Option<TicTacToePiece>; BOARD_SIZE]; BOARD_SIZE];
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TicTacToeState {
     board: Board,
     x_piece_count: usize,
