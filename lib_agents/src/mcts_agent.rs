@@ -68,7 +68,7 @@ where
     /// If the given root node is already a leaf,
     /// or is saturated, it is returned.
     fn select_to_leaf(&self, root: &TNode) -> TNode::Handle {
-        let mut cur_node = root.make_borrowable();
+        let mut cur_node = root.get_handle();
 
         loop {
             let selected_child: Option<TNode::Handle> = self.select_child(&cur_node);

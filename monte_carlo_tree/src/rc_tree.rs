@@ -22,7 +22,7 @@ impl<T: Clone> Node for RcNode<T> {
         &self.data
     }
 
-    fn make_borrowable(&self) -> Self::Handle {
+    fn get_handle(&self) -> Self::Handle {
         self.clone()
     }
 

@@ -10,7 +10,7 @@ pub trait Node: Sized + Clone {
 
     fn data(&self) -> &Self::Data;
     fn parent(&self) -> Option<Self::Handle>;
-    fn make_borrowable(&self) -> Self::Handle;
+    fn get_handle(&self) -> Self::Handle;
     fn children(&self) -> Self::ChildrenIter;
 
     fn new_child(&self, state: Self::Data) -> Self::Handle;
@@ -35,7 +35,7 @@ mod tests {
         fn parent(&self) -> Option<Self::Handle> {
             unimplemented!()
         }
-        fn make_borrowable(&self) -> Self::Handle {
+        fn get_handle(&self) -> Self::Handle {
             unimplemented!()
         }
         fn children(&self) -> Self::ChildrenIter {
