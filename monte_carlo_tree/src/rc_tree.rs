@@ -15,18 +15,18 @@ pub type RcNode<T> = Rc<NodeContent<T>>;
 
 impl<T: Clone> Node for RcNode<T> {
     type ChildrenIter = Vec<Self>;
-    type Borrowable = Self;
+    type Handle = Self;
     type Data = T;
 
     fn data(&self) -> &T {
         &self.data
     }
 
-    fn make_borrowable(&self) -> Self::Borrowable {
+    fn make_borrowable(&self) -> Self::Handle {
         self.clone()
     }
 
-    fn parent(&self) -> Option<Self::Borrowable> {
+    fn parent(&self) -> Option<Self::Handle> {
         self.parent.upgrade().clone()
     }
 

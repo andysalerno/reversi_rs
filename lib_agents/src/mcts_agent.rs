@@ -67,11 +67,11 @@ where
     /// Repeatedly select nodes down the tree until a leaf is reached.
     /// If the given root node is already a leaf,
     /// or is saturated, it is returned.
-    fn select_to_leaf(&self, root: &TNode) -> TNode::Borrowable {
+    fn select_to_leaf(&self, root: &TNode) -> TNode::Handle {
         let mut cur_node = root.make_borrowable();
 
         loop {
-            let selected_child: Option<TNode::Borrowable> = self.select_child(&cur_node);
+            let selected_child: Option<TNode::Handle> = self.select_child(&cur_node);
 
             if selected_child.is_none() {
                 return cur_node;
@@ -84,7 +84,7 @@ where
     /// For all children of the given node, assign each one a score,
     /// and return the child with the highest score (ties broken by the first)
     /// or None if there are no children (or if every child is already saturated).
-    fn select_child(&self, root: &TNode::Borrowable) -> Option<TNode::Borrowable> {
+    fn select_child(&self, root: &TNode::Handle) -> Option<TNode::Handle> {
         let child_nodes = root.borrow().children();
 
         child_nodes
@@ -158,9 +158,6 @@ where
 
             if expanded_children.is_none() {
                 // we've reached a terminating node in the game
-                // TODO: remove this sanity check
-                assert!(leaf.children().into_iter().count() == 0);
-
                 let sim_result = simulate(leaf);
                 self.backprop_sim_result(leaf, sim_result);
 
@@ -193,7 +190,6 @@ where
             (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        // TODO: here we should prefer any saturated child with 100% win
         let state_children = turn_root.borrow().children();
         let max_child = state_children
             .into_iter()
