@@ -2,6 +2,7 @@ use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
 use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
 use lib_boardgame::{GameState, PlayerColor};
+use rayon::prelude::*;
 
 #[derive(Clone)]
 pub struct ReversiState {
@@ -217,18 +218,22 @@ impl GameState for ReversiState {
             PlayerColor::White => ReversiPiece::White,
         };
 
-        let mut moves = Vec::new();
-
         let all_directions = [POSITIVE, NEGATIVE, SAME];
 
-        for col in 0..Self::BOARD_SIZE {
-            for row in 0..Self::BOARD_SIZE {
-                let origin = BoardPosition::new(col, row);
-                if self.get_piece(origin).is_some() {
-                    // this position can't be legal if it already contains a piece
-                    continue;
-                }
+        let all_positions =  
+            (0..Self::BOARD_SIZE)
+            .into_iter()
+            .product(0..Self::BOARD_SIZE)
+            .map(|(col, row)| BoardPosition::new(col, row))
+            .collect::<Vec<_>>();
 
+        let empty_positions = all_positions.into_iter()
+            .filter(|origin| self.get_piece(*origin).is_none())
+            .collect::<Vec<_>>();
+
+        let mut moves =
+            empty_positions.into_iter()
+            .filter(|origin| {
                 for col_dir in all_directions.iter() {
                     for row_dir in all_directions.iter() {
                         if *col_dir == SAME && *row_dir == SAME {
@@ -241,18 +246,54 @@ impl GameState for ReversiState {
                         };
 
                         if self
-                            .find_sibling_piece_pos(origin, piece_color, direction)
+                            .find_sibling_piece_pos(*origin, piece_color, direction)
                             .is_some()
                         {
-                            moves.push(ReversiPlayerAction::Move {
-                                piece: piece_color,
-                                position: origin,
-                            });
+                            return true;
                         }
                     }
                 }
-            }
-        }
+
+                false
+        })
+        .map(|position| ReversiPlayerAction::Move {
+            piece: piece_color,
+            position
+        })
+        .collect::<Vec<_>>();
+
+        // for col in 0..Self::BOARD_SIZE {
+        //     for row in 0..Self::BOARD_SIZE {
+        //         let origin = BoardPosition::new(col, row);
+        //         if self.get_piece(origin).is_some() {
+        //             // this position can't be legal if it already contains a piece
+        //             continue;
+        //         }
+
+        //         for col_dir in all_directions.iter() {
+        //             for row_dir in all_directions.iter() {
+        //                 if *col_dir == SAME && *row_dir == SAME {
+        //                     continue;
+        //                 }
+
+        //                 let direction = Directions {
+        //                     col_dir: *col_dir,
+        //                     row_dir: *row_dir,
+        //                 };
+
+        //                 if self
+        //                     .find_sibling_piece_pos(origin, piece_color, direction)
+        //                     .is_some()
+        //                 {
+        //                     moves.push(ReversiPlayerAction::Move {
+        //                         piece: piece_color,
+        //                         position: origin,
+        //                     });
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
