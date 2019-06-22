@@ -220,63 +220,25 @@ impl GameState for ReversiState {
 
         let all_directions = [POSITIVE, NEGATIVE, SAME];
 
-        // let mut all_positions: [(usize, usize); Self::BOARD_SIZE * Self::BOARD_SIZE] = [(0, 0); Self::BOARD_SIZE * Self::BOARD_SIZE];
-
-        // for col in 0..Self::BOARD_SIZE {
-        //     for row in 0..self::BOARD_SIZE {
-        //         let index = (col * Self::BOARD_SIZE) + row;
-        //         all_positions[index] = (col, row);
-        //     }
-        // }
-
-        // let all_positions = all_positions
-        //     .into_iter()
-        //     .map(|(col, row)| BoardPosition::new(*col, *row));
-
-        // let empty_positions = all_positions.into_iter()
-        //     .filter(|origin| self.get_piece(*origin).is_none());
-
-        // let mut moves: Vec<_> =
-        //     empty_positions.into_iter()
-        //     .filter(|origin| {
-        //         for col_dir in all_directions.iter() {
-        //             for row_dir in all_directions.iter() {
-        //                 if *col_dir == SAME && *row_dir == SAME {
-        //                     continue;
-        //                 }
-
-        //                 let direction = Directions {
-        //                     col_dir: *col_dir,
-        //                     row_dir: *row_dir,
-        //                 };
-
-        //                 if self
-        //                     .find_sibling_piece_pos(*origin, piece_color, direction)
-        //                     .is_some()
-        //                 {
-        //                     return true;
-        //                 }
-        //             }
-        //         }
-
-        //         false
-        // })
-        // .map(|position| ReversiPlayerAction::Move {
-        //     piece: piece_color,
-        //     position
-        // })
-        // .collect();
-
-        let mut moves = Vec::new();
+        let mut all_positions: [(usize, usize); Self::BOARD_SIZE * Self::BOARD_SIZE] = [(0, 0); Self::BOARD_SIZE * Self::BOARD_SIZE];
 
         for col in 0..Self::BOARD_SIZE {
-            for row in 0..Self::BOARD_SIZE {
-                let origin = BoardPosition::new(col, row);
-                if self.get_piece(origin).is_some() {
-                    // this position can't be legal if it already contains a piece
-                    continue;
-                }
+            for row in 0..self::BOARD_SIZE {
+                let index = (col * Self::BOARD_SIZE) + row;
+                all_positions[index] = (col, row);
+            }
+        }
 
+        let all_positions = all_positions
+            .into_iter()
+            .map(|(col, row)| BoardPosition::new(*col, *row));
+
+        let empty_positions = all_positions
+            .filter(|origin| self.get_piece(*origin).is_none());
+
+        let mut moves: Vec<_> =
+            empty_positions
+            .filter(|origin| {
                 for col_dir in all_directions.iter() {
                     for row_dir in all_directions.iter() {
                         if *col_dir == SAME && *row_dir == SAME {
@@ -289,18 +251,21 @@ impl GameState for ReversiState {
                         };
 
                         if self
-                            .find_sibling_piece_pos(origin, piece_color, direction)
+                            .find_sibling_piece_pos(*origin, piece_color, direction)
                             .is_some()
                         {
-                            moves.push(ReversiPlayerAction::Move {
-                                piece: piece_color,
-                                position: origin,
-                            });
+                            return true;
                         }
                     }
                 }
-            }
-        }
+
+                false
+        })
+        .map(|position| ReversiPlayerAction::Move {
+            piece: piece_color,
+            position
+        })
+        .collect();
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
