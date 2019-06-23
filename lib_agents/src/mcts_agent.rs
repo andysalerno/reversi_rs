@@ -20,6 +20,7 @@ pub struct MCTSAgent<TState, TNode>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
+    <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     color: PlayerColor,
 
@@ -32,6 +33,7 @@ impl<TState, TNode> MCTSAgent<TState, TNode>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
+    <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     pub fn new(color: PlayerColor) -> Self {
         MCTSAgent {
@@ -41,7 +43,7 @@ where
         }
     }
 
-    fn mcts(&self, state: TState) -> Vec<MctsData<TState>> {
+    fn mcts(self, state: TState) -> Vec<MctsData<TState>> {
         let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
 
         for _ in 0..TOTAL_SIMS {
@@ -191,18 +193,19 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
 where
-    TNode: Node<Data = MctsData<TState>> + Sync,
-    TState: GameState,
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState + Send + Sync,
+    TState::Move: Send
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
-        // let (mcts_result, _) = rayon::join(
-        //     || self.mcts(state.clone()),
-        //     || self.mcts(state.clone())
-        // );
+        let (mcts_result, _) = rayon::join(
+            || self.mcts(state.clone()),
+            || self.mcts(state.clone())
+        );
 
-        let mcts_result = self.mcts(state.clone());
+        // let mcts_result = self.mcts(state.clone());
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
