@@ -9,6 +9,7 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::time::Instant;
 use tree_search::{Data, MctsData};
+use rayon::prelude::*;
 
 
 const TOTAL_SIMS: u128 = 1000;
@@ -190,11 +191,16 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
 where
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>> + Sync,
     TState: GameState,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
+
+        // let (mcts_result, _) = rayon::join(
+        //     || self.mcts(state.clone()),
+        //     || self.mcts(state.clone())
+        // );
 
         let mcts_result = self.mcts(state.clone());
 
