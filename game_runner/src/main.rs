@@ -1,13 +1,24 @@
+
+use lib_agents::human_agent::HumanAgent;
 use lib_agents::mcts_agent::MCTSRcAgent;
-use lib_agents::random_agent::RandomAgent;
 use lib_boardgame::{Game, PlayerColor};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
 use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
+use rayon::prelude::*;
 
 fn main() {
-    // play_tic_tac_toe();
+
+    // for _ in 0..1000 {
+    //     play_tic_tac_toe();
+    // }
+
+    // rayon::join(
+    //     || (0..500).for_each(|_| play_tic_tac_toe()),
+    //     || (0..500).for_each(|_| play_tic_tac_toe()),
+    // );
+
     play_reversi();
 }
 

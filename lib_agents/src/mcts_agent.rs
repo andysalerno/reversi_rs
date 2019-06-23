@@ -10,6 +10,9 @@ use std::marker::PhantomData;
 use std::time::Instant;
 use tree_search::{Data, MctsData};
 
+
+const TOTAL_SIMS: u128 = 1000;
+
 pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
 
 pub struct MCTSAgent<TState, TNode>
@@ -35,6 +38,60 @@ where
             _phantom_a: PhantomData,
             _phantom_b: PhantomData,
         }
+    }
+
+    fn mcts(&self, state: TState) -> Vec<MctsData<TState>> {
+        let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
+
+        for _ in 0..TOTAL_SIMS {
+            // if our previous work has saturated the tree, we can break early,
+            // since we have visited every single outcome already
+            if turn_root.borrow().data().is_saturated() {
+                break;
+            }
+
+            // select the leaf node that we will expand
+            let leaf = self.select_to_leaf(turn_root.borrow());
+            let leaf = leaf.borrow();
+
+            // expand (create the child nodes for the selected leaf node)
+            let expanded_children = expand(leaf);
+
+            if expanded_children.is_none() {
+                // we've reached a terminating node in the game
+                let sim_result = simulate(leaf);
+                self.backprop_sim_result(leaf, sim_result);
+
+                leaf.data().set_end_state_result(sim_result);
+
+                // we now know we have selected a terminating node (which is saturated by definition),
+                // so we can update the parent's saturated child count.
+                backprop_saturation(leaf);
+
+                continue;
+            }
+
+            let newly_expanded_children =
+                expanded_children.unwrap().into_iter().collect::<Vec<_>>();
+
+            let sim_node = util::random_pick(&newly_expanded_children);
+            let sim_node = sim_node.borrow();
+
+            // simulate
+            let sim_result = simulate(sim_node);
+
+            // backprop
+            self.backprop_sim_result(sim_node, sim_result);
+        }
+
+        let state_children = turn_root.borrow().children();
+
+        let results: Vec<_> = state_children
+            .into_iter()
+            .map(|c| c.borrow().data().clone())
+            .collect();
+
+        results
     }
 
     // TODO: this can become a function, not a method,
@@ -116,18 +173,18 @@ where
     /// Given a node, score it by giving it a value we can use
     /// to rank which node should be returned by this agent
     /// as the node to play in the game.
-    fn score_node_to_play(&self, node: &TNode) -> usize 
-    {
-        if let Some(state_result) = node.data().end_state_result() {
-            let is_win = (state_result == GameResult::BlackWins && self.color == PlayerColor::Black)
+    fn score_mcts_results(&self, data: &MctsData<TState>) -> usize {
+        if let Some(state_result) = data.end_state_result() {
+            let is_win = (state_result == GameResult::BlackWins
+                && self.color == PlayerColor::Black)
                 || (state_result == GameResult::WhiteWins && self.color == PlayerColor::White);
-            
+
             if is_win {
                 return std::usize::MAX;
             }
         }
 
-        node.data().plays()
+        data.plays()
     }
 }
 
@@ -137,51 +194,9 @@ where
     TState: GameState,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-        let turn_root = TNode::new_root(MctsData::new(state, 0, 0, None));
-
         let now = Instant::now();
 
-        const TOTAL_SIMS: u128 = 1000;
-        for _ in 0..TOTAL_SIMS {
-            // if our previous work has saturated the tree, we can break early,
-            // since we have visited every single outcome already
-            if turn_root.borrow().data().is_saturated() {
-                break;
-            }
-
-            // select the leaf node that we will expand
-            let leaf = self.select_to_leaf(turn_root.borrow());
-            let leaf = leaf.borrow();
-
-            // expand (create the child nodes for the selected leaf node)
-            let expanded_children = expand(leaf);
-
-            if expanded_children.is_none() {
-                // we've reached a terminating node in the game
-                let sim_result = simulate(leaf);
-                self.backprop_sim_result(leaf, sim_result);
-
-                leaf.data().set_end_state_result(sim_result);
-
-                // we now know we have selected a terminating node (which is saturated by definition),
-                // so we can update the parent's saturated child count.
-                backprop_saturation(leaf);
-
-                continue;
-            }
-
-            let newly_expanded_children =
-                expanded_children.unwrap().into_iter().collect::<Vec<_>>();
-
-            let sim_node = util::random_pick(&newly_expanded_children);
-            let sim_node = sim_node.borrow();
-
-            // simulate
-            let sim_result = simulate(sim_node);
-
-            // backprop
-            self.backprop_sim_result(sim_node, sim_result);
-        }
+        let mcts_result = self.mcts(state.clone());
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
@@ -190,16 +205,16 @@ where
             (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        let state_children = turn_root.borrow().children();
-        let max_child = state_children
-            .into_iter()
-            .max_by_key(|c| self.score_node_to_play(c.borrow()))
+        let max_scoring_result = mcts_result
+            .iter()
+            .max_by_key(|c| self.score_mcts_results(c))
             .unwrap();
 
-        let max_action = max_child.borrow().data().action().unwrap();
+        let max_action = max_scoring_result.action().unwrap();
 
-        let plays = max_child.borrow().data().plays();
-        let wins = max_child.borrow().data().wins();
+        let plays = max_scoring_result.plays();
+        let wins = max_scoring_result.wins();
+
         println!(
             "Plays: {} Wins: {} ({:.2})",
             plays,
@@ -297,7 +312,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib_boardgame::{Game, GameState, GameMove};
+    use lib_boardgame::{Game, GameMove, GameState};
     use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
     use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
 
@@ -366,7 +381,7 @@ mod tests {
         // XXX
         // _O_
         // __O
-        assert_eq!(TicTacToeAction(BoardPosition::new(1,2)), mcts_chosen_move);
+        assert_eq!(TicTacToeAction(BoardPosition::new(1, 2)), mcts_chosen_move);
     }
 
     #[test]
