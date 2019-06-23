@@ -220,34 +220,16 @@ impl GameState for ReversiState {
 
         let all_directions = [POSITIVE, NEGATIVE, SAME];
 
-        let mut all_positions: [(usize, usize); Self::BOARD_SIZE * Self::BOARD_SIZE] = [(0, 0); Self::BOARD_SIZE * Self::BOARD_SIZE];
+        // (0,0), (0,1) ... (4, 7), (5, 0) ... (7, 7)
+        let all_positions = (0..(Self::BOARD_SIZE * Self::BOARD_SIZE))
+            .map(|index| ((index / Self::BOARD_SIZE), (index % Self::BOARD_SIZE)))
+            .map(|(col, row)| BoardPosition::new(col, row));
 
-        for col in 0..Self::BOARD_SIZE {
-            for row in 0..self::BOARD_SIZE {
-                let index = (col * Self::BOARD_SIZE) + row;
-                all_positions[index] = (col, row);
-            }
-        }
-
-        let first_half_positions = all_positions
-            .iter()
-            .take((Self::BOARD_SIZE * Self::BOARD_SIZE) / 2)
-            .map(|(col, row)| BoardPosition::new(*col, *row));
-
-        let second_half_positions = all_positions
-            .iter()
-            .skip((Self::BOARD_SIZE * Self::BOARD_SIZE) / 2)
-            .map(|(col, row)| BoardPosition::new(*col, *row));
-
-        let (empty_first_half, empty_second_half) = rayon::join(
-         || first_half_positions.filter(|origin| self.get_piece(*origin).is_none()).collect::<Vec<_>>(),
-         || second_half_positions.filter(|origin| self.get_piece(*origin).is_none()).collect::<Vec<_>>());
-
-        let empty_positions = empty_first_half.into_iter().chain(empty_second_half.into_iter());
+        let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
 
         let mut moves: Vec<_> =
             empty_positions
-            .filter(|origin| {
+            .filter(|pos| {
                 for col_dir in all_directions.iter() {
                     for row_dir in all_directions.iter() {
                         if *col_dir == SAME && *row_dir == SAME {
@@ -260,7 +242,7 @@ impl GameState for ReversiState {
                         };
 
                         if self
-                            .find_sibling_piece_pos(*origin, piece_color, direction)
+                            .find_sibling_piece_pos(*pos, piece_color, direction)
                             .is_some()
                         {
                             return true;
