@@ -229,11 +229,21 @@ impl GameState for ReversiState {
             }
         }
 
-        let all_positions = all_positions
-            .into_iter()
+        let first_half_positions = all_positions
+            .iter()
+            .take((Self::BOARD_SIZE * Self::BOARD_SIZE) / 2)
             .map(|(col, row)| BoardPosition::new(*col, *row));
 
-        let empty_positions = all_positions
+        let second_half_positions = all_positions
+            .iter()
+            .skip((Self::BOARD_SIZE * Self::BOARD_SIZE) / 2)
+            .map(|(col, row)| BoardPosition::new(*col, *row));
+
+        let (empty_first_half, empty_second_half) = rayon::join(
+         || first_half_positions.filter(|origin| self.get_piece(*origin).is_none()),
+         || second_half_positions.filter(|origin| self.get_piece(*origin).is_none()));
+
+        let empty_positions = empty_first_half.chain(empty_second_half)
             .filter(|origin| self.get_piece(*origin).is_none());
 
         let mut moves: Vec<_> =
