@@ -30,7 +30,7 @@ pub trait GameMove: Copy + fmt::Debug + Send {}
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
 /// or any other relevant info.
-pub trait GameState: Clone {
+pub trait GameState: Clone + Send {
     type Move: GameMove;
 
     /// Returns a human-friendly string for representing the state.

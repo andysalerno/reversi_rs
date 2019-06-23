@@ -14,9 +14,7 @@ use rayon::prelude::*;
 
 const TOTAL_SIMS: u128 = 1000;
 
-pub type MCTSRcAgent<TState> = MCTSAgent<TState, RcNode<MctsData<TState>>>;
-
-pub struct MCTSAgent<TState, TNode>
+pub struct MctsAgent<TState, TNode=RcNode<MctsData<TState>>>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
@@ -29,21 +27,21 @@ where
     _phantom_b: PhantomData<TNode>,
 }
 
-impl<TState, TNode> MCTSAgent<TState, TNode>
+impl<TState, TNode> MctsAgent<TState, TNode>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
     <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     pub fn new(color: PlayerColor) -> Self {
-        MCTSAgent {
+        MctsAgent {
             color,
             _phantom_a: PhantomData,
             _phantom_b: PhantomData,
         }
     }
 
-    fn mcts(self, state: TState) -> Vec<MctsData<TState>> {
+    fn mcts(&self, state: TState) -> Vec<MctsData<TState>> {
         let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
 
         for _ in 0..TOTAL_SIMS {
@@ -191,7 +189,7 @@ where
     }
 }
 
-impl<TState, TNode> GameAgent<TState> for MCTSAgent<TState, TNode>
+impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState + Send + Sync,
@@ -200,10 +198,12 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
-        let (mcts_result, _) = rayon::join(
-            || self.mcts(state.clone()),
-            || self.mcts(state.clone())
-        );
+        let mcts_result = self.mcts(state.clone());
+
+        // let (mcts_result, _) = rayon::join(
+        //     || self.mcts(state.clone()),
+        //     || self.mcts(state.clone())
+        // );
 
         // let mcts_result = self.mcts(state.clone());
 
@@ -339,8 +339,8 @@ mod tests {
 
     #[test]
     fn tree_search_always_picks_winning_move() {
-        let black_agent = MCTSRcAgent::new(PlayerColor::Black);
-        let white_agent = MCTSRcAgent::new(PlayerColor::White);
+        let black_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::Black);
+        let white_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::White);
 
         let mut game = TicTacToe::new(white_agent, black_agent);
 
@@ -382,7 +382,7 @@ mod tests {
         assert_eq!(state.current_player_turn(), PlayerColor::Black);
         let legal_moves = state.legal_moves(PlayerColor::Black);
 
-        let test_black_agent = MCTSRcAgent::new(PlayerColor::Black);
+        let test_black_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::Black);
         let mcts_chosen_move = test_black_agent.pick_move(state, &legal_moves);
 
         // The agent MUST pick the winning move:
@@ -406,7 +406,7 @@ mod tests {
 
     #[test]
     fn backprop_works_one_node() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
 
         let data = make_test_data();
         let tree_root = make_node(data.clone());
@@ -432,7 +432,7 @@ mod tests {
 
     #[test]
     fn backprop_works_several_nodes() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
 
         let data = make_test_data();
 
@@ -453,7 +453,7 @@ mod tests {
 
     #[test]
     fn select_child_works() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
         let data = make_test_data();
 
         let tree_root = RcNode::new_root(data.clone());
@@ -481,7 +481,6 @@ mod tests {
             .select_child(&child_level_3)
             .expect("the child should have been selected.");
 
-        // let selected: &RcNode<MctsData<ReversiState>> = selected_borrow.borrow();
         let selected: &RcNode<_> = selected_borrow.borrow();
 
         assert_eq!(1, selected.data().plays());
@@ -489,7 +488,7 @@ mod tests {
 
     #[test]
     fn select_to_leaf_works() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
         let data = make_test_data();
 
         let tree_root = RcNode::new_root(data.clone());
@@ -523,7 +522,7 @@ mod tests {
 
     #[test]
     fn select_to_leaf_when_already_leaf_returns_self() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
         let data = MctsData::new(&make_test_state(), 10, 10, None);
 
         let tree_root = RcNode::new_root(data.clone());
@@ -632,7 +631,7 @@ mod tests {
 
     #[test]
     fn score_node_works() {
-        let agent = MCTSAgent::new(PlayerColor::White);
+        let agent = MctsAgent::new(PlayerColor::White);
         let data = make_test_data();
 
         let tree_root = make_node(data.clone());

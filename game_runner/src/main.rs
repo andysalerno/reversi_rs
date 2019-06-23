@@ -1,6 +1,6 @@
 
 use lib_agents::human_agent::HumanAgent;
-use lib_agents::mcts_agent::MCTSRcAgent;
+use lib_agents::mcts_agent::MctsAgent;
 use lib_boardgame::{Game, PlayerColor};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
@@ -24,8 +24,8 @@ fn main() {
 
 #[allow(unused)]
 fn play_reversi() {
-    let black = MCTSRcAgent::<ReversiState>::new(PlayerColor::Black);
-    let white = MCTSRcAgent::<ReversiState>::new(PlayerColor::White);
+    let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
+    let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
 
     let mut game = Reversi::new(white, black);
 
@@ -35,8 +35,8 @@ fn play_reversi() {
 
 #[allow(unused)]
 fn play_tic_tac_toe() {
-    let black = MCTSRcAgent::<TicTacToeState>::new(PlayerColor::Black);
-    let white = MCTSRcAgent::<TicTacToeState>::new(PlayerColor::White);
+    let black = MctsAgent::<TicTacToeState>::new(PlayerColor::Black);
+    let white = MctsAgent::<TicTacToeState>::new(PlayerColor::White);
 
     let mut game = TicTacToe::new(white, black);
 
