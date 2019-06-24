@@ -5,7 +5,7 @@ use std::borrow::Borrow;
 
 pub trait Node: Sized + Clone {
     type ChildrenIter: IntoIterator<Item = Self::Handle>;
-    type Handle: Borrow<Self>;
+    type Handle: Borrow<Self> + Clone;
     type Data;
 
     fn data(&self) -> &Self::Data;

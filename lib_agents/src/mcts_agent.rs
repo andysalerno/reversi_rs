@@ -49,7 +49,7 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
-        let mcts_result = tree_search::mcts::<TNode, TState>(state.clone());
+        let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), self.color);
 
         // let (mcts_result, _) = rayon::join(
         //     || self.mcts(state.clone()),
