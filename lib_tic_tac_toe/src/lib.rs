@@ -13,7 +13,7 @@ pub enum TicTacToePiece {
 } 
 
 impl TicTacToePiece {
-    pub fn player_color(&self) -> PlayerColor {
+    pub fn player_color(self) -> PlayerColor {
         match self {
             TicTacToePiece::X => PlayerColor::Black,
             TicTacToePiece::O => PlayerColor::White,

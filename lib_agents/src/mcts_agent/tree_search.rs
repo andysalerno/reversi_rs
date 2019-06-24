@@ -1,4 +1,4 @@
-use crate::mcts_agent::mcts_data::{Data, MctsData};
+use crate::mcts_agent::mcts_data::{Data, MctsData, MctsResult};
 use crate::util;
 
 use lib_boardgame::GameResult;
@@ -185,7 +185,7 @@ where
 /// to rank which node should be returned by this agent
 /// as the node to play in the game.
 pub(super) fn score_mcts_results<TNode, TState>(
-    data: &MctsData<TState>,
+    data: (TState::Move, usize, usize),
     color: PlayerColor,
 ) -> usize
 where
@@ -205,7 +205,7 @@ where
     data.plays()
 }
 
-pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsData<TState>>
+pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> MctsResult<TState>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -254,10 +254,11 @@ where
 
     let state_children = turn_root.borrow().children();
 
-    let results: Vec<_> = state_children
+    let results: MctsResult<TState> = state_children
         .into_iter()
-        .map(|c| c.borrow().data().clone())
-        .collect();
+        .map(|c| c.borrow().data())
+        .collect::<Vec<_>>()
+        .into();
 
     results
 }

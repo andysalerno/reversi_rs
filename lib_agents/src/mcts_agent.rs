@@ -9,7 +9,6 @@ use std::time::Instant;
 use mcts_data::{Data, MctsData};
 use rayon::prelude::*;
 
-
 const TOTAL_SIMS: u128 = 1000;
 
 pub struct MctsAgent<TState, TNode=RcNode<MctsData<TState>>>
@@ -51,10 +50,10 @@ where
 
         let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), self.color);
 
-        // let (mcts_result, _) = rayon::join(
-        //     || self.mcts(state.clone()),
-        //     || self.mcts(state.clone())
-        // );
+        let (mcts_result, _) = rayon::join(
+            || tree_search::mcts::<TNode, TState>(state.clone(), self.color),
+            || tree_search::mcts::<TNode, TState>(state.clone(), self.color)
+        );
 
         // let mcts_result = self.mcts(state.clone());
 
@@ -66,8 +65,8 @@ where
         );
 
         let max_scoring_result = mcts_result
-            .iter()
-            .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, PlayerColor::Black)) // TODO
+            .action_scores()
+            .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color)) // TODO
             .unwrap();
 
         let max_action = max_scoring_result.action().unwrap();

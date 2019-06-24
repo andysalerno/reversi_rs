@@ -24,6 +24,33 @@ pub struct MctsData<T: GameState> {
     end_state_result: Cell<Option<GameResult>>,
 }
 
+pub struct MctsResult<TState: GameState> {
+    action_scores: Vec<(TState::Move, usize, usize)>
+}
+
+impl<TState: GameState> MctsResult<TState> {
+    pub fn action_scores(self) -> impl Iterator<Item=(TState::Move, usize, usize)> {
+        self.action_scores.into_iter()
+    } 
+}
+
+impl<TData, TState> From<Vec<&TData>> for MctsResult<TState>
+where 
+TData: Data<TState>,
+TState: GameState,
+{
+    fn from(data: Vec<&TData>) -> Self {
+        let mut action_scores = Vec::new();
+
+        for result in data.iter() {
+            action_scores.push((result.action().unwrap(), result.plays(), result.wins()));
+        }
+
+        MctsResult { action_scores }
+    }
+}
+
+
 impl<T: GameState> MctsData<T> {
     pub fn increment_plays(&self) {
         self.plays.set(self.plays.get() + 1);

@@ -2,7 +2,7 @@ use crate::*;
 
 #[derive(Clone, Default)]
 pub struct TestGameState {
-    child_states: Vec<Box<TestActionResult>>,
+    child_states: Vec<TestActionResult>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
