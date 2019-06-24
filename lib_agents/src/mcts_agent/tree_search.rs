@@ -1,194 +1,555 @@
-use lib_boardgame::{GameResult, GameState};
-use std::cell::Cell;
+use monte_carlo_tree::Node;
+use std::borrow::Borrow;
+use crate::util;
+use lib_boardgame::GameResult;
+use crate::mcts_agent::mcts_data::{Data, MctsData};
+use lib_boardgame::{GameAgent, GameState, PlayerColor};
 
-pub trait Data<T: GameState> {
-    fn state(&self) -> &T;
-    fn plays(&self) -> usize;
-    fn wins(&self) -> usize;
-    fn action(&self) -> Option<T::Move>;
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
+const TOTAL_SIMS: u128 = 1000;
+
+fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    node.data().mark_expanded();
+
+    // todo: unnecessary optimization here?
+    {
+        let children = node.children().into_iter().collect::<Vec<_>>();
+        assert!(children.is_empty());
+    }
+
+    let state = node.data().state();
+    if state.is_game_over() {
+        // if the game is over, we have nothing to expand
+        return None;
+    }
+
+    let player_turn = state.current_player_turn();
+    let legal_actions = state.legal_moves(player_turn);
+
+    // Now that we've expanded this node, update it to
+    // inform it how many children it has.
+    node.data().set_children_count(legal_actions.len());
+
+    // create a new child node for every available action->state transition
+    for action in legal_actions {
+        let resulting_state = state.next_state(action);
+        let data = MctsData::new(&resulting_state, 0, 0, Some(action));
+        let _child_node = node.new_child(data);
+    }
+
+    Some(node.children())
 }
 
-/// MCTS-related data that every Node will have.
-#[derive(Default, Clone)]
-pub struct MctsData<T: GameState> {
-    state: T,
-    plays: Cell<usize>,
-    wins: Cell<usize>,
-    action: Option<T::Move>,
+/// Increment this node's count of saturated children.
+/// If doing so results in this node itself becoming saturated,
+/// follow the same operation for its parent.
+fn backprop_saturation<TNode, TState>(node: &TNode)
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut parent_node = node.parent();
 
-    is_expanded: Cell<bool>,
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        let data = parent.data();
+        data.increment_saturated_children_count();
 
-    children_count: Cell<usize>,
-    children_saturated_count: Cell<usize>,
-    end_state_result: Cell<Option<GameResult>>,
-}
+        if !data.is_saturated() {
+            // we incremented but we're still not saturated,
+            // so don't keep going.
+            return;
+        }
 
-impl<T: GameState> MctsData<T> {
-    pub fn increment_plays(&self) {
-        self.plays.set(self.plays.get() + 1);
-    }
-
-    pub fn increment_wins(&self) {
-        self.wins.set(self.wins.get() + 1);
-    }
-
-    pub fn end_state_result(&self) -> Option<GameResult> {
-        self.end_state_result.get()
-    }
-
-    pub fn set_end_state_result(&self, result: GameResult) {
-        self.end_state_result.set(Some(result));
-    }
-
-    /// A node is considered saturated if:
-    ///     * it is a terminal node (i.e. has been expanded and still has no children), OR
-    ///     * every one of its children is saturated
-    /// During MCTS, we should not traverse down saturated nodes,
-    /// since we have already seen every outcome.
-    /// Nodes should not be marked saturated until AFTER their result
-    /// has been backpropagated.
-    pub fn is_saturated(&self) -> bool {
-        self.is_expanded.get() && self.children_saturated_count.get() >= self.children_count.get()
-    }
-
-    /// The owner of the tree search should call this
-    /// upon expanding the node, to mark it as "expanded".
-    /// This is an important because it distinguishes
-    /// nodes that have been expanded but have no more children (terminal nodes)
-    /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
-    pub fn mark_expanded(&self) {
-        assert!(!self.is_expanded.get());
-        self.is_expanded.set(true);
-    }
-
-    pub fn set_children_count(&self, count: usize) {
-        self.children_count.set(count);
-    }
-
-    pub fn increment_saturated_children_count(&self) {
-        self.children_saturated_count
-            .set(self.children_saturated_count.get() + 1);
-
-        assert!(self.children_saturated_count.get() <= self.children_count.get());
+        parent_node = parent.parent();
     }
 }
 
-impl<T: GameState> Data<T> for MctsData<T> {
-    fn state(&self) -> &T {
-        &self.state
-    }
+fn simulate<TNode, TState>(node: &TNode) -> GameResult
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut state = node.data().state().clone();
 
-    fn plays(&self) -> usize {
-        self.plays.get()
-    }
+    loop {
+        if state.is_game_over() {
+            return state
+                .game_result()
+                .expect("There must be a game result, since the game is confirmed to be over.");
+        }
 
-    fn wins(&self) -> usize {
-        self.wins.get()
-    }
+        let player = state.current_player_turn();
+        let legal_moves = state.legal_moves(player);
+        let random_action = util::random_choice(&legal_moves);
 
-    fn action(&self) -> Option<T::Move> {
-        self.action
+        state.apply_move(random_action);
     }
+}
+    // TODO: this can become a function, not a method,
+    // by passing in the opinionated game result (i.e. it knows if "we" won)
+    fn backprop_sim_result<TNode, TState>(node: &TNode, result: GameResult, color: PlayerColor) 
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    {
+        let data = node.data();
+        data.increment_plays();
 
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
-        Self {
-            state: state.clone(),
-            plays: Cell::new(plays),
-            wins: Cell::new(wins),
-            action,
-            children_count: Default::default(),
-            children_saturated_count: Default::default(),
-            is_expanded: Cell::new(false),
-            end_state_result: Default::default(),
+        let incr_wins = (result == GameResult::BlackWins && color == PlayerColor::Black)
+            || (result == GameResult::WhiteWins && color == PlayerColor::White);
+
+        if incr_wins {
+            data.increment_wins();
+        }
+
+        let mut parent_node = node.parent();
+
+        while let Some(p) = parent_node {
+            let parent = p.borrow();
+            let data = parent.data();
+            data.increment_plays();
+
+            if incr_wins {
+                data.increment_wins();
+            }
+            parent_node = parent.parent();
         }
     }
-}
+
+    /// Repeatedly select nodes down the tree until a leaf is reached.
+    /// If the given root node is already a leaf,
+    /// or is saturated, it is returned.
+    fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode::Handle 
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    {
+        let mut cur_node = root.get_handle();
+
+        loop {
+            let selected_child: Option<TNode::Handle> = select_child::<TNode, TState>(&cur_node);
+
+            if selected_child.is_none() {
+                return cur_node;
+            }
+
+            cur_node = selected_child.unwrap();
+        }
+    }
+
+    /// For all children of the given node, assign each one a score,
+    /// and return the child with the highest score (ties broken by the first)
+    /// or None if there are no children (or if every child is already saturated).
+    fn select_child<TNode, TState>(root: &TNode::Handle) -> Option<TNode::Handle> 
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    {
+        let child_nodes = root.borrow().children();
+
+        child_nodes
+            .into_iter()
+            .filter(|n| !n.borrow().data().is_saturated())
+            .max_by(|a, b| {
+                score_node(a.borrow())
+                    .partial_cmp(&score_node(b.borrow()))
+                    .unwrap()
+            })
+    }
+
+    /// Given a node, score it in such a way that encourages
+    /// both exploration and exploitation of the state space.
+    fn score_node<TNode, TState>(node: &TNode) -> f32 
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    
+    {
+        let plays = node.data().plays() as f32;
+
+        if plays == 0f32 {
+            return std::f32::MAX;
+        }
+
+        let wins = node.data().wins() as f32;
+        let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+        let bias = 2_f32;
+
+        (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    }
+
+    /// Given a node, score it by giving it a value we can use
+    /// to rank which node should be returned by this agent
+    /// as the node to play in the game.
+    pub(super) fn score_mcts_results<TNode, TState>(data: &MctsData<TState>, color: PlayerColor) -> usize 
+    
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    {
+        if let Some(state_result) = data.end_state_result() {
+            let is_win = (state_result == GameResult::BlackWins
+                && color == PlayerColor::Black)
+                || (state_result == GameResult::WhiteWins && color == PlayerColor::White);
+
+            if is_win {
+                return std::usize::MAX;
+            }
+        }
+
+        data.plays()
+    }
+
+    pub(super) fn mcts<TNode, TState>(state: TState) -> Vec<MctsData<TState>> 
+    where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    
+    {
+        let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
+
+        for _ in 0..TOTAL_SIMS {
+            // if our previous work has saturated the tree, we can break early,
+            // since we have visited every single outcome already
+            if turn_root.borrow().data().is_saturated() {
+                break;
+            }
+
+            // select the leaf node that we will expand
+            let leaf = select_to_leaf(turn_root.borrow());
+            let leaf = leaf.borrow();
+
+            // expand (create the child nodes for the selected leaf node)
+            let expanded_children = expand(leaf);
+
+            if expanded_children.is_none() {
+                // we've reached a terminating node in the game
+                let sim_result = simulate(leaf);
+                backprop_sim_result(leaf, sim_result, PlayerColor::Black); // TODO
+
+                leaf.data().set_end_state_result(sim_result);
+
+                // we now know we have selected a terminating node (which is saturated by definition),
+                // so we can update the parent's saturated child count.
+                backprop_saturation(leaf);
+
+                continue;
+            }
+
+            let newly_expanded_children =
+                expanded_children.unwrap().into_iter().collect::<Vec<_>>();
+
+            let sim_node = util::random_pick(&newly_expanded_children);
+            let sim_node = sim_node.borrow();
+
+            // simulate
+            let sim_result = simulate(sim_node);
+
+            // backprop
+            backprop_sim_result(sim_node, sim_result, PlayerColor::Black); // TODO
+        }
+
+        let state_children = turn_root.borrow().children();
+
+        let results: Vec<_> = state_children
+            .into_iter()
+            .map(|c| c.borrow().data().clone())
+            .collect();
+
+        results
+    }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use lib_boardgame::{GameMove, PlayerColor};
-    use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
+    mod tests {
+        use super::*;
+        use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
+        use monte_carlo_tree::rc_tree::RcNode;
+
+    fn make_test_state() -> impl GameState {
+        TicTacToeState::new()
+    }
+
+    fn make_node<G: GameState>(data: MctsData<G>) -> impl Node<Data = MctsData<G>> {
+        RcNode::new_root(data)
+    }
+
+    fn make_test_data() -> MctsData<impl GameState> {
+        MctsData::new(&make_test_state(), 0, 0, None)
+    }
 
     #[test]
-    fn is_saturated_expects_false_on_default_node() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+    fn new_child_works() {
+        let data = make_test_data();
+        let tree_root = make_node(data.clone());
+        let child = tree_root.new_child(data.clone());
+
+        assert_eq!(1, tree_root.children().into_iter().count());
+        assert!(child.borrow().parent().is_some());
+        assert!(tree_root.parent().is_none());
+    }
+
+    #[test]
+    fn backprop_works_one_node() {
+        let data = make_test_data();
+        let tree_root = make_node(data.clone());
+
+        backprop_sim_result(&tree_root, GameResult::BlackWins, PlayerColor::Black); // TODO
+
+        assert_eq!(1, tree_root.data().plays());
+    }
+
+    #[test]
+    fn expand_works() {
+        let tree_root = RcNode::new_root(make_test_data());
+
+        let expanded_children = expand(&tree_root)
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        // The game used for testing is TicTacToe,
+        // which has nine intitial legal children positions.
+        assert_eq!(9, expanded_children.len());
+    }
+
+    #[test]
+    fn backprop_works_several_nodes() {
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
+
+        backprop_sim_result(child_level_3.borrow(), GameResult::BlackWins, PlayerColor::Black); // TODO
+
+        assert_eq!(1, child_level_3.borrow().data().plays());
+        assert_eq!(1, child_level_2.borrow().data().plays());
+        assert_eq!(1, child_level_1.borrow().data().plays());
+        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(0, child_level_4.borrow().data().plays());
+    }
+
+    // #[test]
+    // fn select_child_works() {
+    //     let data = make_test_data();
+
+    //     let tree_root = RcNode::new_root(data.clone());
+    //     let child_level_1 = tree_root.new_child(data.clone());
+    //     let child_level_2 = child_level_1.new_child(data.clone());
+    //     let child_level_3 = child_level_2.new_child(data.clone());
+    //     let child_level_4 = child_level_3.new_child(data.clone());
+    //     let child_level_4b = child_level_3.new_child(data.clone());
+
+    //     child_level_1.data().set_children_count(1);
+    //     child_level_2.data().set_children_count(1);
+    //     child_level_3.data().set_children_count(2);
+    //     child_level_4.data().set_children_count(1);
+    //     child_level_4b.data().set_children_count(1);
+
+    //     backprop_sim_result(&child_level_3, GameResult::BlackWins, PlayerColor::Black); // TODO: all
+    //     backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+    //     backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+    //     backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+    //     backprop_sim_result(&child_level_4b, GameResult::BlackWins, PlayerColor::Black);
+
+    //     assert!(!child_level_3.data().is_saturated());
+
+    //     let selected_borrow: RcNode<MctsData<TicTacToeState>> = 
+    //         select_child::<RcNode<MctsData<TicTacToeState>>, TicTacToeState>(&child_level_3)
+    //         .expect("the child should have been selected.");
+
+    //     let selected: &RcNode<_> = selected_borrow.borrow();
+
+    //     assert_eq!(1, selected.data().plays());
+    // }
+
+    #[test]
+    fn select_to_leaf_works() {
+        let data = make_test_data();
+
+        let tree_root = RcNode::new_root(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_3 = child_level_2.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_4b = child_level_3.new_child(data.clone());
+
+        tree_root.data().set_children_count(1);
+        child_level_1.data().set_children_count(1);
+        child_level_2.data().set_children_count(1);
+        child_level_3.data().set_children_count(2);
+        child_level_4.data().set_children_count(2);
+        child_level_4b.data().set_children_count(2);
+
+        backprop_sim_result(&child_level_3, GameResult::BlackWins, PlayerColor::Black); // TODO: all
+        backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(&child_level_4, GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(&child_level_4b, GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(&child_level_4b, GameResult::BlackWins, PlayerColor::Black);
+
+        let leaf = select_to_leaf(&tree_root);
+
+        let leaf: &RcNode<_> = leaf.borrow();
+
+        assert_eq!(2, leaf.data().plays());
+    }
+
+    #[test]
+    fn select_to_leaf_when_already_leaf_returns_self() {
+        let data = MctsData::new(&make_test_state(), 10, 10, None);
+
+        let tree_root = RcNode::new_root(data.clone());
+
+        let leaf = select_to_leaf(&tree_root);
+
+        assert_eq!(10, leaf.data().plays());
+        assert_eq!(10, leaf.data().wins());
+    }
+
+    #[test]
+    fn backprop_saturation_becomes_saturated() {
+        let data = {
+            let mut state = make_test_state();
+            state.initialize_board();
+            MctsData::new(&state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        let children = expand(tree_root.borrow())
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
 
         assert!(
-            !data.is_saturated(),
-            "By default, a node should not be considered saturated."
+            !tree_root.data().is_saturated(),
+            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
+        );
+
+        for child in children.iter().skip(1) {
+            backprop_saturation(child.borrow());
+        }
+
+        assert!(
+            !tree_root.data().is_saturated(),
+            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
+        );
+
+        // backprop the one remaining child.
+        backprop_saturation(children[0].borrow());
+
+        assert!(
+            tree_root.data().is_saturated(),
+            "Now that every child has had its saturation backpropagated, the parent should be considered saturated as well."
         );
     }
 
     #[test]
-    fn is_saturated_expects_true_for_expanded_childless_node() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
-        data.mark_expanded();
+    fn backprop_multi_levels_works() {
+        let data = {
+            let mut state = make_test_state();
+            state.initialize_board();
+            MctsData::new(&state, 0, 0, None)
+        };
 
-        assert!(
-            data.is_saturated(),
-            "An expanded node with no children should be considered saturated."
+        let tree_root = make_node(data.clone());
+
+        let children_1 = expand(tree_root.borrow())
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let child_a = &children_1[0];
+        let child_b = &children_1[1];
+
+        let grandchildren_a = expand(child_a.borrow())
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        let grandchildren_b = expand(child_b.borrow())
+            .unwrap()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(!child_a.borrow().data().is_saturated());
+        assert!(!child_b.borrow().data().is_saturated());
+
+        for grandchild in grandchildren_a {
+            backprop_saturation(grandchild.borrow());
+        }
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(!child_b.borrow().data().is_saturated());
+
+        assert!(child_a.borrow().data().is_saturated());
+
+        for grandchild in grandchildren_b {
+            backprop_saturation(grandchild.borrow());
+        }
+
+        assert!(!tree_root.data().is_saturated());
+        assert!(child_a.borrow().data().is_saturated());
+        assert!(child_b.borrow().data().is_saturated());
+
+        for child in children_1.iter().skip(2) {
+            backprop_saturation(child.borrow());
+        }
+
+        assert!(tree_root.data().is_saturated());
+        assert!(child_a.borrow().data().is_saturated());
+        assert!(child_b.borrow().data().is_saturated());
+    }
+
+    #[test]
+    fn score_node_works() {
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+
+        // all children of the same parent
+        let child_a = tree_root.borrow().new_child(data.clone());
+        let child_b = tree_root.borrow().new_child(data.clone());
+        let child_c = tree_root.borrow().new_child(data.clone());
+        let child_d = tree_root.borrow().new_child(data.clone());
+
+        // "visit" each child a different amount of times
+        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, PlayerColor::Black); // TODO: all
+        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, PlayerColor::Black);
+
+        backprop_sim_result(child_b.borrow(), GameResult::BlackWins, PlayerColor::Black);
+        backprop_sim_result(child_b.borrow(), GameResult::BlackWins, PlayerColor::Black);
+
+        backprop_sim_result(child_c.borrow(), GameResult::BlackWins, PlayerColor::Black);
+
+        assert_eq!(1.5456431, score_node(child_a.borrow()));
+        assert_eq!(1.8930185, score_node(child_b.borrow()));
+        assert_eq!(2.6771324, score_node(child_c.borrow()));
+        assert_eq!(
+            340282350000000000000000000000000000000f32,
+            score_node(child_d.borrow())
         );
     }
 
     #[test]
-    fn is_saturated_expects_false_for_expanded_node_with_children() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
-        data.mark_expanded();
-        data.set_children_count(7);
+    fn simulate_runs_to_completion_and_terminates() {
+        let mut initial_state = make_test_state();
+        initial_state.initialize_board();
+        let data = make_test_data();
 
-        assert!(
-            !data.is_saturated(),
-            "An expanded node with children (that have not backprop'd their expansion status or are unexpanded) should be considered unsaturated."
-        );
+        let tree_root = make_node(data.clone());
+
+        let _sim_result = simulate(&tree_root);
     }
 
-    #[test]
-    fn is_saturated_expects_true_after_incrementing_saturation_count_fully() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
-        data.mark_expanded();
-
-        // we mark the data as having 7 children
-        data.set_children_count(7);
-
-        // and then "increment saturation count" 7 times
-        (0..7).for_each(|_| data.increment_saturated_children_count());
-
-        assert!(
-            data.is_saturated(),
-            "An expanded node with a child count of 7 and a saturated-child count of 7 must therefore be considered saturated."
-        );
     }
-
-    #[test]
-    fn is_saturated_expects_false_after_incrementing_saturation_count_partially() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
-        data.mark_expanded();
-
-        data.set_children_count(7);
-
-        (0..6).for_each(|_| data.increment_saturated_children_count());
-
-        assert!(
-            !data.is_saturated(),
-            "A node with 7 children, but only 6 saturated children, should not be considered saturated."
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn increment_saturated_children_count_explodes_if_over_saturated() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
-        data.mark_expanded();
-
-        data.set_children_count(7);
-
-        (0..8).for_each(|_| data.increment_saturated_children_count());
-
-        assert!(
-            data.is_saturated(),
-            "An expanded node with a child count of 7 and a saturated-child count of 8 is impossible so we should panic."
-        );
-    }
-}
