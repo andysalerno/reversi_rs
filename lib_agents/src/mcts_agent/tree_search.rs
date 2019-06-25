@@ -220,9 +220,9 @@ where
         // since we have visited every single outcome already
 
         //  TODO
-        // if turn_root.borrow().data().is_saturated() {
-        //     break;
-        // }
+        if turn_root.borrow().data().is_saturated() {
+            break;
+        }
 
         // select the leaf node that we will expand
         let leaf = select_to_leaf(turn_root.borrow());
