@@ -192,20 +192,19 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let is_win = (mcts_result.result == GameResult::BlackWins && color == PlayerColor::Black)
-        || (mcts_result.result == GameResult::WhiteWins && color == PlayerColor::White);
+    let is_win = if let Some(game_result) = mcts_result.result {
+        (game_result == GameResult::BlackWins && color == PlayerColor::Black)
+            || (game_result == GameResult::WhiteWins && color == PlayerColor::White)
+    } 
+    else {
+        false
+    };
 
     if is_win {
         return std::usize::MAX;
     }
 
     return mcts_result.plays;
-}
-
-pub fn test<TState: GameState + Sync>(t: TState, player_color: PlayerColor) -> usize {
-    println!("{}", t.human_friendly());
-
-    64
 }
 
 pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
@@ -219,7 +218,6 @@ where
         // if our previous work has saturated the tree, we can break early,
         // since we have visited every single outcome already
 
-        //  TODO
         if turn_root.borrow().data().is_saturated() {
             break;
         }

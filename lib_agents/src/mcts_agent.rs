@@ -47,8 +47,6 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
-        let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), self.color);
-
         let state_a = state.clone();
         let state_b = state.clone();
         let color = self.color;

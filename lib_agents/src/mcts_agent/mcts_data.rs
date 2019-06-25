@@ -7,6 +7,7 @@ pub trait Data<T: GameState> {
     fn wins(&self) -> usize;
     fn action(&self) -> Option<T::Move>;
     fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
+    fn end_state_result(&self) -> Option<GameResult>;
 }
 
 /// MCTS-related data that every Node will have.
@@ -25,7 +26,7 @@ pub struct MctsData<T: GameState> {
 }
 
 pub struct MctsResult<TState: GameState> {
-    pub result: GameResult,
+    pub result: Option<GameResult>,
     pub action: TState::Move,
     pub wins: usize,
     pub plays: usize,
@@ -40,7 +41,7 @@ TState: GameState,
         Self {
             plays: data.plays(),
             wins: data.wins(),
-            result: GameResult::Tie, // TODO
+            result: data.end_state_result(), // TODO
             action: data.action().expect("todo"),
         }
     }
@@ -111,6 +112,10 @@ impl<T: GameState> Data<T> for MctsData<T> {
 
     fn action(&self) -> Option<T::Move> {
         self.action
+    }
+
+    fn end_state_result(&self) -> Option<GameResult> {
+        self.end_state_result.get()
     }
 
     fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
