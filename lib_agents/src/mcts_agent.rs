@@ -11,11 +11,11 @@ use rayon::prelude::*;
 
 const TOTAL_SIMS: u128 = 1000;
 
-pub struct MctsAgent<TState, TNode=RcNode<MctsData<TState>>>
+pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
-    <TState as lib_boardgame::GameState>::Move: std::marker::Send
+    // <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     color: PlayerColor,
 
@@ -28,7 +28,7 @@ impl<TState, TNode> MctsAgent<TState, TNode>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
-    <TState as lib_boardgame::GameState>::Move: std::marker::Send
+    // <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     pub fn new(color: PlayerColor) -> Self {
         MctsAgent {
@@ -42,20 +42,21 @@ where
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
     TNode: Node<Data = MctsData<TState>>,
-    TState: GameState + Send + Sync,
-    TState::Move: Send
+    TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
         let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), self.color);
 
-        let (mcts_result, _) = rayon::join(
-            || tree_search::mcts::<TNode, TState>(state.clone(), self.color),
-            || tree_search::mcts::<TNode, TState>(state.clone(), self.color)
-        );
+        let state_a = state.clone();
+        let state_b = state.clone();
+        let color = self.color;
 
-        // let mcts_result = self.mcts(state.clone());
+        let (mcts_result, _) = rayon::join(
+            || tree_search::mcts::<TNode, TState>(state_a, color),
+            || tree_search::mcts::<TNode, TState>(state_b, color),
+        );
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
@@ -65,34 +66,29 @@ where
         );
 
         let max_scoring_result = mcts_result
-            .action_scores()
-            .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color)) // TODO
+            .into_iter()
+            .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color))
             .unwrap();
-
-        let max_action = max_scoring_result.action().unwrap();
-
-        let plays = max_scoring_result.plays();
-        let wins = max_scoring_result.wins();
 
         println!(
             "Plays: {} Wins: {} ({:.2})",
-            plays,
-            wins,
-            wins as f32 / plays as f32,
+            max_scoring_result.plays,
+            max_scoring_result.wins,
+            max_scoring_result.wins as f32 / max_scoring_result.plays as f32,
         );
 
-        max_action
+        max_scoring_result.action
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::borrow::Borrow;
+
     use lib_boardgame::{Game, GameMove, GameState};
     use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
     use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
-
+    use std::borrow::Borrow;
     fn make_test_state() -> impl GameState {
         TicTacToeState::new()
     }

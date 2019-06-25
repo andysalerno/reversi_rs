@@ -185,29 +185,32 @@ where
 /// to rank which node should be returned by this agent
 /// as the node to play in the game.
 pub(super) fn score_mcts_results<TNode, TState>(
-    data: (TState::Move, usize, usize),
+    mcts_result: &MctsResult<TState>,
     color: PlayerColor,
 ) -> usize
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    if let Some(state_result) = data.end_state_result() {
-        let is_win = (state_result == GameResult::BlackWins && color == PlayerColor::Black)
-            || (state_result == GameResult::WhiteWins && color == PlayerColor::White);
+    let is_win = (mcts_result.result == GameResult::BlackWins && color == PlayerColor::Black)
+        || (mcts_result.result == GameResult::WhiteWins && color == PlayerColor::White);
 
-        if is_win {
-            return std::usize::MAX;
-        }
-
+    if is_win {
+        return std::usize::MAX;
     }
 
-    data.plays()
+    return mcts_result.plays;
 }
 
-pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> MctsResult<TState>
+pub fn test<TState: GameState + Sync>(t: TState, player_color: PlayerColor) -> usize {
+    println!("{}", t.human_friendly());
+
+    64
+}
+
+pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
 where
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data=MctsData<TState>>,
     TState: GameState,
 {
     let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
@@ -215,9 +218,11 @@ where
     for _ in 0..TOTAL_SIMS {
         // if our previous work has saturated the tree, we can break early,
         // since we have visited every single outcome already
-        if turn_root.borrow().data().is_saturated() {
-            break;
-        }
+
+        //  TODO
+        // if turn_root.borrow().data().is_saturated() {
+        //     break;
+        // }
 
         // select the leaf node that we will expand
         let leaf = select_to_leaf(turn_root.borrow());
@@ -252,13 +257,13 @@ where
         backprop_sim_result(sim_node, sim_result, player_color);
     }
 
-    let state_children = turn_root.borrow().children();
+    let turn_root = turn_root.borrow();
+    let state_children = turn_root.children();
 
-    let results: MctsResult<TState> = state_children
+    let results: Vec<MctsResult<TState>> = state_children
         .into_iter()
-        .map(|c| c.borrow().data())
-        .collect::<Vec<_>>()
-        .into();
+        .map(|c| c.borrow().data().into())
+        .collect::<Vec<_>>();
 
     results
 }

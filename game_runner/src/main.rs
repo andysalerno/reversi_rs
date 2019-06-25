@@ -38,9 +38,9 @@ fn play_tic_tac_toe() {
     let black = MctsAgent::<TicTacToeState>::new(PlayerColor::Black);
     let white = MctsAgent::<TicTacToeState>::new(PlayerColor::White);
 
-    let mut game = TicTacToe::new(white, black);
+    // let mut game = TicTacToe::new(white, black);
 
-    let game_result = game.play_to_end();
+    // let game_result = game.play_to_end();
 
-    println!("Result: {:?}", game_result);
+    // println!("Result: {:?}", game_result);
 }
