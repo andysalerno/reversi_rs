@@ -51,30 +51,48 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let now = Instant::now();
 
-        let state_a = state.clone();
-        let state_b = state.clone();
         let color = self.color;
 
-        let (mcts_result, mut mcts_result_b) = rayon::join(
-            || tree_search::mcts::<TNode, TState>(state_a, color),
-            || tree_search::mcts::<TNode, TState>(state_b, color),
-        );
+        let results = if color == PlayerColor::Black {
+            let state_a = state.clone();
+            let state_b = state.clone();
 
-        for result in mcts_result_b.iter_mut() {
-            let other_result = mcts_result.iter().find(|r| r.action == result.action).expect("should both contain the same results");
+            let (mcts_result, mut mcts_result_b) = rayon::join(
+                || tree_search::mcts::<TNode, TState>(state_a, color),
+                || tree_search::mcts::<TNode, TState>(state_b, color),
+            );
 
-            result.plays += other_result.plays;
-            result.wins += other_result.wins;
+            for result in mcts_result_b.iter_mut() {
+                let other_result = mcts_result.iter().find(|r| r.action == result.action).expect("should both contain the same results");
+
+                result.plays += other_result.plays;
+                result.wins += other_result.wins;
+            }
+
+            mcts_result_b
         }
+        else {
+            let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), color);
+
+            mcts_result
+        };
+
+        let sims = if color == PlayerColor::Black {
+            TOTAL_SIMS * 2
+        }
+        else {
+            TOTAL_SIMS
+        };
+
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
             "{} sims total. {:.2} sims/sec.",
-            TOTAL_SIMS * 2,
-            ((TOTAL_SIMS * 2) as f64 / elapsed_micros as f64) * 1_000_000f64
+            sims * 2,
+            ((sims * 2) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        let max_scoring_result = mcts_result_b
+        let max_scoring_result = results
             .into_iter()
             .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color))
             .unwrap();
