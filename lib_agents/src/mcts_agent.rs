@@ -6,7 +6,7 @@ use monte_carlo_tree::rc_tree::RcNode;
 use monte_carlo_tree::Node;
 use std::marker::PhantomData;
 use std::time::Instant;
-use mcts_data::{Data, MctsData};
+use mcts_data::{Data, MctsData, MctsResult};
 use rayon::prelude::*;
 
 const TOTAL_SIMS: u128 = 1000;
@@ -37,6 +37,10 @@ where
             _phantom_b: PhantomData,
         }
     }
+
+    // fn combine_results(results: &[MctsResult<TState>]) -> TState::Move {
+
+    // }
 }
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
@@ -51,19 +55,26 @@ where
         let state_b = state.clone();
         let color = self.color;
 
-        let (mcts_result, _) = rayon::join(
+        let (mcts_result, mut mcts_result_b) = rayon::join(
             || tree_search::mcts::<TNode, TState>(state_a, color),
             || tree_search::mcts::<TNode, TState>(state_b, color),
         );
 
+        for result in mcts_result_b.iter_mut() {
+            let other_result = mcts_result.iter().find(|r| r.action == result.action).expect("should both contain the same results");
+
+            result.plays += other_result.plays;
+            result.wins += other_result.wins;
+        }
+
         let elapsed_micros = now.elapsed().as_micros();
         println!(
             "{} sims total. {:.2} sims/sec.",
-            TOTAL_SIMS,
-            (TOTAL_SIMS as f64 / elapsed_micros as f64) * 1_000_000f64
+            TOTAL_SIMS * 2,
+            ((TOTAL_SIMS * 2) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        let max_scoring_result = mcts_result
+        let max_scoring_result = mcts_result_b
             .into_iter()
             .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color))
             .unwrap();

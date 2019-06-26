@@ -25,6 +25,7 @@ pub struct MctsData<T: GameState> {
     end_state_result: Cell<Option<GameResult>>,
 }
 
+#[derive(Default)]
 pub struct MctsResult<TState: GameState> {
     pub result: Option<GameResult>,
     pub action: TState::Move,
