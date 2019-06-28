@@ -19,7 +19,6 @@ where
 {
     color: PlayerColor,
 
-    // todo: the fact that I require these lines must mean something is wrong...
     _phantom_a: PhantomData<TState>,
     _phantom_b: PhantomData<TNode>,
 }
@@ -28,7 +27,6 @@ impl<TState, TNode> MctsAgent<TState, TNode>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
-    // <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     pub fn new(color: PlayerColor) -> Self {
         MctsAgent {
@@ -37,10 +35,6 @@ where
             _phantom_b: PhantomData,
         }
     }
-
-    // fn combine_results(results: &[MctsResult<TState>]) -> TState::Move {
-
-    // }
 }
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
@@ -54,22 +48,45 @@ where
         let color = self.color;
 
         let results = if color == PlayerColor::Black {
-            let state_a = state.clone();
-            let state_b = state.clone();
+            let mut result_1 = None;
+            let mut result_2 = None;
+            let mut result_3 = None;
+            let mut result_4 = None;
 
-            let (mcts_result, mut mcts_result_b) = rayon::join(
-                || tree_search::mcts::<TNode, TState>(state_a, color),
-                || tree_search::mcts::<TNode, TState>(state_b, color),
-            );
+            let state_1 = state.clone();
+            let state_2 = state.clone();
+            let state_3 = state.clone();
+            let state_4 = state.clone();
 
-            for result in mcts_result_b.iter_mut() {
-                let other_result = mcts_result.iter().find(|r| r.action == result.action).expect("should both contain the same results");
+            rayon::scope(|s| {
+                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState>(state_1, color)));
+                s.spawn(|_| result_2 = Some(tree_search::mcts::<TNode, TState>(state_2, color)));
+                s.spawn(|_| result_3 = Some(tree_search::mcts::<TNode, TState>(state_3, color)));
+                s.spawn(|_| result_4 = Some(tree_search::mcts::<TNode, TState>(state_4, color)));
+            });
 
-                result.plays += other_result.plays;
-                result.wins += other_result.wins;
+            let mut result_1 = result_1.unwrap();
+
+            let actions_count = result_1.len();
+
+            let subsequent_results = vec![result_2, result_3, result_4];
+
+            // aggregate all the action play/win values into result_1
+            for i in 0..actions_count {
+                let result_1_action = result_1.get_mut(i).unwrap();
+
+                for subsequent_result in &subsequent_results {
+                    let matching_action = subsequent_result.as_ref().unwrap()
+                        .iter()
+                        .find(|r| r.action == result_1_action.action)
+                        .unwrap();
+
+                    result_1_action.plays += matching_action.plays;
+                    result_1_action.wins += matching_action.wins;
+                }
             }
 
-            mcts_result_b
+            result_1
         }
         else {
             let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), color);
@@ -78,7 +95,7 @@ where
         };
 
         let sims = if color == PlayerColor::Black {
-            TOTAL_SIMS * 2
+            TOTAL_SIMS * 4
         }
         else {
             TOTAL_SIMS
