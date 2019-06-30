@@ -1,4 +1,5 @@
 use std::fmt;
+use std::str::FromStr;
 pub mod test_impls;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -26,6 +27,10 @@ pub enum GameResult {
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
 pub trait GameMove: Copy + fmt::Debug + Send + PartialEq {}
+
+pub trait GameMoveFromStr : GameMove + FromStr {
+    fn from_str(s: &str, player_color: PlayerColor) -> Result<Self, Self::Err>;
+}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
@@ -122,6 +127,10 @@ where
             PlayerColor::Black => self.black_agent().pick_move(state, &legal_moves),
             PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
         };
+
+        if legal_moves.iter().find(|&&m| m == picked_action).is_none() {
+            panic!("Agent provided a move that is illegal.");
+        }
 
         println!("Player {:?} picked move {:?}", player, picked_action);
 

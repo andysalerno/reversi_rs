@@ -2,7 +2,7 @@ pub mod reversi;
 pub mod reversi_gamestate;
 mod util;
 
-use lib_boardgame::GameMove;
+use lib_boardgame::{GameMove, GameMoveFromStr, PlayerColor};
 use std::fmt;
 
 /// The size of the board.
@@ -70,6 +70,26 @@ impl fmt::Debug for ReversiPlayerAction {
         };
 
         write!(f, "{}", msg)
+    }
+}
+
+impl GameMoveFromStr for ReversiPlayerAction {
+    fn from_str(s: &str, player_color: PlayerColor) -> Result<Self, Self::Err> {
+        let reversi_piece = if player_color == PlayerColor::Black {
+            ReversiPiece::Black
+        }
+        else {
+            ReversiPiece::White
+        };
+
+        let mut action: ReversiPlayerAction = std::str::FromStr::from_str(s)?;
+
+        match action {
+            ReversiPlayerAction::Move{ ref mut piece, position: _ } => *piece = reversi_piece,
+            _ => {}
+        };
+
+        Ok(action)
     }
 }
 

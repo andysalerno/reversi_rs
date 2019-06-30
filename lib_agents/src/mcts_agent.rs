@@ -7,7 +7,6 @@ use monte_carlo_tree::{rc_tree::RcNode, Node};
 use std::marker::PhantomData;
 use std::time::Instant;
 
-
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
     TState: GameState,
@@ -43,7 +42,6 @@ where
 
         let color = self.color;
 
-        // TODO: just wrap a vec in an Arc(Mutex) and share it.
         let results = {
             let mut result_1 = None;
             let mut result_2 = None;
