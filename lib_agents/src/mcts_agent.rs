@@ -1,21 +1,17 @@
-mod tree_search;
 mod mcts_data;
+mod tree_search;
 
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
-use monte_carlo_tree::rc_tree::RcNode;
-use monte_carlo_tree::Node;
+use mcts_data::MctsData;
+use monte_carlo_tree::{rc_tree::RcNode, Node};
 use std::marker::PhantomData;
 use std::time::Instant;
-use mcts_data::{Data, MctsData, MctsResult};
-use rayon::prelude::*;
 
-const TOTAL_SIMS: u128 = 1000;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
     TState: GameState,
     TNode: Node<Data = MctsData<TState>>,
-    // <TState as lib_boardgame::GameState>::Move: std::marker::Send
 {
     color: PlayerColor,
 
@@ -47,7 +43,8 @@ where
 
         let color = self.color;
 
-        let results = if color == PlayerColor::Black {
+        // TODO: just wrap a vec in an Arc(Mutex) and share it.
+        let results = {
             let mut result_1 = None;
             let mut result_2 = None;
             let mut result_3 = None;
@@ -76,7 +73,9 @@ where
                 let result_1_action = result_1.get_mut(i).unwrap();
 
                 for subsequent_result in &subsequent_results {
-                    let matching_action = subsequent_result.as_ref().unwrap()
+                    let matching_action = subsequent_result
+                        .as_ref()
+                        .unwrap()
                         .iter()
                         .find(|r| r.action == result_1_action.action)
                         .unwrap();
@@ -87,26 +86,17 @@ where
             }
 
             result_1
-        }
-        else {
-            let mcts_result = tree_search::mcts::<TNode, TState>(state.clone(), color);
-
-            mcts_result
         };
 
-        let sims = if color == PlayerColor::Black {
-            TOTAL_SIMS * 4
-        }
-        else {
-            TOTAL_SIMS
-        };
+        let sims_count = tree_search::TOTAL_SIMS * rayon::current_num_threads();
 
+        println!("Thread count: {}", rayon::current_num_threads());
 
         let elapsed_micros = now.elapsed().as_micros();
         println!(
             "{} sims total. {:.2} sims/sec.",
-            sims * 2,
-            ((sims * 2) as f64 / elapsed_micros as f64) * 1_000_000f64
+            sims_count,
+            ((sims_count) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
         let max_scoring_result = results
@@ -129,21 +119,9 @@ where
 mod tests {
     use super::*;
 
-    use lib_boardgame::{Game, GameMove, GameState};
+    use lib_boardgame::{Game, GameState};
     use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
-    use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
-    use std::borrow::Borrow;
-    fn make_test_state() -> impl GameState {
-        TicTacToeState::new()
-    }
-
-    fn make_node<G: GameState>(data: MctsData<G>) -> impl Node<Data = MctsData<G>> {
-        RcNode::new_root(data)
-    }
-
-    fn make_test_data() -> MctsData<impl GameState> {
-        MctsData::new(&make_test_state(), 0, 0, None)
-    }
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction};
 
     #[test]
     fn tree_search_always_picks_winning_move() {

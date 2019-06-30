@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-const TOTAL_SIMS: u128 = 1000;
+pub const TOTAL_SIMS: usize = 1000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -123,7 +123,7 @@ where
 /// Repeatedly select nodes down the tree until a leaf is reached.
 /// If the given root node is already a leaf,
 /// or is saturated, it is returned.
-fn select_to_leaf<TNode, TState>(root: &TNode) -> TNode::Handle
+fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -131,7 +131,22 @@ where
     let mut cur_node = root.get_handle();
 
     loop {
-        let selected_child: Option<TNode::Handle> = select_child::<TNode, TState>(cur_node.clone());
+        let selected_child =
+            if player_color == cur_node.borrow().data().state().current_player_turn() {
+                let selected_child: Option<TNode::Handle> =
+                    select_child::<TNode, TState>(cur_node.clone());
+                selected_child
+            } else {
+                let all_children = cur_node
+                    .borrow()
+                    .children()
+                    .into_iter()
+                    .filter(|c| !c.borrow().data().is_saturated())
+                    .collect::<Vec<_>>();
+
+                let selected_child = util::random_pick(&all_children);
+                selected_child.cloned()
+            };
 
         if selected_child.is_none() {
             return cur_node;
@@ -195,8 +210,7 @@ where
     let is_win = if let Some(game_result) = mcts_result.result {
         (game_result == GameResult::BlackWins && color == PlayerColor::Black)
             || (game_result == GameResult::WhiteWins && color == PlayerColor::White)
-    } 
-    else {
+    } else {
         false
     };
 
@@ -209,7 +223,7 @@ where
 
 pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
 where
-    TNode: Node<Data=MctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
@@ -223,7 +237,7 @@ where
         }
 
         // select the leaf node that we will expand
-        let leaf = select_to_leaf(turn_root.borrow());
+        let leaf = select_to_leaf(turn_root.borrow(), player_color);
         let leaf = leaf.borrow();
 
         // expand (create the child nodes for the selected leaf node)
@@ -245,7 +259,8 @@ where
 
         let newly_expanded_children = expanded_children.unwrap().into_iter().collect::<Vec<_>>();
 
-        let sim_node = util::random_pick(&newly_expanded_children);
+        let sim_node = util::random_pick(&newly_expanded_children)
+            .expect("Must have had at least one expanded child.");
         let sim_node = sim_node.borrow();
 
         // simulate
@@ -471,7 +486,7 @@ mod tests {
             PlayerColor::Black,
         );
 
-        let leaf = select_to_leaf(&tree_root);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
 
         let leaf = leaf.borrow();
 
@@ -484,7 +499,7 @@ mod tests {
 
         let tree_root = RcNode::new_root(data.clone());
 
-        let leaf = select_to_leaf(&tree_root);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
 
         assert_eq!(10, leaf.data().plays());
         assert_eq!(10, leaf.data().wins());
