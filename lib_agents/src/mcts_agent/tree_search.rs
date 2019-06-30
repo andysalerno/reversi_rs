@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 10_000;
+pub(super) const TOTAL_SIMS: usize = 5000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -218,13 +218,18 @@ where
         return std::usize::MAX;
     }
 
-    if mcts_result.plays == 0 {
-        return 0;
-    }
-    else {
-        let ratio = (mcts_result.wins * 100) / mcts_result.plays;
-        return ratio as usize;
-    }
+    let result = if color == PlayerColor::White {
+        mcts_result.plays
+    } else {
+        if mcts_result.plays == 0 {
+            0
+        } else {
+            let ratio = (mcts_result.wins * 100) / mcts_result.plays;
+            ratio as usize
+        }
+    };
+
+    result
 }
 
 pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
