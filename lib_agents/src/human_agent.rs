@@ -7,7 +7,6 @@ where
     TState::Move: FromStr,
 {
     _phantom: PhantomData<TState>,
-    player_color: PlayerColor,
 }
 
 impl<TState: GameState> HumanAgent<TState>
@@ -15,10 +14,9 @@ where
     TState::Move: FromStr,
     <TState::Move as FromStr>::Err: std::fmt::Debug,
 {
-    pub fn new(player_color: PlayerColor) -> Self {
+    pub fn new() -> Self {
         Self {
             _phantom: Default::default(),
-            player_color,
         }
     }
 

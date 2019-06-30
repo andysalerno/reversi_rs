@@ -218,7 +218,7 @@ where
         return std::usize::MAX;
     }
 
-    return mcts_result.plays;
+    mcts_result.plays
 }
 
 pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
