@@ -1,6 +1,6 @@
 use lib_agents::human_agent::HumanAgent;
 use lib_agents::mcts_agent::MctsAgent;
-use lib_boardgame::{Game, PlayerColor};
+use lib_boardgame::{Game, PlayerColor, GameResult};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
@@ -17,19 +17,35 @@ fn main() {
     //     || (0..500).for_each(|_| play_tic_tac_toe()),
     // );
 
-    play_reversi();
+    let game_count: usize = std::env::args()
+        .collect::<Vec<_>>()
+        .get(1).unwrap_or(&String::from("1"))
+        .parse().expect("Couldn't parse arg as a usize.");
+
+    let results = (0..game_count)
+        .map(|_| play_reversi())
+        .collect::<Vec<_>>();
+
+    let white_wins = results.iter().filter(|&&r| r == GameResult::WhiteWins).count();
+    let black_wins = results.iter().filter(|&&r| r == GameResult::BlackWins).count();
+    let ties = results.iter().filter(|&&r| r == GameResult::Tie).count();
+
+    let total = results.len();
+
+    println!("Black wins: {} ({:.2})", black_wins, black_wins as f32 / total as f32);
+    println!("White wins: {} ({:.2})", white_wins, white_wins as f32 / total as f32);
+    println!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
 }
 
 #[allow(unused)]
-fn play_reversi() {
+fn play_reversi() -> lib_boardgame::GameResult {
     // let white = HumanAgent::new(PlayerColor::White);
     let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
     let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
 
     let mut game = Reversi::new(white, black);
 
-    let game_result = game.play_to_end();
-    println!("Result: {:?}", game_result);
+    game.play_to_end()
 }
 
 #[allow(unused)]

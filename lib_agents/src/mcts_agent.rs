@@ -70,7 +70,7 @@ where
             for i in 0..actions_count {
                 let result_1_action = result_1.get_mut(i).unwrap();
 
-                for subsequent_result in &subsequent_results {
+                for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
                     let matching_action = subsequent_result
                         .as_ref()
                         .unwrap()
@@ -86,7 +86,7 @@ where
             result_1
         };
 
-        let sims_count = tree_search::TOTAL_SIMS * rayon::current_num_threads();
+        let sims_count = tree_search::TOTAL_SIMS * 4;
 
         println!("Thread count: {}", rayon::current_num_threads());
 
@@ -99,7 +99,7 @@ where
 
         let max_scoring_result = results
             .into_iter()
-            .max_by_key(|c| tree_search::score_mcts_results::<TNode, TState>(c, self.color))
+            .max_by_key(|c| tree_search::score_mcts_results_ratio::<TNode, TState>(c, self.color))
             .unwrap();
 
         println!(
@@ -109,8 +109,34 @@ where
             max_scoring_result.wins as f32 / max_scoring_result.plays as f32,
         );
 
+        let white_wins = if color == PlayerColor::White {
+            max_scoring_result.wins
+        } else {
+            max_scoring_result.plays - max_scoring_result.wins
+        };
+
+        println!("{}", pretty_ratio_bar_text(20, white_wins, max_scoring_result.plays));
+
         max_scoring_result.action
     }
+}
+
+fn pretty_ratio_bar_text(len_chars: usize, numerator_white_wins: usize, denominator_plays: usize) -> String {
+    let mut bar = String::with_capacity(len_chars + 2);
+
+    bar.push_str("B [");
+
+    let bar_len = (numerator_white_wins * len_chars) / denominator_plays;
+    let bar_txt = "=".repeat(bar_len);
+    bar.push_str(&bar_txt);
+    bar.push('|');
+
+    let bar_empty = " ".repeat(len_chars - bar_len);
+    bar.push_str(&bar_empty);
+
+    bar.push_str("] W");
+
+    bar
 }
 
 #[cfg(test)]

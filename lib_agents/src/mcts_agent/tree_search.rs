@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 5000;
+pub(super) const TOTAL_SIMS: usize = 500;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -123,7 +123,27 @@ where
 /// Repeatedly select nodes down the tree until a leaf is reached.
 /// If the given root node is already a leaf,
 /// or is saturated, it is returned.
+#[allow(unused)]
 fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut cur_node = root.get_handle();
+
+    loop {
+        let selected_child = select_child::<TNode, TState>(cur_node.clone());
+
+        if selected_child.is_none() {
+            return cur_node;
+        }
+
+        cur_node = selected_child.unwrap();
+    }
+}
+
+/// This proved to give better results (marginally) than the non-rand version.
+fn select_to_leaf_rand<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -199,7 +219,8 @@ where
 /// Given a node, score it by giving it a value we can use
 /// to rank which node should be returned by this agent
 /// as the node to play in the game.
-pub(super) fn score_mcts_results<TNode, TState>(
+/// This has outperformed the _plays version.
+pub(super) fn score_mcts_results_ratio<TNode, TState>(
     mcts_result: &MctsResult<TState>,
     color: PlayerColor,
 ) -> usize
@@ -218,16 +239,36 @@ where
         return std::usize::MAX;
     }
 
-    let result = if color == PlayerColor::White {
-        mcts_result.plays
+    let result = if mcts_result.plays == 0 {
+        0
     } else {
-        if mcts_result.plays == 0 {
-            0
-        } else {
-            let ratio = (mcts_result.wins * 100) / mcts_result.plays;
-            ratio as usize
-        }
+        let ratio = (mcts_result.wins * 100) / mcts_result.plays;
+        ratio as usize
     };
+
+    result
+}
+
+pub(super) fn score_mcts_results_plays<TNode, TState>(
+    mcts_result: &MctsResult<TState>,
+    color: PlayerColor,
+) -> usize
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let is_win = if let Some(game_result) = mcts_result.result {
+        (game_result == GameResult::BlackWins && color == PlayerColor::Black)
+            || (game_result == GameResult::WhiteWins && color == PlayerColor::White)
+    } else {
+        false
+    };
+
+    if is_win {
+        return std::usize::MAX;
+    }
+
+    let result = mcts_result.plays;
 
     result
 }
@@ -248,7 +289,8 @@ where
         }
 
         // select the leaf node that we will expand
-        let leaf = select_to_leaf(turn_root.borrow(), player_color);
+        let leaf = select_to_leaf_rand(turn_root.borrow(), player_color);
+
         let leaf = leaf.borrow();
 
         // expand (create the child nodes for the selected leaf node)
