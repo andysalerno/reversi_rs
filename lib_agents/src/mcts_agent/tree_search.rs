@@ -132,7 +132,7 @@ where
     let mut cur_node = root.get_handle();
 
     loop {
-        let selected_child = select_child::<TNode, TState>(cur_node.clone());
+        let selected_child = select_child::<TNode, TState>(cur_node.clone(), player_color);
 
         if selected_child.is_none() {
             return cur_node;
@@ -152,9 +152,9 @@ where
 
     loop {
         let selected_child =
-            if player_color == cur_node.borrow().data().state().current_player_turn() {
+            if player_color == PlayerColor::White || player_color == cur_node.borrow().data().state().current_player_turn() {
                 let selected_child: Option<TNode::Handle> =
-                    select_child::<TNode, TState>(cur_node.clone());
+                    select_child::<TNode, TState>(cur_node.clone(), player_color);
                 selected_child
             } else {
                 let all_children = cur_node
@@ -179,7 +179,7 @@ where
 /// For all children of the given node, assign each one a score,
 /// and return the child with the highest score (ties broken by the first)
 /// or None if there are no children (or if every child is already saturated).
-fn select_child<TNode, TState>(root: TNode::Handle) -> Option<TNode::Handle>
+fn select_child<TNode, TState>(root: TNode::Handle, player_color: PlayerColor) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -190,30 +190,41 @@ where
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            score_node(a.borrow())
-                .partial_cmp(&score_node(b.borrow()))
+            score_node(a.borrow(), player_color)
+                .partial_cmp(&score_node(b.borrow(), player_color))
                 .unwrap()
         })
 }
 
 /// Given a node, score it in such a way that encourages
 /// both exploration and exploitation of the state space.
-fn score_node<TNode, TState>(node: &TNode) -> f32
+fn score_node<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let plays = node.data().plays() as f32;
+    let wins = node.data().wins() as f32;
 
     if plays == 0f32 {
         return std::f32::MAX;
     }
 
-    let wins = node.data().wins() as f32;
-    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-    let bias = 2_f32;
+    let wins_factor = if false && player_color == PlayerColor::Black {
+        if node.data().state().current_player_turn() == player_color {
+            wins / plays
+        } else {
+            1_f32 - (wins / plays)
+        }
+    }
+    else {
+        wins / plays
+    };
 
-    (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+    let bias = 2_f32; // TODO: experiment with this
+
+    wins_factor + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
 }
 
 /// Given a node, score it by giving it a value we can use
@@ -680,12 +691,12 @@ mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), GameResult::BlackWins, player_agent_color);
 
-        assert_eq!(1.5456431, score_node(child_a.borrow()));
-        assert_eq!(1.8930185, score_node(child_b.borrow()));
-        assert_eq!(2.6771324, score_node(child_c.borrow()));
+        assert_eq!(1.5456431, score_node(child_a.borrow(), player_agent_color));
+        assert_eq!(1.8930185, score_node(child_b.borrow(), player_agent_color));
+        assert_eq!(2.6771324, score_node(child_c.borrow(), player_agent_color));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node(child_d.borrow())
+            score_node(child_d.borrow(), player_agent_color)
         );
     }
 
