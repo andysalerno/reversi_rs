@@ -38,11 +38,9 @@ where
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-        use rand::rand_core::SeedableRng;
+        use crate::util::weak_rng;
 
         let now = Instant::now();
-
-        let rng = rand_xorshift::XorShiftRng::from_seed(0);
 
         let color = self.color;
 
@@ -58,16 +56,17 @@ where
             let state_4 = state.clone();
 
             rayon::scope(|s| {
-                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState>(state_1, color)));
+                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState, _>(state_1, color, &mut weak_rng())));
+
                 if color == PlayerColor::Black {
                     s.spawn(|_| {
-                        result_2 = Some(tree_search::mcts::<TNode, TState>(state_2, color))
+                        result_2 = Some(tree_search::mcts::<TNode, TState, _>(state_2, color, &mut weak_rng()))
                     });
                     s.spawn(|_| {
-                        result_3 = Some(tree_search::mcts::<TNode, TState>(state_3, color))
+                        result_3 = Some(tree_search::mcts::<TNode, TState, _>(state_3, color, &mut weak_rng()))
                     });
                     s.spawn(|_| {
-                        result_4 = Some(tree_search::mcts::<TNode, TState>(state_4, color))
+                        result_4 = Some(tree_search::mcts::<TNode, TState, _>(state_4, color, &mut weak_rng()))
                     });
                 }
             });

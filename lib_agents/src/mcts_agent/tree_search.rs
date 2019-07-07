@@ -69,10 +69,11 @@ where
     }
 }
 
-fn simulate<TNode, TState>(node: &TNode) -> GameResult
+fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
+    R: rand_core::RngCore,
 {
     let mut state = node.data().state().clone();
 
@@ -85,7 +86,7 @@ where
 
         let player = state.current_player_turn();
         let legal_moves = state.legal_moves(player);
-        let random_action = util::random_choice(&legal_moves);
+        let random_action = util::random_choice(&legal_moves, rng);
 
         state.apply_move(random_action);
     }
@@ -147,7 +148,7 @@ fn select_to_leaf_rand<TNode, TState, Rng>(root: &TNode, player_color: PlayerCol
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
-    Rng: rand::Rng + Sized,
+    Rng: rand_core::RngCore,
 {
     let mut cur_node = root.get_handle();
 
@@ -278,7 +279,7 @@ pub fn mcts<TNode, TState, Rng>(state: TState, player_color: PlayerColor, rng: &
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
-    Rng: rand::Rng + Sized,
+    Rng: rand_core::RngCore,
 {
     let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
 
@@ -300,7 +301,7 @@ where
 
         if expanded_children.is_none() {
             // we've reached a terminating node in the game
-            let sim_result = simulate(leaf);
+            let sim_result = simulate(leaf, rng);
             backprop_sim_result(leaf, sim_result, player_color);
 
             leaf.data().set_end_state_result(sim_result);
@@ -319,7 +320,7 @@ where
         let sim_node = sim_node.borrow();
 
         // simulate
-        let sim_result = simulate(sim_node);
+        let sim_result = simulate(sim_node, rng);
 
         // backprop
         backprop_sim_result(sim_node, sim_result, player_color);
@@ -699,7 +700,7 @@ mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let _sim_result = simulate(&tree_root);
+        // let _sim_result = simulate(&tree_root) TODO ;
     }
 
 }
