@@ -73,7 +73,7 @@ fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
-    R: rand_core::RngCore,
+    R: rand::Rng,
 {
     let mut state = node.data().state().clone();
 
@@ -148,7 +148,7 @@ fn select_to_leaf_rand<TNode, TState, Rng>(root: &TNode, player_color: PlayerCol
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
-    Rng: rand_core::RngCore,
+    Rng: rand::Rng,
 {
     let mut cur_node = root.get_handle();
 
@@ -241,16 +241,15 @@ where
         return std::usize::MAX;
     }
 
-    let result = if mcts_result.plays == 0 {
+    if mcts_result.plays == 0 {
         0
     } else {
         let ratio = (mcts_result.wins * 100) / mcts_result.plays;
         ratio as usize
-    };
-
-    result
+    }
 }
 
+#[allow(unused)]
 pub(super) fn score_mcts_results_plays<TNode, TState>(
     mcts_result: &MctsResult<TState>,
     color: PlayerColor,
@@ -270,16 +269,14 @@ where
         return std::usize::MAX;
     }
 
-    let result = mcts_result.plays;
-
-    result
+    mcts_result.plays
 }
 
 pub fn mcts<TNode, TState, Rng>(state: TState, player_color: PlayerColor, rng: &mut Rng) -> Vec<MctsResult<TState>>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
-    Rng: rand_core::RngCore,
+    Rng: rand::Rng,
 {
     let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
 

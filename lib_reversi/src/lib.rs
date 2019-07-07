@@ -84,10 +84,9 @@ impl GameMoveFromStr for ReversiPlayerAction {
 
         let mut action: ReversiPlayerAction = std::str::FromStr::from_str(s)?;
 
-        match action {
-            ReversiPlayerAction::Move{ ref mut piece, position: _ } => *piece = reversi_piece,
-            _ => {}
-        };
+        if let ReversiPlayerAction::Move{ref mut piece, position: _} = action {
+            *piece = reversi_piece;
+        }
 
         Ok(action)
     }

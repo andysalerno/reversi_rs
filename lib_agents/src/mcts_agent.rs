@@ -38,7 +38,7 @@ where
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-        use crate::util::weak_rng;
+        use crate::util::get_rng;
 
         let now = Instant::now();
 
@@ -56,17 +56,17 @@ where
             let state_4 = state.clone();
 
             rayon::scope(|s| {
-                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState, _>(state_1, color, &mut weak_rng())));
+                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState, _>(state_1, color, &mut get_rng())));
 
                 if color == PlayerColor::Black {
                     s.spawn(|_| {
-                        result_2 = Some(tree_search::mcts::<TNode, TState, _>(state_2, color, &mut weak_rng()))
+                        result_2 = Some(tree_search::mcts::<TNode, TState, _>(state_2, color, &mut get_rng()))
                     });
                     s.spawn(|_| {
-                        result_3 = Some(tree_search::mcts::<TNode, TState, _>(state_3, color, &mut weak_rng()))
+                        result_3 = Some(tree_search::mcts::<TNode, TState, _>(state_3, color, &mut get_rng()))
                     });
                     s.spawn(|_| {
-                        result_4 = Some(tree_search::mcts::<TNode, TState, _>(state_4, color, &mut weak_rng()))
+                        result_4 = Some(tree_search::mcts::<TNode, TState, _>(state_4, color, &mut get_rng()))
                     });
                 }
             });
@@ -140,21 +140,21 @@ fn pretty_ratio_bar_text(
     numerator_white_wins: usize,
     denominator_plays: usize,
 ) -> String {
-    let mut bar = String::with_capacity(len_chars + 7);
+    let mut text_bar = String::with_capacity(len_chars + 7);
 
-    bar.push_str("B [");
+    text_bar.push_str("B [");
 
     let bar_len = (numerator_white_wins * len_chars) / denominator_plays;
     let bar_txt = "=".repeat(bar_len);
-    bar.push_str(&bar_txt);
-    bar.push('|');
+    text_bar.push_str(&bar_txt);
+    text_bar.push('|');
 
     let bar_empty = " ".repeat(len_chars - bar_len);
-    bar.push_str(&bar_empty);
+    text_bar.push_str(&bar_empty);
 
-    bar.push_str("] W");
+    text_bar.push_str("] W");
 
-    bar
+    text_bar
 }
 
 #[cfg(test)]

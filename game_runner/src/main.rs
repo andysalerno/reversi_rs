@@ -1,9 +1,13 @@
+#[allow(unused)]
 use lib_agents::human_agent::HumanAgent;
+
+#[allow(unused)]
+use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
+
 use lib_agents::mcts_agent::MctsAgent;
 use lib_boardgame::{Game, PlayerColor, GameResult};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
-use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
 use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
 fn main() {

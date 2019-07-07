@@ -36,10 +36,10 @@ where
         let result = GameMoveFromStr::from_str(&input, self.player_color);
 
         match result {
-            Ok(r) => return r,
+            Ok(r) => r,
             _ => {
                 println!("Invalid input.  Try again.");
-                return self.prompt_input();
+                self.prompt_input()
             }
         }
     }
