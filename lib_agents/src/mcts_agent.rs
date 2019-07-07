@@ -38,7 +38,11 @@ where
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+        use rand::rand_core::SeedableRng;
+
         let now = Instant::now();
+
+        let rng = rand_xorshift::XorShiftRng::from_seed(0);
 
         let color = self.color;
 
@@ -55,9 +59,17 @@ where
 
             rayon::scope(|s| {
                 s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState>(state_1, color)));
-                s.spawn(|_| result_2 = Some(tree_search::mcts::<TNode, TState>(state_2, color)));
-                s.spawn(|_| result_3 = Some(tree_search::mcts::<TNode, TState>(state_3, color)));
-                s.spawn(|_| result_4 = Some(tree_search::mcts::<TNode, TState>(state_4, color)));
+                if color == PlayerColor::Black {
+                    s.spawn(|_| {
+                        result_2 = Some(tree_search::mcts::<TNode, TState>(state_2, color))
+                    });
+                    s.spawn(|_| {
+                        result_3 = Some(tree_search::mcts::<TNode, TState>(state_3, color))
+                    });
+                    s.spawn(|_| {
+                        result_4 = Some(tree_search::mcts::<TNode, TState>(state_4, color))
+                    });
+                }
             });
 
             let mut result_1 = result_1.unwrap();
@@ -115,14 +127,21 @@ where
             max_scoring_result.plays - max_scoring_result.wins
         };
 
-        println!("{}", pretty_ratio_bar_text(20, white_wins, max_scoring_result.plays));
+        println!(
+            "{}",
+            pretty_ratio_bar_text(20, white_wins, max_scoring_result.plays)
+        );
 
         max_scoring_result.action
     }
 }
 
-fn pretty_ratio_bar_text(len_chars: usize, numerator_white_wins: usize, denominator_plays: usize) -> String {
-    let mut bar = String::with_capacity(len_chars + 2);
+fn pretty_ratio_bar_text(
+    len_chars: usize,
+    numerator_white_wins: usize,
+    denominator_plays: usize,
+) -> String {
+    let mut bar = String::with_capacity(len_chars + 7);
 
     bar.push_str("B [");
 

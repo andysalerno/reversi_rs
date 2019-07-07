@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 500;
+pub(super) const TOTAL_SIMS: usize = 5000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -143,10 +143,11 @@ where
 }
 
 /// This proved to give better results (marginally) than the non-rand version.
-fn select_to_leaf_rand<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
+fn select_to_leaf_rand<TNode, TState, Rng>(root: &TNode, player_color: PlayerColor, rng: &mut Rng) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
+    Rng: rand::Rng + Sized,
 {
     let mut cur_node = root.get_handle();
 
@@ -164,7 +165,7 @@ where
                     .filter(|c| !c.borrow().data().is_saturated())
                     .collect::<Vec<_>>();
 
-                let selected_child = util::random_pick(&all_children);
+                let selected_child = util::random_pick(&all_children, rng);
                 selected_child.cloned()
             };
 
@@ -273,10 +274,11 @@ where
     result
 }
 
-pub fn mcts<TNode, TState>(state: TState, player_color: PlayerColor) -> Vec<MctsResult<TState>>
+pub fn mcts<TNode, TState, Rng>(state: TState, player_color: PlayerColor, rng: &mut Rng) -> Vec<MctsResult<TState>>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
+    Rng: rand::Rng + Sized,
 {
     let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
 
@@ -289,7 +291,7 @@ where
         }
 
         // select the leaf node that we will expand
-        let leaf = select_to_leaf_rand(turn_root.borrow(), player_color);
+        let leaf = select_to_leaf_rand(turn_root.borrow(), player_color, rng);
 
         let leaf = leaf.borrow();
 
@@ -312,7 +314,7 @@ where
 
         let newly_expanded_children = expanded_children.unwrap().into_iter().collect::<Vec<_>>();
 
-        let sim_node = util::random_pick(&newly_expanded_children)
+        let sim_node = util::random_pick(&newly_expanded_children, rng)
             .expect("Must have had at least one expanded child.");
         let sim_node = sim_node.borrow();
 
