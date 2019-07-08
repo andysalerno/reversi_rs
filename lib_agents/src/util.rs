@@ -20,3 +20,8 @@ where
 pub(crate) fn get_rng() -> impl rand::Rng {
     SmallRng::from_entropy()
 }
+
+pub(crate) fn get_rng_deterministic() -> impl rand::Rng {
+    use rand::SeedableRng;
+    SmallRng::from_seed([0; 16])
+}

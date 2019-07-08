@@ -233,8 +233,8 @@ where
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            score_node(a.borrow())
-                .partial_cmp(&score_node(b.borrow()))
+            score_node_simple(a.borrow())
+                .partial_cmp(&score_node_simple(b.borrow()))
                 .unwrap()
         })
 }
@@ -253,8 +253,8 @@ where
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            score_node_inverted(a.borrow(), player_color)
-                .partial_cmp(&score_node_inverted(b.borrow(), player_color))
+            score_node_pessimistic(a.borrow(), player_color)
+                .partial_cmp(&score_node_pessimistic(b.borrow(), player_color))
                 .unwrap()
         })
 }
@@ -281,7 +281,7 @@ where
 
 /// Given a node, score it in such a way that encourages
 /// both exploration and exploitation of the state space.
-fn score_node<TNode, TState>(node: &TNode) -> f32
+fn score_node_simple<TNode, TState>(node: &TNode) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -299,7 +299,7 @@ where
     (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
 }
 
-fn score_node_inverted<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
+fn score_node_pessimistic<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -450,7 +450,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
+
+    use lib_tic_tac_toe::{
+        tic_tac_toe::TicTacToe,
+        tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState},
+        TicTacToePiece,
+    };
+
     use monte_carlo_tree::rc_tree::RcNode;
 
     fn make_test_state() -> impl GameState {
@@ -838,12 +844,12 @@ mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), GameResult::BlackWins, player_agent_color);
 
-        assert_eq!(1.5456431, score_node(child_a.borrow()));
-        assert_eq!(1.8930185, score_node(child_b.borrow()));
-        assert_eq!(2.6771324, score_node(child_c.borrow()));
+        assert_eq!(1.5456431, score_node_simple(child_a.borrow()));
+        assert_eq!(1.8930185, score_node_simple(child_b.borrow()));
+        assert_eq!(2.6771324, score_node_simple(child_c.borrow()));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node(child_d.borrow())
+            score_node_simple(child_d.borrow())
         );
     }
 
@@ -855,7 +861,77 @@ mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let _sim_result = simulate(&tree_root, &mut crate::util::get_rng());
+        let _sim_result = simulate(&tree_root, &mut crate::util::get_rng_deterministic());
     }
 
+    #[test]
+    fn mcts_score_results_ratio_expects_always_avoids_losing_move() {
+        type BP = BoardPosition;
+        // _ _ _
+        // _ _ _
+        // _ _ _
+        let mut state = TicTacToeState::initial_state();
+
+        // X _ _
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 2)));
+
+        // X _ O
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(2, 2)));
+
+        // X _ O
+        // _ _ _
+        // X _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 0)));
+
+        // White MUST block, or it will lose
+        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+
+        let max_by_ratio = mcts_results
+            .iter()
+            .max_by_key(|c| score_mcts_results_ratio::<RcNode<_>, _>(c, PlayerColor::White))
+            .unwrap();
+
+        let expected_action = TicTacToeAction(BP::new(0, 1));
+        assert_eq!(expected_action, max_by_ratio.action);
+    }
+
+    #[test]
+    fn mcts_score_results_plays_expects_always_avoids_losing_move() {
+        type BP = BoardPosition;
+        // _ _ _
+        // _ _ _
+        // _ _ _
+        let mut state = TicTacToeState::initial_state();
+
+        // X _ _
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 2)));
+
+        // X _ O
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(2, 2)));
+
+        // X _ O
+        // _ _ _
+        // X _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 0)));
+
+        // White MUST block, or it will lose
+        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+
+        let max_by_plays = mcts_results
+            .iter()
+            .max_by_key(|c| score_mcts_results_plays::<RcNode<_>, _>(c, PlayerColor::White))
+            .unwrap();
+
+        let expected_action = TicTacToeAction(BP::new(0, 1));
+        assert_eq!(expected_action, max_by_plays.action);
+    }
 }
+
