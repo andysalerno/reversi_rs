@@ -933,5 +933,95 @@ mod tests {
         let expected_action = TicTacToeAction(BP::new(0, 1));
         assert_eq!(expected_action, max_by_plays.action);
     }
+
+    #[test]
+    fn mcts_score_results_plays_expects_always_picks_winning_move() {
+        type BP = BoardPosition;
+        // _ _ _
+        // _ _ _
+        // _ _ _
+        let mut state = TicTacToeState::initial_state();
+
+        // X _ _
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 2)));
+
+        // X _ O
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(2, 2)));
+
+        // X _ O
+        // _ _ _
+        // X _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 0)));
+
+        // X _ O
+        // _ _ _
+        // X _ O
+        state.apply_move(TicTacToeAction(BP::new(2, 0)));
+
+        // X _ O
+        // _ X _
+        // X _ O
+        state.apply_move(TicTacToeAction(BP::new(1, 1)));
+
+        // White MUST block, or it will lose
+        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+
+        let max_by_plays = mcts_results
+            .iter()
+            .max_by_key(|c| score_mcts_results_plays::<RcNode<_>, _>(c, PlayerColor::White))
+            .unwrap();
+
+        let expected_action = TicTacToeAction(BP::new(2, 1));
+        assert_eq!(expected_action, max_by_plays.action);
+    }
+
+    #[test]
+    fn mcts_score_results_ratio_expects_always_picks_winning_move() {
+        type BP = BoardPosition;
+        // _ _ _
+        // _ _ _
+        // _ _ _
+        let mut state = TicTacToeState::initial_state();
+
+        // X _ _
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 2)));
+
+        // X _ O
+        // _ _ _
+        // _ _ _
+        state.apply_move(TicTacToeAction(BP::new(2, 2)));
+
+        // X _ O
+        // _ _ _
+        // X _ _
+        state.apply_move(TicTacToeAction(BP::new(0, 0)));
+
+        // X _ O
+        // _ _ _
+        // X _ O
+        state.apply_move(TicTacToeAction(BP::new(2, 0)));
+
+        // X _ O
+        // _ X _
+        // X _ O
+        state.apply_move(TicTacToeAction(BP::new(1, 1)));
+
+        // White MUST block, or it will lose
+        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+
+        let max_by_plays = mcts_results
+            .iter()
+            .max_by_key(|c| score_mcts_results_ratio::<RcNode<_>, _>(c, PlayerColor::White))
+            .unwrap();
+
+        let expected_action = TicTacToeAction(BP::new(2, 1));
+        assert_eq!(expected_action, max_by_plays.action);
+    }
 }
 
