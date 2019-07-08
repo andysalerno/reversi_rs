@@ -56,19 +56,34 @@ where
             let state_4 = state.clone();
 
             rayon::scope(|s| {
-                s.spawn(|_| result_1 = Some(tree_search::mcts::<TNode, TState, _>(state_1, color, &mut get_rng())));
-
-                if color == PlayerColor::Black {
-                    s.spawn(|_| {
-                        result_2 = Some(tree_search::mcts::<TNode, TState, _>(state_2, color, &mut get_rng()))
-                    });
-                    s.spawn(|_| {
-                        result_3 = Some(tree_search::mcts::<TNode, TState, _>(state_3, color, &mut get_rng()))
-                    });
-                    s.spawn(|_| {
-                        result_4 = Some(tree_search::mcts::<TNode, TState, _>(state_4, color, &mut get_rng()))
-                    });
-                }
+                s.spawn(|_| {
+                    result_1 = Some(tree_search::mcts::<TNode, TState, _>(
+                        state_1,
+                        color,
+                        &mut get_rng(),
+                    ))
+                });
+                s.spawn(|_| {
+                    result_2 = Some(tree_search::mcts::<TNode, TState, _>(
+                        state_2,
+                        color,
+                        &mut get_rng(),
+                    ))
+                });
+                s.spawn(|_| {
+                    result_3 = Some(tree_search::mcts::<TNode, TState, _>(
+                        state_3,
+                        color,
+                        &mut get_rng(),
+                    ))
+                });
+                s.spawn(|_| {
+                    result_4 = Some(tree_search::mcts::<TNode, TState, _>(
+                        state_4,
+                        color,
+                        &mut get_rng(),
+                    ))
+                });
             });
 
             let mut result_1 = result_1.unwrap();
