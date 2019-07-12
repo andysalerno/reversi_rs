@@ -86,8 +86,16 @@ impl<T: GameState> MctsData<T> {
         self.is_expanded.set(true);
     }
 
+    pub fn is_expanded(&self) -> bool {
+        self.is_expanded.get()
+    }
+
     pub fn set_children_count(&self, count: usize) {
         self.children_count.set(count);
+    }
+
+    pub fn children_count(&self) -> usize {
+        self.children_count.get()
     }
 
     pub fn increment_saturated_children_count(&self) {
