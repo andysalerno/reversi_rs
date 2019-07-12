@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 5000;
+pub(super) const TOTAL_SIMS: usize = 1000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where

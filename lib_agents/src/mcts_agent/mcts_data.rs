@@ -136,7 +136,6 @@ impl<T: GameState> Data<T> for MctsData<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lib_boardgame::{GameMove, PlayerColor};
     use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
     #[test]
