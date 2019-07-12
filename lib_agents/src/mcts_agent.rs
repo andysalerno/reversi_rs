@@ -46,14 +46,14 @@ where
 
         let results = {
             let mut result_1 = None;
-            let mut result_2 = None;
-            let mut result_3 = None;
-            let mut result_4 = None;
+            // let mut result_2 = None;
+            // let mut result_3 = None;
+            // let mut result_4 = None;
 
             let state_1 = state.clone();
-            let state_2 = state.clone();
-            let state_3 = state.clone();
-            let state_4 = state.clone();
+            // let state_2 = state.clone();
+            // let state_3 = state.clone();
+            // let state_4 = state.clone();
 
             rayon::scope(|s| {
                 s.spawn(|_| {
@@ -63,51 +63,51 @@ where
                         &mut get_rng(),
                     ))
                 });
-                s.spawn(|_| {
-                    result_2 = Some(tree_search::mcts::<TNode, TState, _>(
-                        state_2,
-                        color,
-                        &mut get_rng(),
-                    ))
-                });
-                s.spawn(|_| {
-                    result_3 = Some(tree_search::mcts::<TNode, TState, _>(
-                        state_3,
-                        color,
-                        &mut get_rng(),
-                    ))
-                });
-                s.spawn(|_| {
-                    result_4 = Some(tree_search::mcts::<TNode, TState, _>(
-                        state_4,
-                        color,
-                        &mut get_rng(),
-                    ))
-                });
+                // s.spawn(|_| {
+                //     result_2 = Some(tree_search::mcts::<TNode, TState, _>(
+                //         state_2,
+                //         color,
+                //         &mut get_rng(),
+                //     ))
+                // });
+                // s.spawn(|_| {
+                //     result_3 = Some(tree_search::mcts::<TNode, TState, _>(
+                //         state_3,
+                //         color,
+                //         &mut get_rng(),
+                //     ))
+                // });
+                // s.spawn(|_| {
+                //     result_4 = Some(tree_search::mcts::<TNode, TState, _>(
+                //         state_4,
+                //         color,
+                //         &mut get_rng(),
+                //     ))
+                // });
             });
 
             let mut result_1 = result_1.unwrap();
 
             let actions_count = result_1.len();
 
-            let subsequent_results = vec![result_2, result_3, result_4];
+            // let subsequent_results = vec![result_2, result_3, result_4];
 
-            // aggregate all the action play/win values into result_1
-            for i in 0..actions_count {
-                let result_1_action = result_1.get_mut(i).unwrap();
+            // // aggregate all the action play/win values into result_1
+            // for i in 0..actions_count {
+            //     let result_1_action = result_1.get_mut(i).unwrap();
 
-                for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
-                    let matching_action = subsequent_result
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .find(|r| r.action == result_1_action.action)
-                        .unwrap();
+            //     for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
+            //         let matching_action = subsequent_result
+            //             .as_ref()
+            //             .unwrap()
+            //             .iter()
+            //             .find(|r| r.action == result_1_action.action)
+            //             .unwrap();
 
-                    result_1_action.plays += matching_action.plays;
-                    result_1_action.wins += matching_action.wins;
-                }
-            }
+            //         result_1_action.plays += matching_action.plays;
+            //         result_1_action.wins += matching_action.wins;
+            //     }
+            // }
 
             result_1
         };

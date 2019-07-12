@@ -1,5 +1,5 @@
 use crate::{TicTacToePiece, BOARD_SIZE};
-use lib_boardgame::{GameMove, GameState, PlayerColor};
+use lib_boardgame::{GameMove, GameMoveFromStr, GameState, PlayerColor};
 
 type Board = [[Option<TicTacToePiece>; BOARD_SIZE]; BOARD_SIZE];
 
@@ -25,6 +25,49 @@ pub struct BoardPosition {
 impl BoardPosition {
     pub fn new(col: usize, row: usize) -> Self {
         BoardPosition { col, row }
+    }
+}
+
+impl std::str::FromStr for TicTacToeAction {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let nums: Vec<_> = s.split(',').map(|x| x.trim()).collect();
+
+        if nums.len() != 2 {
+            println!("Invalid input: {} -- expected format: col,row", s);
+            return Err(());
+        }
+
+        let col = nums[0].parse::<usize>();
+        let row = nums[1].parse::<usize>();
+
+        if let (Ok(col), Ok(row)) = (col, row) {
+            let position = BoardPosition::new(col, row);
+
+            if col > BOARD_SIZE || row >= BOARD_SIZE {
+                println!(
+                    "Position out of bounds of board. Input: {:?}, actual board size: {}",
+                    position, BOARD_SIZE
+                );
+
+                return Err(());
+            } else {
+                let action = TicTacToeAction(position);
+                return Ok(action);
+            }
+        } else {
+            println!("Didn't recognize input as a board position: {}", s);
+            return Err(());
+        }
+    }
+}
+
+impl GameMoveFromStr for TicTacToeAction {
+    fn from_str(s: &str, _player_color: PlayerColor) -> Result<Self, Self::Err> {
+        let action: TicTacToeAction = std::str::FromStr::from_str(s)?;
+
+        Ok(action)
     }
 }
 
