@@ -24,6 +24,16 @@ pub enum GameResult {
     BlackWins,
 }
 
+impl GameResult {
+    pub fn is_win_for_player(self, player_color: PlayerColor) -> bool {
+        match self {
+            GameResult::BlackWins => player_color == PlayerColor::Black,
+            GameResult::WhiteWins => player_color == PlayerColor::White,
+            _ => false
+        }
+    }
+}
+
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
 pub trait GameMove: Copy + fmt::Debug + Send + PartialEq {}

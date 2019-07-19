@@ -100,8 +100,7 @@ where
     let data = node.data();
     data.increment_plays();
 
-    let incr_wins = (result == GameResult::BlackWins && color == PlayerColor::Black)
-        || (result == GameResult::WhiteWins && color == PlayerColor::White);
+    let incr_wins = result.is_win_for_player(color);
 
     if incr_wins {
         data.increment_wins();
@@ -335,8 +334,7 @@ where
     TState: GameState,
 {
     let is_win = if let Some(game_result) = mcts_result.result {
-        (game_result == GameResult::BlackWins && color == PlayerColor::Black)
-            || (game_result == GameResult::WhiteWins && color == PlayerColor::White)
+        game_result.is_win_for_player(color)
     } else {
         false
     };
@@ -888,7 +886,11 @@ mod tests {
         state.apply_move(TicTacToeAction(BP::new(0, 0)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+        let mcts_results = mcts::<RcNode<_>, _, _>(
+            state,
+            PlayerColor::White,
+            &mut util::get_rng_deterministic(),
+        );
 
         let max_by_ratio = mcts_results
             .iter()
@@ -923,7 +925,11 @@ mod tests {
         state.apply_move(TicTacToeAction(BP::new(0, 0)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+        let mcts_results = mcts::<RcNode<_>, _, _>(
+            state,
+            PlayerColor::White,
+            &mut util::get_rng_deterministic(),
+        );
 
         let max_by_plays = mcts_results
             .iter()
@@ -968,7 +974,11 @@ mod tests {
         state.apply_move(TicTacToeAction(BP::new(1, 1)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+        let mcts_results = mcts::<RcNode<_>, _, _>(
+            state,
+            PlayerColor::White,
+            &mut util::get_rng_deterministic(),
+        );
 
         let max_by_plays = mcts_results
             .iter()
@@ -1013,7 +1023,11 @@ mod tests {
         state.apply_move(TicTacToeAction(BP::new(1, 1)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(state, PlayerColor::White, &mut util::get_rng_deterministic());
+        let mcts_results = mcts::<RcNode<_>, _, _>(
+            state,
+            PlayerColor::White,
+            &mut util::get_rng_deterministic(),
+        );
 
         let max_by_plays = mcts_results
             .iter()
@@ -1024,4 +1038,3 @@ mod tests {
         assert_eq!(expected_action, max_by_plays.action);
     }
 }
-
