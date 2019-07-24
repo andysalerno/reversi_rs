@@ -44,7 +44,7 @@ where
 
         let color = self.color;
 
-        let results = {
+        let mut results = {
             let mut result_1 = None;
             // let mut result_2 = None;
             // let mut result_3 = None;
@@ -123,17 +123,19 @@ where
             ((sims_count) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        let max_scoring_result = results
-            .into_iter()
-            .max_by_key(|c| tree_search::score_mcts_results_ratio::<TNode, TState>(c, self.color))
-            .unwrap();
+        results.sort_by_key(|r| tree_search::score_mcts_results_ratio::<TNode, TState>(r, self.color));
 
-        println!(
-            "Plays: {} Wins: {} ({:.2})",
-            max_scoring_result.plays,
-            max_scoring_result.wins,
-            max_scoring_result.wins as f32 / max_scoring_result.plays as f32,
-        );
+        for r in &results {
+            println!(
+                "Action: {:?} Plays: {} Wins: {} ({:.2})",
+                r.action,
+                r.plays,
+                r.wins,
+                r.wins as f32 / r.plays as f32,
+            );
+        }
+
+        let max_scoring_result = &results[0];
 
         let white_wins = if color == PlayerColor::White {
             max_scoring_result.wins
