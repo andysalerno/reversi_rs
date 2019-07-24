@@ -451,6 +451,7 @@ where
     results
 }
 
+#[cfg(test)]
 pub mod tests {
     use super::*;
 
@@ -867,6 +868,7 @@ pub mod tests {
         let _sim_result = simulate(&tree_root, &mut crate::util::get_rng_deterministic());
     }
 
+    #[test]
     pub fn mcts_score_results_ratio_expects_always_avoids_losing_move() {
         type BP = BoardPosition;
         // _ _ _
@@ -905,6 +907,7 @@ pub mod tests {
         assert_eq!(expected_action, max_by_ratio.action);
     }
 
+    #[test]
     pub fn mcts_score_results_plays_expects_always_avoids_losing_move() {
         type BP = BoardPosition;
         // _ _ _
