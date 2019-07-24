@@ -315,9 +315,13 @@ impl GameState for TicTacToeState {
 
     /// Returns the score of the given player in this state.
     fn player_score(&self, player: PlayerColor) -> usize {
-        match player {
-            PlayerColor::White => self.o_piece_count,
-            PlayerColor::Black => self.x_piece_count,
+        const WIN: usize = 1;
+        const NOT_WIN: usize = 0;
+
+        match self.get_winner() {
+            Some(PlayerColor::White) if player == PlayerColor::White => WIN,
+            Some(PlayerColor::Black) if player == PlayerColor::Black => WIN,
+            _ => NOT_WIN 
         }
     }
 

@@ -220,7 +220,7 @@ where
 
 /// For all children of the given node, assign each one a score,
 /// and return the child with the highest score (ties broken by the first)
-/// or None if there are no children (or if every child is already saturated).
+/// or None if there are no unsaturated children.
 fn select_child_max_score<TNode, TState>(root: TNode::Handle) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -232,9 +232,10 @@ where
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            score_node_simple(a.borrow())
-                .partial_cmp(&score_node_simple(b.borrow()))
-                .unwrap()
+            let a_score = score_node_simple(a.borrow());
+            let b_score = score_node_simple(b.borrow());
+
+            a_score.partial_cmp(&b_score).unwrap()
         })
 }
 
@@ -252,9 +253,10 @@ where
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            score_node_pessimistic(a.borrow(), player_color)
-                .partial_cmp(&score_node_pessimistic(b.borrow(), player_color))
-                .unwrap()
+            let a_score = score_node_pessimistic(a.borrow(), player_color);
+            let b_score = score_node_pessimistic(b.borrow(), player_color);
+
+            a_score.partial_cmp(&b_score).unwrap()
         })
 }
 
@@ -285,6 +287,8 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    // score = win_ratio + sqrt( 2lg(parent_plays) / plays)
+
     let plays = node.data().plays() as f32;
 
     if plays == 0f32 {
@@ -295,7 +299,7 @@ where
     let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
     let bias = 2_f32;
 
-    (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    (wins / plays) + f32::sqrt((bias * f32::ln(parent_plays)) / plays)
 }
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
@@ -318,7 +322,7 @@ where
     let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
     let bias = 2_f32;
 
-    (wins / plays) + (bias * f32::sqrt(f32::ln(parent_plays) / plays))
+    (wins / plays) + f32::sqrt((bias * f32::ln(parent_plays)) / plays)
 }
 
 /// Given a node, score it by giving it a value we can use
@@ -409,6 +413,7 @@ where
 
         if expanded_children.is_none() {
             // we've reached a terminating node in the game
+            let _action: String = format!("{:?}", leaf.data().action());
             let sim_result = simulate(leaf, rng);
             backprop_sim_result(leaf, sim_result, player_color);
 
@@ -426,6 +431,7 @@ where
         let sim_node = util::random_pick(&newly_expanded_children, rng)
             .expect("Must have had at least one expanded child.");
         let sim_node = sim_node.borrow();
+        let _action: String = format!("{:?}", leaf.data().action());
 
         // simulate
         let sim_result = simulate(sim_node, rng);
@@ -445,8 +451,7 @@ where
     results
 }
 
-#[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     use lib_tic_tac_toe::{
@@ -842,9 +847,9 @@ mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), GameResult::BlackWins, player_agent_color);
 
-        assert_eq!(1.5456431, score_node_simple(child_a.borrow()));
-        assert_eq!(1.8930185, score_node_simple(child_b.borrow()));
-        assert_eq!(2.6771324, score_node_simple(child_c.borrow()));
+        assert_eq!(1.0929347, score_node_simple(child_a.borrow()));
+        assert_eq!(1.3385662, score_node_simple(child_b.borrow()));
+        assert_eq!(1.8930185, score_node_simple(child_c.borrow()));
         assert_eq!(
             340282350000000000000000000000000000000f32,
             score_node_simple(child_d.borrow())
@@ -862,8 +867,7 @@ mod tests {
         let _sim_result = simulate(&tree_root, &mut crate::util::get_rng_deterministic());
     }
 
-    #[test]
-    fn mcts_score_results_ratio_expects_always_avoids_losing_move() {
+    pub fn mcts_score_results_ratio_expects_always_avoids_losing_move() {
         type BP = BoardPosition;
         // _ _ _
         // _ _ _
@@ -901,8 +905,7 @@ mod tests {
         assert_eq!(expected_action, max_by_ratio.action);
     }
 
-    #[test]
-    fn mcts_score_results_plays_expects_always_avoids_losing_move() {
+    pub fn mcts_score_results_plays_expects_always_avoids_losing_move() {
         type BP = BoardPosition;
         // _ _ _
         // _ _ _
@@ -941,7 +944,7 @@ mod tests {
     }
 
     #[test]
-    fn mcts_score_results_plays_expects_always_picks_winning_move() {
+    pub fn mcts_score_results_plays_expects_always_picks_winning_move() {
         type BP = BoardPosition;
         // _ _ _
         // _ _ _
@@ -990,7 +993,7 @@ mod tests {
     }
 
     #[test]
-    fn mcts_score_results_ratio_expects_always_picks_winning_move() {
+    pub fn mcts_score_results_ratio_expects_always_picks_winning_move() {
         type BP = BoardPosition;
         // _ _ _
         // _ _ _

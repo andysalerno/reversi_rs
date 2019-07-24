@@ -24,8 +24,65 @@ impl TicTacToePiece {
 
 #[cfg(test)]
 mod tests {
+    use crate::tic_tac_toe_gamestate::{TicTacToeState, TicTacToeAction, BoardPosition};
+    use lib_boardgame::{GameState, PlayerColor};
+
     #[test]
     fn it_works() {
         assert_eq!(2 + 2, 4);
+    }
+
+    #[test]
+    fn winning_player_has_higher_score() {
+        let mut state = TicTacToeState::initial_state();
+
+        // Start with black's turn
+        assert_eq!(state.current_player_turn(), PlayerColor::Black);
+
+        // Create this state:
+        // X__
+        // ___
+        // ___
+        state.apply_move(TicTacToeAction(BoardPosition::new(0, 2)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::White);
+
+        // Create this state:
+        // X__
+        // ___
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(2, 0)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::Black);
+
+        // Create this state:
+        // X_X
+        // ___
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(2, 2)));
+
+        assert_eq!(state.current_player_turn(), PlayerColor::White);
+
+        // Create this state:
+        // X_X
+        // _O_
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(1, 1)));
+
+        let white_score = state.player_score(PlayerColor::White);
+        let black_score = state.player_score(PlayerColor::Black);
+
+        assert_eq!(white_score, black_score, "No winner yet, so scores should be equal.");
+
+        // Create this state:
+        // XXX
+        // _O_
+        // __O
+        state.apply_move(TicTacToeAction(BoardPosition::new(1, 2)));
+
+        let white_score = state.player_score(PlayerColor::White);
+        let black_score = state.player_score(PlayerColor::Black);
+
+        assert!(black_score > white_score, "Black has won, so it should have the higher score.");
     }
 }

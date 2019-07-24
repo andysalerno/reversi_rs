@@ -12,33 +12,29 @@ use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
 fn main() {
 
-    // for _ in 0..1000 {
-    //     play_tic_tac_toe();
-    // }
+    // lib_agents::mcts_agent::tree_search::tests::mcts_score_results_ratio_expects_always_picks_winning_move();
+    lib_agents::mcts_agent::tree_search::tests::mcts_score_results_ratio_expects_always_avoids_losing_move();
+    // lib_agents::mcts_agent::tree_search::tests::mcts_score_results_plays_expects_always_picks_winning_move();
+    lib_agents::mcts_agent::tree_search::tests::mcts_score_results_plays_expects_always_avoids_losing_move();
 
-    // rayon::join(
-    //     || (0..500).for_each(|_| play_tic_tac_toe()),
-    //     || (0..500).for_each(|_| play_tic_tac_toe()),
-    // );
+    // let game_count: usize = std::env::args()
+    //     .collect::<Vec<_>>()
+    //     .get(1).unwrap_or(&String::from("1"))
+    //     .parse().expect("Couldn't parse arg as a usize.");
 
-    let game_count: usize = std::env::args()
-        .collect::<Vec<_>>()
-        .get(1).unwrap_or(&String::from("1"))
-        .parse().expect("Couldn't parse arg as a usize.");
+    // let results = (0..game_count)
+    //     .map(|_| play_tic_tac_toe())
+    //     .collect::<Vec<_>>();
 
-    let results = (0..game_count)
-        .map(|_| play_tic_tac_toe())
-        .collect::<Vec<_>>();
+    // let white_wins = results.iter().filter(|&&r| r == GameResult::WhiteWins).count();
+    // let black_wins = results.iter().filter(|&&r| r == GameResult::BlackWins).count();
+    // let ties = results.iter().filter(|&&r| r == GameResult::Tie).count();
 
-    let white_wins = results.iter().filter(|&&r| r == GameResult::WhiteWins).count();
-    let black_wins = results.iter().filter(|&&r| r == GameResult::BlackWins).count();
-    let ties = results.iter().filter(|&&r| r == GameResult::Tie).count();
+    // let total = results.len();
 
-    let total = results.len();
-
-    println!("Black wins: {} ({:.2})", black_wins, black_wins as f32 / total as f32);
-    println!("White wins: {} ({:.2})", white_wins, white_wins as f32 / total as f32);
-    println!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
+    // println!("Black wins: {} ({:.2})", black_wins, black_wins as f32 / total as f32);
+    // println!("White wins: {} ({:.2})", white_wins, white_wins as f32 / total as f32);
+    // println!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
 }
 
 #[allow(unused)]

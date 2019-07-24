@@ -1,5 +1,5 @@
 mod mcts_data;
-mod tree_search;
+pub mod tree_search;
 
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use mcts_data::MctsData;
