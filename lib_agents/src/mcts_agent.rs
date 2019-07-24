@@ -124,6 +124,7 @@ where
         );
 
         results.sort_by_key(|r| tree_search::score_mcts_results_ratio::<TNode, TState>(r, self.color));
+        results.reverse();
 
         for r in &results {
             println!(
