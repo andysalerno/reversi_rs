@@ -12,8 +12,7 @@ use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
 fn main() {
     let game_count: usize = std::env::args()
-        .collect::<Vec<_>>()
-        .get(1).unwrap_or(&String::from("1"))
+        .nth(1).unwrap_or_else(|| "1".into())
         .parse().expect("Couldn't parse arg as a usize.");
 
     let results = (0..game_count)

@@ -52,20 +52,20 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let mut parent_node = node.parent();
+    let mut parent_handle = node.parent();
 
-    while let Some(p) = parent_node {
+    while let Some(p) = parent_handle {
         let parent = p.borrow();
         let data = parent.data();
         data.increment_saturated_children_count();
 
         if !data.is_saturated() {
-            // we incremented but we're still not saturated,
-            // so don't keep going.
+            // Don't back-prop any further
+            // if we've reached a saturated node.
             return;
         }
 
-        parent_node = parent.parent();
+        parent_handle = parent.parent();
     }
 }
 
@@ -120,30 +120,9 @@ where
     }
 }
 
-/// Repeatedly select nodes down the tree until a leaf is reached.
-/// If the given root node is already a leaf,
-/// or is saturated, it is returned.
-// #[allow(unused)]
-// fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
-// where
-//     TNode: Node<Data = MctsData<TState>>,
-//     TState: GameState,
-// {
-//     let mut cur_node = root.get_handle();
-
-//     loop {
-//         let selected_child = select_child::<TNode, TState>(cur_node.clone());
-
-//         if selected_child.is_none() {
-//             return cur_node;
-//         }
-
-//         cur_node = selected_child.unwrap();
-//     }
-// }
-
 /// Always chooses to select the child with the best win/plays ratio,
 /// even on the opponent's turn (i.e. no pessimism).
+#[allow(unused)]
 fn select_to_leaf_uninverted<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
@@ -166,6 +145,7 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn picks randomly.
+#[allow(unused)]
 fn select_to_leaf_rand<TNode, TState, Rng>(
     root: &TNode,
     player_color: PlayerColor,
@@ -195,6 +175,7 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
+#[allow(unused)]
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -239,6 +220,7 @@ where
         })
 }
 
+#[allow(unused)]
 fn select_child_max_score_inverted<TNode, TState>(
     root: TNode::Handle,
     player_color: PlayerColor,
@@ -260,6 +242,7 @@ where
         })
 }
 
+#[allow(unused)]
 fn select_child_rand<TNode, TState, Rng>(
     root: TNode::Handle,
     rng: &mut Rng,
@@ -302,6 +285,7 @@ where
     (wins / plays) + f32::sqrt((bias * f32::ln(parent_plays)) / plays)
 }
 
+#[allow(unused)]
 fn score_node_pessimistic<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -388,39 +372,36 @@ where
     TState: GameState,
     Rng: rand::Rng,
 {
-    let turn_root = TNode::new_root(MctsData::new(&state, 0, 0, None));
+    let root_handle = TNode::new_root(MctsData::new(&state, 0, 0, None));
+    let root = root_handle.borrow();
 
     for _ in 0..TOTAL_SIMS {
-        // if our previous work has saturated the tree, we can break early,
-        // since we have visited every single outcome already
-
-        if turn_root.borrow().data().is_saturated() {
+        // If we have completely explored this entire tree,
+        // there's nothing left to do.
+        if root.data().is_saturated() {
             break;
         }
 
-        // select the leaf node that we will expand
-        // TODO test: rand vs rand
-        let leaf = if player_color == PlayerColor::Black {
-            select_to_leaf_rand(turn_root.borrow(), player_color, rng)
-        } else {
-            select_to_leaf_inverted::<TNode, TState>(turn_root.borrow(), player_color)
-        };
-
+        // Select: travel down to a leaf node, using the explore/exploit rules.
+        let leaf = select_to_leaf_uninverted::<TNode, TState>(root, player_color);
         let leaf = leaf.borrow();
 
-        // expand (create the child nodes for the selected leaf node)
+        // Expand: generate fresh child nodes for the selected leaf node.
         let expanded_children = expand(leaf);
 
+        // If the leaf node had no possible children (i.e. it was also a terminating node)
+        // then we should do our saturation backpropagation.
         if expanded_children.is_none() {
-            // we've reached a terminating node in the game
-            let _action: String = format!("{:?}", leaf.data().action());
             let sim_result = simulate(leaf, rng);
-            backprop_sim_result(leaf, sim_result, player_color);
 
+            if leaf.data().plays() == 0 {
+                // TODO: this might *always* be 0 or *always* be non-0; I'm not sure yet
+                backprop_sim_result(leaf, sim_result, player_color);
+            }
+
+            // Update the terminating node so it knows its own end game result.
             leaf.data().set_end_state_result(sim_result);
 
-            // we now know we have selected a terminating node (which is saturated by definition),
-            // so we can update the parent's saturated child count.
             backprop_saturation(leaf);
 
             continue;
@@ -431,7 +412,6 @@ where
         let sim_node = util::random_pick(&newly_expanded_children, rng)
             .expect("Must have had at least one expanded child.");
         let sim_node = sim_node.borrow();
-        let _action: String = format!("{:?}", leaf.data().action());
 
         // simulate
         let sim_result = simulate(sim_node, rng);
@@ -440,15 +420,12 @@ where
         backprop_sim_result(sim_node, sim_result, player_color);
     }
 
-    let turn_root = turn_root.borrow();
-    let state_children = turn_root.children();
+    let state_children = root.children();
 
-    let results: Vec<MctsResult<TState>> = state_children
+    state_children
         .into_iter()
         .map(|c| c.borrow().data().into())
-        .collect::<Vec<_>>();
-
-    results
+        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]

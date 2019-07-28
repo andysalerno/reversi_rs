@@ -1,6 +1,7 @@
 use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
 
+// TODO: get rid of this, it is pointless...
 pub trait Data<T: GameState> {
     fn state(&self) -> &T;
     fn plays(&self) -> usize;
@@ -8,6 +9,7 @@ pub trait Data<T: GameState> {
     fn action(&self) -> Option<T::Move>;
     fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
     fn end_state_result(&self) -> Option<GameResult>;
+    fn worst_case_result(&self) -> Option<GameResult>;
 }
 
 /// MCTS-related data that every Node will have.
@@ -23,6 +25,7 @@ pub struct MctsData<T: GameState> {
     children_count: Cell<usize>,
     children_saturated_count: Cell<usize>,
     end_state_result: Cell<Option<GameResult>>,
+    worst_case_result: Cell<Option<GameResult>>,
 }
 
 #[derive(Default)]
@@ -104,6 +107,10 @@ impl<T: GameState> MctsData<T> {
 
         assert!(self.children_saturated_count.get() <= self.children_count.get());
     }
+
+    fn set_worst_case_result(&self, wcr: GameResult) {
+        self.worst_case_result.set(Some(wcr))
+    }
 }
 
 impl<T: GameState> Data<T> for MctsData<T> {
@@ -133,11 +140,18 @@ impl<T: GameState> Data<T> for MctsData<T> {
             plays: Cell::new(plays),
             wins: Cell::new(wins),
             action,
+
+            // TODO: why can't I use the sugar `..Default::default()` for the remaining??
+            is_expanded: Default::default(),
+            end_state_result: Default::default(),
             children_count: Default::default(),
             children_saturated_count: Default::default(),
-            is_expanded: Cell::new(false),
-            end_state_result: Default::default(),
+            worst_case_result: Default::default(),
         }
+    }
+
+    fn worst_case_result(&self) -> Option<GameResult> {
+        self.worst_case_result.get()
     }
 }
 
