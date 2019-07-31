@@ -76,7 +76,11 @@ impl<T: GameState> MctsData<T> {
     /// Nodes should not be marked saturated until AFTER their result
     /// has been backpropagated.
     pub fn is_saturated(&self) -> bool {
-        self.is_expanded.get() && self.children_saturated_count.get() >= self.children_count.get()
+        let children_count = self.children_count();
+        let saturated_children_count = self.children_saturated_count.get();
+        assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");
+
+        self.is_expanded.get() && saturated_children_count >= children_count
     }
 
     /// The owner of the tree search should call this

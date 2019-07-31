@@ -47,25 +47,29 @@ where
 /// Increment this node's count of saturated children.
 /// If doing so results in this node itself becoming saturated,
 /// follow the same operation for its parent.
-fn backprop_saturation<TNode, TState>(node: &TNode)
+fn backprop_saturation<TNode, TState>(leaf: &TNode)
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let mut parent_handle = node.parent();
+    assert!(
+        leaf.data().is_saturated(),
+        "Only a leaf considered saturated can have its saturated status backpropagated."
+    );
+    let mut handle = leaf.parent();
 
-    while let Some(p) = parent_handle {
-        let parent = p.borrow();
-        let data = parent.data();
+    while let Some(p) = handle {
+        let node = p.borrow();
+        let data = node.data();
         data.increment_saturated_children_count();
 
         if !data.is_saturated() {
             // Don't back-prop any further
-            // if we've reached a saturated node.
+            // if we've reached a non-saturated node.
             return;
         }
 
-        parent_handle = parent.parent();
+        handle = node.parent();
     }
 }
 
@@ -97,16 +101,9 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let data = node.data();
-    data.increment_plays();
-
     let incr_wins = result.is_win_for_player(color);
 
-    if incr_wins {
-        data.increment_wins();
-    }
-
-    let mut parent_node = node.parent();
+    let mut parent_node = Some(node.get_handle());
 
     while let Some(p) = parent_node {
         let parent = p.borrow();
@@ -395,7 +392,6 @@ where
             let sim_result = simulate(leaf, rng);
 
             if leaf.data().plays() == 0 {
-                // TODO: this might *always* be 0 or *always* be non-0; I'm not sure yet
                 backprop_sim_result(leaf, sim_result, player_color);
             }
 
@@ -437,6 +433,8 @@ pub mod tests {
         tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState},
         TicTacToePiece,
     };
+
+    use std::str::FromStr;
 
     use monte_carlo_tree::rc_tree::RcNode;
 
@@ -705,8 +703,48 @@ pub mod tests {
     #[test]
     fn backprop_saturation_expects_becomes_saturated_when_all_children_saturated() {
         let data = {
-            let mut state = make_test_state();
-            state.initialize_board();
+            let mut state = TicTacToeState::initial_state();
+
+            // ___
+            // ___
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,0").unwrap());
+
+            // ___
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
+
+            // __X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("2,2").unwrap());
+
+            // O_X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,2").unwrap());
+
+            // O_X
+            // _O_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("2,0").unwrap());
+
+            // O_X
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("0,1").unwrap());
+
+            // OXX
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("1,2").unwrap());
+
+            // OXX
+            // OO_
+            // XOX
+            state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
+
             MctsData::new(&state, 0, 0, None)
         };
 
@@ -722,80 +760,14 @@ pub mod tests {
             "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
         );
 
-        for child in children.iter().skip(1) {
-            backprop_saturation(child.borrow());
-        }
-
-        assert!(
-            !tree_root.data().is_saturated(),
-            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
-        );
-
         // backprop the one remaining child.
+        expand(children[0].borrow());
         backprop_saturation(children[0].borrow());
 
         assert!(
             tree_root.data().is_saturated(),
             "Now that every child has had its saturation backpropagated, the parent should be considered saturated as well."
         );
-    }
-
-    #[test]
-    fn backprop_saturation_expects_fully_saturated_grandchildren_updates_to_root_node() {
-        let data = {
-            let mut state = make_test_state();
-            state.initialize_board();
-            MctsData::new(&state, 0, 0, None)
-        };
-
-        let tree_root = make_node(data.clone());
-
-        let children_1 = expand(&tree_root)
-            .expect("must have children")
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        let child_a = &children_1[0];
-        let child_b = &children_1[1];
-
-        let grandchildren_a = expand(child_a.borrow())
-            .unwrap()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        let grandchildren_b = expand(child_b.borrow())
-            .unwrap()
-            .into_iter()
-            .collect::<Vec<_>>();
-
-        assert!(!tree_root.data().is_saturated());
-        assert!(!child_a.borrow().data().is_saturated());
-        assert!(!child_b.borrow().data().is_saturated());
-
-        for grandchild in grandchildren_a {
-            backprop_saturation(grandchild.borrow());
-        }
-
-        assert!(!tree_root.data().is_saturated());
-        assert!(!child_b.borrow().data().is_saturated());
-
-        assert!(child_a.borrow().data().is_saturated());
-
-        for grandchild in grandchildren_b {
-            backprop_saturation(grandchild.borrow());
-        }
-
-        assert!(!tree_root.data().is_saturated());
-        assert!(child_a.borrow().data().is_saturated());
-        assert!(child_b.borrow().data().is_saturated());
-
-        for child in children_1.iter().skip(2) {
-            backprop_saturation(child.borrow());
-        }
-
-        assert!(tree_root.data().is_saturated());
-        assert!(child_a.borrow().data().is_saturated());
-        assert!(child_b.borrow().data().is_saturated());
     }
 
     #[test]

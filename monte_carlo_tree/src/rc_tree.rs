@@ -31,6 +31,8 @@ impl<T: Clone> Node for RcNode<T> {
     }
 
     fn children(&self) -> Self::ChildrenIter {
+        // TODO: perhaps this can return a borrowed slice instead,
+        // if the borrow checker will allow.
         let c: Vec<Self> = self.children.borrow().iter().cloned().collect();
 
         c
