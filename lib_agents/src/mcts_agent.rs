@@ -123,7 +123,7 @@ where
             ((sims_count) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
 
-        results.sort_by_key(|r| tree_search::score_mcts_results_ratio::<TNode, TState>(r, self.color));
+        results.sort_by_key(|r| tree_search::score_mcts_results_plays::<TNode, TState>(r, self.color));
         results.reverse();
 
         for r in &results {

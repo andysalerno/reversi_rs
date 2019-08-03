@@ -6,7 +6,7 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 500;
+pub(super) const TOTAL_SIMS: usize = 25_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -96,13 +96,11 @@ where
     }
 }
 
-fn backprop_sim_result<TNode, TState>(node: &TNode, result: GameResult, color: PlayerColor)
+fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let incr_wins = result.is_win_for_player(color);
-
     let mut parent_node = Some(node.get_handle());
 
     while let Some(p) = parent_node {
@@ -110,9 +108,10 @@ where
         let data = parent.data();
         data.increment_plays();
 
-        if incr_wins {
+        if is_win {
             data.increment_wins();
         }
+
         parent_node = parent.parent();
     }
 }
@@ -376,11 +375,12 @@ where
         // If we have completely explored this entire tree,
         // there's nothing left to do.
         if root.data().is_saturated() {
+            dbg!("Total saturation (full tree explored");
             break;
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf_uninverted::<TNode, TState>(root, player_color);
+        let leaf = select_to_leaf_inverted::<TNode, TState>(root, player_color);
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -392,7 +392,8 @@ where
             let sim_result = simulate(leaf, rng);
 
             if leaf.data().plays() == 0 {
-                backprop_sim_result(leaf, sim_result, player_color);
+                let is_win = sim_result.is_win_for_player(player_color);
+                backprop_sim_result(leaf, is_win);
             }
 
             // Update the terminating node so it knows its own end game result.
@@ -413,7 +414,8 @@ where
         let sim_result = simulate(sim_node, rng);
 
         // backprop
-        backprop_sim_result(sim_node, sim_result, player_color);
+        let is_win = sim_result.is_win_for_player(player_color);
+        backprop_sim_result(sim_node, is_win);
     }
 
     let state_children = root.children();
@@ -465,19 +467,9 @@ pub mod tests {
     fn backprop_sim_results_when_black_wins_expects_update_plays_wins() {
         let data = make_test_data();
         let tree_root = make_node(data.clone());
+        let is_win = true;
 
-        backprop_sim_result(&tree_root, GameResult::BlackWins, PlayerColor::Black);
-
-        assert_eq!(1, tree_root.data().plays());
-        assert_eq!(1, tree_root.data().wins());
-    }
-
-    #[test]
-    fn backprop_sim_results_when_white_wins_expects_update_plays_wins() {
-        let data = make_test_data();
-        let tree_root = make_node(data.clone());
-
-        backprop_sim_result(&tree_root, GameResult::WhiteWins, PlayerColor::White);
+        backprop_sim_result(&tree_root, is_win);
 
         assert_eq!(1, tree_root.data().plays());
         assert_eq!(1, tree_root.data().wins());
@@ -487,19 +479,9 @@ pub mod tests {
     fn backprop_sim_results_when_black_wins_expects_update_white_plays_not_wins() {
         let data = make_test_data();
         let tree_root = make_node(data.clone());
+        let is_win = false;
 
-        backprop_sim_result(&tree_root, GameResult::BlackWins, PlayerColor::White);
-
-        assert_eq!(1, tree_root.data().plays());
-        assert_eq!(0, tree_root.data().wins());
-    }
-
-    #[test]
-    fn backprop_sim_results_expects_tie_game_is_not_a_win() {
-        let data = make_test_data();
-        let tree_root = make_node(data.clone());
-
-        backprop_sim_result(&tree_root, GameResult::Tie, PlayerColor::White);
+        backprop_sim_result(&tree_root, is_win);
 
         assert_eq!(1, tree_root.data().plays());
         assert_eq!(0, tree_root.data().wins());
@@ -515,11 +497,8 @@ pub mod tests {
         let child_level_3 = child_level_2.borrow().new_child(data.clone());
         let child_level_4 = child_level_3.borrow().new_child(data.clone());
 
-        backprop_sim_result(
-            child_level_3.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
+        let is_win = true;
+        backprop_sim_result(child_level_3.borrow(), is_win);
 
         assert_eq!(1, child_level_3.borrow().data().plays());
         assert_eq!(1, child_level_2.borrow().data().plays());
@@ -610,11 +589,12 @@ pub mod tests {
         child_level_4.data().set_children_count(1);
         child_level_4b.data().set_children_count(1);
 
-        backprop_sim_result(child_level_3, GameResult::BlackWins, PlayerColor::Black);
-        backprop_sim_result(child_level_4, GameResult::BlackWins, PlayerColor::Black);
-        backprop_sim_result(child_level_4, GameResult::BlackWins, PlayerColor::Black);
-        backprop_sim_result(child_level_4, GameResult::BlackWins, PlayerColor::Black);
-        backprop_sim_result(child_level_4b, GameResult::BlackWins, PlayerColor::Black);
+        let is_win = true;
+        backprop_sim_result(child_level_3, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4b, is_win);
 
         assert!(!child_level_3.data().is_saturated());
 
@@ -644,41 +624,14 @@ pub mod tests {
         child_level_4.borrow().data().set_children_count(2);
         child_level_4b.borrow().data().set_children_count(2);
 
-        backprop_sim_result(
-            child_level_3.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4b.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
-        backprop_sim_result(
-            child_level_4b.borrow(),
-            GameResult::BlackWins,
-            PlayerColor::Black,
-        );
+        let is_win = true;
+        backprop_sim_result(child_level_3.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4b.borrow(), is_win);
+        backprop_sim_result(child_level_4b.borrow(), is_win);
 
         let leaf = select_to_leaf_uninverted(&tree_root, PlayerColor::Black);
 
@@ -786,16 +739,17 @@ pub mod tests {
 
         // "visit" each child a different amount of times
         // child a: three visits
-        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, player_agent_color);
-        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, player_agent_color);
-        backprop_sim_result(child_a.borrow(), GameResult::BlackWins, player_agent_color);
+        let is_win = false;
+        backprop_sim_result(child_a.borrow(), is_win);
+        backprop_sim_result(child_a.borrow(), is_win);
+        backprop_sim_result(child_a.borrow(), is_win);
 
         // child b: two visits
-        backprop_sim_result(child_b.borrow(), GameResult::BlackWins, player_agent_color);
-        backprop_sim_result(child_b.borrow(), GameResult::BlackWins, player_agent_color);
+        backprop_sim_result(child_b.borrow(), is_win);
+        backprop_sim_result(child_b.borrow(), is_win);
 
         // child c: one visit
-        backprop_sim_result(child_c.borrow(), GameResult::BlackWins, player_agent_color);
+        backprop_sim_result(child_c.borrow(), is_win);
 
         assert_eq!(1.0929347, score_node_simple(child_a.borrow()));
         assert_eq!(1.3385662, score_node_simple(child_b.borrow()));
