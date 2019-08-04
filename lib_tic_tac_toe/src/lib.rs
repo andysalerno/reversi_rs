@@ -26,6 +26,7 @@ impl TicTacToePiece {
 mod tests {
     use crate::tic_tac_toe_gamestate::{TicTacToeState, TicTacToeAction, BoardPosition};
     use lib_boardgame::{GameState, PlayerColor};
+    use std::str::FromStr;
 
     #[test]
     fn it_works() {
@@ -84,5 +85,19 @@ mod tests {
         let black_score = state.player_score(PlayerColor::Black);
 
         assert!(black_score > white_score, "Black has won, so it should have the higher score.");
+    }
+
+    #[test]
+    #[should_panic]
+    fn applying_move_nonempty_location_expects_panic() {
+        let mut state = TicTacToeState::initial_state();
+
+        state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
+
+        // Another location is fine.
+        state.apply_move(TicTacToeAction::from_str("2,1").unwrap());
+
+        // But the same location should panic.
+        state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
     }
 }

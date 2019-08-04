@@ -57,7 +57,7 @@ where
 
             rayon::scope(|s| {
                 s.spawn(|_| {
-                    result_1 = Some(tree_search::mcts::<TNode, TState, _>(
+                    result_1 = Some(tree_search::mcts_result::<TNode, TState, _>(
                         state_1,
                         color,
                         &mut get_rng(),

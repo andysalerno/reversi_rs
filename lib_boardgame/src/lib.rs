@@ -102,6 +102,15 @@ pub trait GameState: Clone + Send {
             Some(GameResult::Tie)
         }
     }
+
+    /// Apply the given moves (or 'actions') to this state, mutating it
+    /// each time and advancing it through the chain of states.
+    /// Implemented in terms of apply_move().
+    fn apply_moves(&mut self, moves: impl IntoIterator<Item=Self::Move>) {
+        for m in moves {
+            self.apply_move(m);
+        }
+    }
 }
 
 pub trait Game<WhiteAgent, BlackAgent>

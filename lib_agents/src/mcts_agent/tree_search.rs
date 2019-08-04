@@ -6,7 +6,12 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
 use std::borrow::Borrow;
 
-pub(super) const TOTAL_SIMS: usize = 25_000;
+// todo: mcts() should return the actual winning node,
+// and if the subtree from the root is saturated
+// it should use ratio of wins/plays inatead of sum(plays)
+// as the score.
+
+pub(super) const TOTAL_SIMS: usize = 50_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -358,7 +363,7 @@ where
     mcts_result.plays
 }
 
-pub fn mcts<TNode, TState, Rng>(
+pub fn mcts_result<TNode, TState, Rng>(
     state: TState,
     player_color: PlayerColor,
     rng: &mut Rng,
@@ -371,6 +376,22 @@ where
     let root_handle = TNode::new_root(MctsData::new(&state, 0, 0, None));
     let root = root_handle.borrow();
 
+    mcts(root, player_color, rng);
+
+    let state_children = root.children();
+
+    state_children
+        .into_iter()
+        .map(|c| c.borrow().data().into())
+        .collect::<Vec<_>>()
+}
+
+fn mcts<TNode, TState, Rng>(root: &TNode, player_color: PlayerColor, rng: &mut Rng)
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+    Rng: rand::Rng,
+{
     for _ in 0..TOTAL_SIMS {
         // If we have completely explored this entire tree,
         // there's nothing left to do.
@@ -380,7 +401,7 @@ where
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf_inverted::<TNode, TState>(root, player_color);
+        let leaf = select_to_leaf_uninverted::<TNode, TState>(root, player_color);
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -417,13 +438,6 @@ where
         let is_win = sim_result.is_win_for_player(player_color);
         backprop_sim_result(sim_node, is_win);
     }
-
-    let state_children = root.children();
-
-    state_children
-        .into_iter()
-        .map(|c| c.borrow().data().into())
-        .collect::<Vec<_>>()
 }
 
 #[cfg(test)]
@@ -795,7 +809,7 @@ pub mod tests {
         state.apply_move(TicTacToeAction(BP::new(0, 0)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(
+        let mcts_results = mcts_result::<RcNode<_>, _, _>(
             state,
             PlayerColor::White,
             &mut util::get_rng_deterministic(),
@@ -834,7 +848,7 @@ pub mod tests {
         state.apply_move(TicTacToeAction(BP::new(0, 0)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(
+        let mcts_results = mcts_result::<RcNode<_>, _, _>(
             state,
             PlayerColor::White,
             &mut util::get_rng_deterministic(),
@@ -883,7 +897,7 @@ pub mod tests {
         state.apply_move(TicTacToeAction(BP::new(1, 1)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(
+        let mcts_results = mcts_result::<RcNode<_>, _, _>(
             state,
             PlayerColor::White,
             &mut util::get_rng_deterministic(),
@@ -932,7 +946,7 @@ pub mod tests {
         state.apply_move(TicTacToeAction(BP::new(1, 1)));
 
         // White MUST block, or it will lose
-        let mcts_results = mcts::<RcNode<_>, _, _>(
+        let mcts_results = mcts_result::<RcNode<_>, _, _>(
             state,
             PlayerColor::White,
             &mut util::get_rng_deterministic(),
@@ -945,5 +959,121 @@ pub mod tests {
 
         let expected_action = TicTacToeAction(BP::new(2, 1));
         assert_eq!(expected_action, max_by_plays.action);
+    }
+
+    #[test]
+    fn mcts_when_sufficient_resources_expects_saturates_root_node() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root: &RcNode<_> = root_handle.borrow();
+
+        assert!(
+            !root.data().is_saturated(),
+            "The node must not be saturated to begin with."
+        );
+
+        mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated after sufficient MCTS traversal."
+        );
+    }
+
+    #[test]
+    fn mcts_expects_parent_play_count_sum_children_play_counts() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root: &RcNode<_> = root_handle.borrow();
+
+        mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated for this test to be valid."
+        );
+
+        let mut traversal = vec![root.get_handle()];
+        while let Some(n) = traversal.pop() {
+            let node: &RcNode<_> = n.borrow();
+
+            let node_play_count = node.data().plays();
+            let child_play_sum: usize = node.children().into_iter().map(|c| c.data().plays()).sum();
+
+            assert!(
+                node_play_count - child_play_sum <= 1,
+                "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
+            );
+
+            traversal.extend(node.children());
+        }
+    }
+
+    #[test]
+    fn mcts_when_root_saturated_expects_all_terminals_played_exactly_once() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root: &RcNode<_> = root_handle.borrow();
+
+        mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated for this test to be valid."
+        );
+
+        let mut traversal = vec![root.get_handle()];
+        let mut terminal_play_count = 0;
+        while let Some(n) = traversal.pop() {
+            let node: &RcNode<_> = n.borrow();
+
+            if node.children().is_empty() {
+                assert_eq!(
+                    node.data().plays(),
+                    1,
+                    "A terminal node with no children must have been played exactly one time."
+                );
+
+                terminal_play_count += 1;
+            }
+
+            traversal.extend(node.children());
+        }
+
+        assert_eq!(
+            terminal_play_count,
+            root.data().plays(),
+            "The root node must have been played exactly once (left) for every terminal node played (right)"
+        );
     }
 }

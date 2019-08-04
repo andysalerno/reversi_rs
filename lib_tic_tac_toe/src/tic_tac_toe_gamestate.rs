@@ -299,6 +299,10 @@ impl GameState for TicTacToeState {
             panic!("The provided action is illegal because the board position is out of bounds.");
         }
 
+        if self.get_piece(action.0).is_some() {
+            panic!("Cannot place piece at position {:?} (another piece exists there", action.0);
+        }
+
         let piece = match self.current_player_turn() {
             PlayerColor::Black => TicTacToePiece::X,
             PlayerColor::White => TicTacToePiece::O,
