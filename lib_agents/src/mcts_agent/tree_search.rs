@@ -1021,6 +1021,8 @@ pub mod tests {
             let child_play_sum: usize = node.children().into_iter().map(|c| c.data().plays()).sum();
 
             assert!(
+                // Note: this is a bit of a hack right now, they should be exactly equal
+                // but the root node is a special case that doesn't ever get played itself, only its children.
                 node_play_count - child_play_sum <= 1,
                 "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
             );
