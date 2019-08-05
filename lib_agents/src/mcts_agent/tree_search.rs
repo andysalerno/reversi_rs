@@ -20,12 +20,6 @@ where
 {
     node.data().mark_expanded();
 
-    // todo: unnecessary optimization here?
-    {
-        let children_len = node.children().into_iter().count();
-        assert_eq!(0, children_len);
-    }
-
     let state = node.data().state();
     if state.is_game_over() {
         // if the game is over, we have nothing to expand
@@ -135,7 +129,7 @@ where
     let mut cur_node = root.get_handle();
 
     loop {
-        let selected_child = select_child_max_score::<TNode, TState>(cur_node.clone());
+        let selected_child = select_child_max_score::<TNode, TState>(cur_node.borrow());
 
         if selected_child.is_none() {
             return cur_node;
@@ -162,9 +156,9 @@ where
     loop {
         let selected_child =
             if player_color == cur_node.borrow().data().state().current_player_turn() {
-                select_child_max_score::<TNode, TState>(cur_node.clone())
+                select_child_max_score::<TNode, TState>(cur_node.borrow())
             } else {
-                select_child_rand::<TNode, TState, _>(cur_node.clone(), rng)
+                select_child_rand::<TNode, TState, _>(cur_node.borrow(), rng)
             };
 
         if selected_child.is_none() {
@@ -187,28 +181,27 @@ where
     loop {
         let selected_child =
             if player_color == cur_node.borrow().data().state().current_player_turn() {
-                select_child_max_score::<TNode, TState>(cur_node.clone())
+                select_child_max_score::<TNode, TState>(cur_node.borrow())
             } else {
-                select_child_max_score_inverted::<TNode, TState>(cur_node.clone(), player_color)
+                select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color)
             };
 
-        if selected_child.is_none() {
-            return cur_node;
+        match selected_child {
+            Some(c) => cur_node = c,
+            None => return cur_node,
         }
-
-        cur_node = selected_child.unwrap();
     }
 }
 
 /// For all children of the given node, assign each one a score,
 /// and return the child with the highest score (ties broken by the first)
 /// or None if there are no unsaturated children.
-fn select_child_max_score<TNode, TState>(root: TNode::Handle) -> Option<TNode::Handle>
+fn select_child_max_score<TNode, TState>(root: &TNode) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let child_nodes = root.borrow().children();
+    let child_nodes = root.children();
 
     child_nodes
         .into_iter()
@@ -223,14 +216,14 @@ where
 
 #[allow(unused)]
 fn select_child_max_score_inverted<TNode, TState>(
-    root: TNode::Handle,
+    root: &TNode,
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let child_nodes = root.borrow().children();
+    let child_nodes = root.children();
 
     child_nodes
         .into_iter()
@@ -245,7 +238,7 @@ where
 
 #[allow(unused)]
 fn select_child_rand<TNode, TState, Rng>(
-    root: TNode::Handle,
+    root: &TNode,
     rng: &mut Rng,
 ) -> Option<TNode::Handle>
 where
@@ -253,7 +246,7 @@ where
     TState: GameState,
     Rng: rand::Rng,
 {
-    let child_nodes = root.borrow().children();
+    let child_nodes = root.children();
 
     let unsaturated_children = child_nodes
         .into_iter()
@@ -378,12 +371,28 @@ where
 
     mcts(root, player_color, rng);
 
-    let state_children = root.children();
+    let mut state_children = root.children().into_iter().collect::<Vec<_>>();
+
+    if root.data().is_saturated() {
+        state_children
+            .sort_by_key(|c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
+    } else {
+        state_children.sort_by_key(|c| c.borrow().data().plays());
+    };
+
+    // Regardless of any other metric, actions that win the game are always preferred.
+    state_children.sort_by_key(|c| {
+        if let Some(result) = c.borrow().data().end_state_result() {
+            result.is_win_for_player(player_color)
+        } else {
+            false
+        }
+    });
 
     state_children
         .into_iter()
         .map(|c| c.borrow().data().into())
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 fn mcts<TNode, TState, Rng>(root: &TNode, player_color: PlayerColor, rng: &mut Rng)
@@ -396,12 +405,12 @@ where
         // If we have completely explored this entire tree,
         // there's nothing left to do.
         if root.data().is_saturated() {
-            dbg!("Total saturation (full tree explored");
+            dbg!("Total saturation (full tree explored)");
             break;
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf_uninverted::<TNode, TState>(root, player_color);
+        let leaf = select_to_leaf_inverted::<TNode, TState>(root, player_color);
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -1055,7 +1064,6 @@ pub mod tests {
         );
 
         let mut traversal = vec![root.get_handle()];
-        let mut terminal_play_count = 0;
         while let Some(n) = traversal.pop() {
             let node: &RcNode<_> = n.borrow();
 
@@ -1065,17 +1073,9 @@ pub mod tests {
                     1,
                     "A terminal node with no children must have been played exactly one time."
                 );
-
-                terminal_play_count += 1;
             }
 
             traversal.extend(node.children());
         }
-
-        assert_eq!(
-            terminal_play_count,
-            root.data().plays(),
-            "The root node must have been played exactly once (left) for every terminal node played (right)"
-        );
     }
 }

@@ -112,8 +112,7 @@ where
             result_1
         };
 
-        let sims_count = tree_search::TOTAL_SIMS * 4;
-
+        let sims_count = tree_search::TOTAL_SIMS;
         println!("Thread count: {}", rayon::current_num_threads());
 
         let elapsed_micros = now.elapsed().as_micros();
@@ -122,9 +121,6 @@ where
             sims_count,
             ((sims_count) as f64 / elapsed_micros as f64) * 1_000_000f64
         );
-
-        results.sort_by_key(|r| tree_search::score_mcts_results_plays::<TNode, TState>(r, self.color));
-        results.reverse();
 
         for r in &results {
             println!(
@@ -136,7 +132,7 @@ where
             );
         }
 
-        let max_scoring_result = &results[0];
+        let max_scoring_result = results.pop().expect("Must have been at least one action.");
 
         let white_wins = if color == PlayerColor::White {
             max_scoring_result.wins
