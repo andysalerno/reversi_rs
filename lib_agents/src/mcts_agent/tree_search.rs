@@ -459,6 +459,11 @@ pub mod tests {
         TicTacToePiece,
     };
 
+    use lib_reversi::{
+        reversi_gamestate::ReversiState,
+        ReversiPlayerAction,
+    };
+
     use std::str::FromStr;
 
     use monte_carlo_tree::rc_tree::RcNode;
@@ -621,7 +626,7 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score::<RcNode<_>, TicTacToeState>(child_level_3_handle)
+        let selected = select_child_max_score::<RcNode<_>, TicTacToeState>(&child_level_3_handle)
             .expect("the child should have been selected.");
 
         let selected: &RcNode<_> = selected.borrow();
@@ -1077,5 +1082,10 @@ pub mod tests {
 
             traversal.extend(node.children());
         }
+    }
+
+    #[test]
+    fn doesnt_make_stupid_move() {
+        let mut state = ReversiState::new();
     }
 }

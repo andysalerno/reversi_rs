@@ -2,7 +2,7 @@ pub mod reversi;
 pub mod reversi_gamestate;
 mod util;
 
-use lib_boardgame::{GameMove, GameMoveFromStr, PlayerColor};
+use lib_boardgame::{GameMove, PlayerColor};
 use std::fmt;
 
 /// The size of the board.
@@ -54,7 +54,6 @@ impl BoardPosition {
 pub enum ReversiPlayerAction {
     PassTurn,
     Move {
-        piece: ReversiPiece,
         position: BoardPosition,
     },
 }
@@ -64,8 +63,8 @@ impl fmt::Debug for ReversiPlayerAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match self {
             ReversiPlayerAction::PassTurn => "(player passes turn)".to_owned(),
-            ReversiPlayerAction::Move { piece, position } => {
-                format!("({}, {}, {:?})", position.col, position.row, piece)
+            ReversiPlayerAction::Move { position } => {
+                format!("({}, {})", position.col, position.row)
             }
         };
 
@@ -73,22 +72,12 @@ impl fmt::Debug for ReversiPlayerAction {
     }
 }
 
-impl GameMoveFromStr for ReversiPlayerAction {
-    fn from_str(s: &str, player_color: PlayerColor) -> Result<Self, Self::Err> {
-        let reversi_piece = if player_color == PlayerColor::Black {
-            ReversiPiece::Black
+impl From<PlayerColor> for ReversiPiece {
+    fn from(color: PlayerColor) -> ReversiPiece {
+        match color {
+            PlayerColor::Black => ReversiPiece::Black,
+            PlayerColor::White => ReversiPiece::White,
         }
-        else {
-            ReversiPiece::White
-        };
-
-        let mut action: ReversiPlayerAction = std::str::FromStr::from_str(s)?;
-
-        if let ReversiPlayerAction::Move{ref mut piece, position: _} = action {
-            *piece = reversi_piece;
-        }
-
-        Ok(action)
     }
 }
 
@@ -123,29 +112,12 @@ impl std::str::FromStr for ReversiPlayerAction {
 
                 return Err(9);
             } else {
-                let piece = ReversiPiece::Black;
-                let action = ReversiPlayerAction::Move { piece, position };
+                let action = ReversiPlayerAction::Move { position };
                 return Ok(action);
             }
         } else {
             println!("Didn't recognize input as a board position: {}", s);
             return Err(9);
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::reversi::Reversi;
-    use lib_agents::random_agent::RandomAgent;
-    use lib_boardgame::Game;
-
-    #[test]
-    fn create_game() {
-        let white = RandomAgent;
-        let black = RandomAgent;
-
-        let mut game = Reversi::new(white, black);
-        game.play_to_end();
     }
 }

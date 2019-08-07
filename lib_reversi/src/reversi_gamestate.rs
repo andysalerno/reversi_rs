@@ -226,8 +226,7 @@ impl GameState for ReversiState {
 
         let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
 
-        let mut moves: Vec<_> =
-            empty_positions
+        let mut moves: Vec<_> = empty_positions
             .filter(|pos| {
                 for col_dir in all_directions.iter() {
                     for row_dir in all_directions.iter() {
@@ -250,12 +249,9 @@ impl GameState for ReversiState {
                 }
 
                 false
-        })
-        .map(|position| ReversiPlayerAction::Move {
-            piece: piece_color,
-            position
-        })
-        .collect();
+            })
+            .map(|position| ReversiPlayerAction::Move { position })
+            .collect();
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
@@ -283,13 +279,13 @@ impl GameState for ReversiState {
     ///        O   X
     ///            X
     fn apply_move(&mut self, action: Self::Move) {
-        let (piece, position) = match action {
+        let position = match action {
+            ReversiPlayerAction::Move { position } => position,
             ReversiPlayerAction::PassTurn => {
                 // Passing a turn implies giving control to the other player, and doing nothing else.
                 self.current_player_turn = opponent(self.current_player_turn);
                 return;
             }
-            ReversiPlayerAction::Move { piece, position } => (piece, position),
         };
 
         if !ReversiState::within_board_bounds(position) {
@@ -303,7 +299,9 @@ impl GameState for ReversiState {
             );
         }
 
-        self.set_piece(position, Some(piece));
+        let player_piece: ReversiPiece = self.current_player_turn().into();
+
+        self.set_piece(position, Some(player_piece));
 
         let all_directions = [POSITIVE, NEGATIVE, SAME];
 
@@ -323,7 +321,7 @@ impl GameState for ReversiState {
                     row_dir: *row_dir,
                 };
                 let origin = position;
-                let sibling = self.find_sibling_piece_pos(origin, piece, direction);
+                let sibling = self.find_sibling_piece_pos(origin, player_piece, direction);
 
                 if let Some(sibling) = sibling {
                     ReversiState::traverse_from(origin, direction)
@@ -398,7 +396,9 @@ impl GameState for ReversiState {
 
 #[cfg(test)]
 mod tests {
-    use super::{BoardPosition, GameState, ReversiPiece, ReversiPlayerAction, ReversiState};
+    use super::{
+        BoardPosition, GameState, PlayerColor, ReversiPiece, ReversiPlayerAction, ReversiState,
+    };
 
     fn pos(col: usize, row: usize) -> BoardPosition {
         BoardPosition::new(col, row)
@@ -468,23 +468,24 @@ mod tests {
         let mut state = ReversiState::new();
 
         // We have two pieces next to each other, like this:
-        // O X
-        state.set_piece(pos(2, 2), Some(ReversiPiece::White));
-        state.set_piece(pos(3, 2), Some(ReversiPiece::Black));
+        // X O
+        state.set_piece(pos(2, 2), Some(ReversiPiece::Black));
+        state.set_piece(pos(3, 2), Some(ReversiPiece::White));
 
         // We place a white piece at the asterisk:
-        // O X *
+        // X O *
         let action = ReversiPlayerAction::Move {
-            piece: ReversiPiece::White,
             position: pos(4, 2),
         };
 
+        assert!(state.current_player_turn() == PlayerColor::Black);
+
         state.apply_move(action);
 
-        // All three pieces should now be white.
-        assert_eq!(ReversiPiece::White, state.get_piece(pos(2, 2)).unwrap());
-        assert_eq!(ReversiPiece::White, state.get_piece(pos(3, 2)).unwrap());
-        assert_eq!(ReversiPiece::White, state.get_piece(pos(4, 2)).unwrap());
+        // All three pieces should now be Black.
+        assert_eq!(ReversiPiece::Black, state.get_piece(pos(2, 2)).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(pos(3, 2)).unwrap());
+        assert_eq!(ReversiPiece::Black, state.get_piece(pos(4, 2)).unwrap());
     }
 
     #[test]
@@ -507,9 +508,10 @@ mod tests {
 
         // We place a black piece at the asterisk:
         let action = ReversiPlayerAction::Move {
-            piece: ReversiPiece::Black,
             position: pos(1, 2),
         };
+
+        assert!(state.current_player_turn() == PlayerColor::Black);
 
         state.apply_move(action);
 
