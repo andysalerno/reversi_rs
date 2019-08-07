@@ -29,7 +29,7 @@ impl GameResult {
         match self {
             GameResult::BlackWins => player_color == PlayerColor::Black,
             GameResult::WhiteWins => player_color == PlayerColor::White,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -38,7 +38,7 @@ impl GameResult {
 /// I.e., in Reversi, a move could be at position (3,7).
 pub trait GameMove: Copy + fmt::Debug + Send + PartialEq {}
 
-pub trait GameMoveFromStr : GameMove + FromStr {
+pub trait GameMoveFromStr: GameMove + FromStr {
     fn from_str(s: &str, player_color: PlayerColor) -> Result<Self, Self::Err>;
 }
 
@@ -106,7 +106,7 @@ pub trait GameState: Clone + Send {
     /// Apply the given moves (or 'actions') to this state, mutating it
     /// each time and advancing it through the chain of states.
     /// Implemented in terms of apply_move().
-    fn apply_moves(&mut self, moves: impl IntoIterator<Item=Self::Move>) {
+    fn apply_moves(&mut self, moves: impl IntoIterator<Item = Self::Move>) {
         for m in moves {
             self.apply_move(m);
         }
@@ -181,4 +181,25 @@ where
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    #[test]
+    fn is_win_for_player_expects_valid_result() {
+        let tie = GameResult::Tie;
+        assert!(!tie.is_win_for_player(PlayerColor::White));
+        assert!(!tie.is_win_for_player(PlayerColor::Black));
+
+        let black_wins = GameResult::BlackWins;
+        assert!(!black_wins.is_win_for_player(PlayerColor::White));
+        assert!(black_wins.is_win_for_player(PlayerColor::Black));
+
+        let white_wins = GameResult::WhiteWins;
+        assert!(white_wins.is_win_for_player(PlayerColor::White));
+        assert!(!white_wins.is_win_for_player(PlayerColor::Black));
+    }
+
 }

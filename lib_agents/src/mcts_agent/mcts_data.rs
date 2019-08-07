@@ -90,6 +90,8 @@ impl<T: GameState> MctsData<T> {
     /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
     pub fn mark_expanded(&self) {
         assert!(!self.is_expanded.get());
+        if self.is_expanded.get() { panic!("Attempted to expand an already-expanded node."); }
+
         self.is_expanded.set(true);
     }
 

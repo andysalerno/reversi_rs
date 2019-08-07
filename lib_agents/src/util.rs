@@ -18,7 +18,8 @@ where
 }
 
 pub(crate) fn get_rng() -> impl rand::Rng {
-    SmallRng::from_entropy()
+    // SmallRng::from_entropy()
+    rand::thread_rng()
 }
 
 pub(crate) fn get_rng_deterministic() -> impl rand::Rng {

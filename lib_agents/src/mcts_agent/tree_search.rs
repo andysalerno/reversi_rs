@@ -26,6 +26,8 @@ where
         return None;
     }
 
+    // TODO: There's no reason for legal_moves() to need this argument
+    // since the state already knows the player's turn.
     let player_turn = state.current_player_turn();
     let legal_actions = state.legal_moves(player_turn);
 
@@ -193,6 +195,32 @@ where
     }
 }
 
+#[allow(unused)]
+fn select_to_leaf_inverted_reversed<TNode, TState>(
+    root: &TNode,
+    player_color: PlayerColor,
+) -> TNode::Handle
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut cur_node = root.get_handle();
+
+    loop {
+        let selected_child =
+            if player_color == cur_node.borrow().data().state().current_player_turn() {
+                select_child_max_score::<TNode, TState>(cur_node.borrow())
+            } else {
+                select_child_max_score_reversed::<TNode, TState>(cur_node.borrow())
+            };
+
+        match selected_child {
+            Some(c) => cur_node = c,
+            None => return cur_node,
+        }
+    }
+}
+
 /// For all children of the given node, assign each one a score,
 /// and return the child with the highest score (ties broken by the first)
 /// or None if there are no unsaturated children.
@@ -237,10 +265,26 @@ where
 }
 
 #[allow(unused)]
-fn select_child_rand<TNode, TState, Rng>(
-    root: &TNode,
-    rng: &mut Rng,
-) -> Option<TNode::Handle>
+fn select_child_max_score_reversed<TNode, TState>(root: &TNode) -> Option<TNode::Handle>
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let child_nodes = root.children();
+
+    child_nodes
+        .into_iter()
+        .filter(|n| !n.borrow().data().is_saturated())
+        .min_by(|a, b| {
+            let a_score = score_node_simple(a.borrow());
+            let b_score = score_node_simple(b.borrow());
+
+            a_score.partial_cmp(&b_score).unwrap()
+        })
+}
+
+#[allow(unused)]
+fn select_child_rand<TNode, TState, Rng>(root: &TNode, rng: &mut Rng) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -264,8 +308,6 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    // score = win_ratio + sqrt( 2lg(parent_plays) / plays)
-
     let plays = node.data().plays() as f32;
 
     if plays == 0f32 {
@@ -274,9 +316,10 @@ where
 
     let wins = node.data().wins() as f32;
     let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-    let bias = 2_f32;
+    let bias = f32::sqrt(2_f32);
 
-    (wins / plays) + f32::sqrt((bias * f32::ln(parent_plays)) / plays)
+    // TODO: test with the bias of '2' inside the sqrt(ln(parent_plays) / plays) part
+    (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays)
 }
 
 #[allow(unused)]
@@ -294,66 +337,14 @@ where
     let wins = if player_color == node.data().state().current_player_turn() {
         node.data().wins() as f32
     } else {
+        assert!(node.data().plays() >= node.data().wins());
         (node.data().plays() - node.data().wins()) as f32
     };
 
     let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-    let bias = 2_f32;
+    let bias = f32::sqrt(2_f32);
 
-    (wins / plays) + f32::sqrt((bias * f32::ln(parent_plays)) / plays)
-}
-
-/// Given a node, score it by giving it a value we can use
-/// to rank which node should be returned by this agent
-/// as the node to play in the game.
-/// This has outperformed the _plays version.
-pub(super) fn score_mcts_results_ratio<TNode, TState>(
-    mcts_result: &MctsResult<TState>,
-    color: PlayerColor,
-) -> usize
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let is_win = if let Some(game_result) = mcts_result.result {
-        game_result.is_win_for_player(color)
-    } else {
-        false
-    };
-
-    if is_win {
-        return std::usize::MAX;
-    }
-
-    if mcts_result.plays == 0 {
-        0
-    } else {
-        let ratio = (mcts_result.wins * 100) / mcts_result.plays;
-        ratio as usize
-    }
-}
-
-#[allow(unused)]
-pub(super) fn score_mcts_results_plays<TNode, TState>(
-    mcts_result: &MctsResult<TState>,
-    color: PlayerColor,
-) -> usize
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let is_win = if let Some(game_result) = mcts_result.result {
-        (game_result == GameResult::BlackWins && color == PlayerColor::Black)
-            || (game_result == GameResult::WhiteWins && color == PlayerColor::White)
-    } else {
-        false
-    };
-
-    if is_win {
-        return std::usize::MAX;
-    }
-
-    mcts_result.plays
+    (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays)
 }
 
 pub fn mcts_result<TNode, TState, Rng>(
@@ -410,7 +401,11 @@ where
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf_inverted::<TNode, TState>(root, player_color);
+        let leaf = match player_color {
+            PlayerColor::Black => select_to_leaf_uninverted(root, player_color),
+            PlayerColor::White => select_to_leaf_rand(root, player_color, rng),
+        };
+
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -424,6 +419,9 @@ where
             if leaf.data().plays() == 0 {
                 let is_win = sim_result.is_win_for_player(player_color);
                 backprop_sim_result(leaf, is_win);
+            } else {
+                // panic!("How is this possible?");
+                // A: It's possible if the node is a terminal node.
             }
 
             // Update the terminating node so it knows its own end game result.
@@ -459,10 +457,7 @@ pub mod tests {
         TicTacToePiece,
     };
 
-    use lib_reversi::{
-        reversi_gamestate::ReversiState,
-        ReversiPlayerAction,
-    };
+    use lib_reversi::{reversi_gamestate::ReversiState, ReversiPlayerAction};
 
     use std::str::FromStr;
 
@@ -797,182 +792,6 @@ pub mod tests {
         let tree_root = make_node(data.clone());
 
         let _sim_result = simulate(&tree_root, &mut crate::util::get_rng_deterministic());
-    }
-
-    #[test]
-    pub fn mcts_score_results_ratio_expects_always_avoids_losing_move() {
-        type BP = BoardPosition;
-        // _ _ _
-        // _ _ _
-        // _ _ _
-        let mut state = TicTacToeState::initial_state();
-
-        // X _ _
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 2)));
-
-        // X _ O
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(2, 2)));
-
-        // X _ O
-        // _ _ _
-        // X _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 0)));
-
-        // White MUST block, or it will lose
-        let mcts_results = mcts_result::<RcNode<_>, _, _>(
-            state,
-            PlayerColor::White,
-            &mut util::get_rng_deterministic(),
-        );
-
-        let max_by_ratio = mcts_results
-            .iter()
-            .max_by_key(|c| score_mcts_results_ratio::<RcNode<_>, _>(c, PlayerColor::White))
-            .unwrap();
-
-        let expected_action = TicTacToeAction(BP::new(0, 1));
-        assert_eq!(expected_action, max_by_ratio.action);
-    }
-
-    #[test]
-    pub fn mcts_score_results_plays_expects_always_avoids_losing_move() {
-        type BP = BoardPosition;
-        // _ _ _
-        // _ _ _
-        // _ _ _
-        let mut state = TicTacToeState::initial_state();
-
-        // X _ _
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 2)));
-
-        // X _ O
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(2, 2)));
-
-        // X _ O
-        // _ _ _
-        // X _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 0)));
-
-        // White MUST block, or it will lose
-        let mcts_results = mcts_result::<RcNode<_>, _, _>(
-            state,
-            PlayerColor::White,
-            &mut util::get_rng_deterministic(),
-        );
-
-        let max_by_plays = mcts_results
-            .iter()
-            .max_by_key(|c| score_mcts_results_plays::<RcNode<_>, _>(c, PlayerColor::White))
-            .unwrap();
-
-        let expected_action = TicTacToeAction(BP::new(0, 1));
-        assert_eq!(expected_action, max_by_plays.action);
-    }
-
-    #[test]
-    pub fn mcts_score_results_plays_expects_always_picks_winning_move() {
-        type BP = BoardPosition;
-        // _ _ _
-        // _ _ _
-        // _ _ _
-        let mut state = TicTacToeState::initial_state();
-
-        // X _ _
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 2)));
-
-        // X _ O
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(2, 2)));
-
-        // X _ O
-        // _ _ _
-        // X _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 0)));
-
-        // X _ O
-        // _ _ _
-        // X _ O
-        state.apply_move(TicTacToeAction(BP::new(2, 0)));
-
-        // X _ O
-        // _ X _
-        // X _ O
-        state.apply_move(TicTacToeAction(BP::new(1, 1)));
-
-        // White MUST block, or it will lose
-        let mcts_results = mcts_result::<RcNode<_>, _, _>(
-            state,
-            PlayerColor::White,
-            &mut util::get_rng_deterministic(),
-        );
-
-        let max_by_plays = mcts_results
-            .iter()
-            .max_by_key(|c| score_mcts_results_plays::<RcNode<_>, _>(c, PlayerColor::White))
-            .unwrap();
-
-        let expected_action = TicTacToeAction(BP::new(2, 1));
-        assert_eq!(expected_action, max_by_plays.action);
-    }
-
-    #[test]
-    pub fn mcts_score_results_ratio_expects_always_picks_winning_move() {
-        type BP = BoardPosition;
-        // _ _ _
-        // _ _ _
-        // _ _ _
-        let mut state = TicTacToeState::initial_state();
-
-        // X _ _
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 2)));
-
-        // X _ O
-        // _ _ _
-        // _ _ _
-        state.apply_move(TicTacToeAction(BP::new(2, 2)));
-
-        // X _ O
-        // _ _ _
-        // X _ _
-        state.apply_move(TicTacToeAction(BP::new(0, 0)));
-
-        // X _ O
-        // _ _ _
-        // X _ O
-        state.apply_move(TicTacToeAction(BP::new(2, 0)));
-
-        // X _ O
-        // _ X _
-        // X _ O
-        state.apply_move(TicTacToeAction(BP::new(1, 1)));
-
-        // White MUST block, or it will lose
-        let mcts_results = mcts_result::<RcNode<_>, _, _>(
-            state,
-            PlayerColor::White,
-            &mut util::get_rng_deterministic(),
-        );
-
-        let max_by_plays = mcts_results
-            .iter()
-            .max_by_key(|c| score_mcts_results_ratio::<RcNode<_>, _>(c, PlayerColor::White))
-            .unwrap();
-
-        let expected_action = TicTacToeAction(BP::new(2, 1));
-        assert_eq!(expected_action, max_by_plays.action);
     }
 
     #[test]

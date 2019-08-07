@@ -405,18 +405,6 @@ mod tests {
     }
 
     #[test]
-    fn it_works() {
-        let mut state = ReversiState::new();
-
-        state.set_piece(pos(2, 3), Some(ReversiPiece::Black));
-        let stringified = state.human_friendly();
-
-        println!("{}", stringified);
-
-        assert_eq!(2 + 2, 4);
-    }
-
-    #[test]
     fn human_friendly_reserves_correct_size() {
         let state = ReversiState::new();
 
