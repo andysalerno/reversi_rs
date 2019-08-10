@@ -11,7 +11,7 @@ use std::borrow::Borrow;
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const TOTAL_SIMS: usize = 50_000;
+pub(super) const TOTAL_SIMS: usize = 5000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -23,6 +23,7 @@ where
     let state = node.data().state();
     if state.is_game_over() {
         // if the game is over, we have nothing to expand
+        node.data().set_children_count(0);
         return None;
     }
 
@@ -238,7 +239,9 @@ where
             let a_score = score_node_simple(a.borrow());
             let b_score = score_node_simple(b.borrow());
 
-            a_score.partial_cmp(&b_score).unwrap()
+            a_score
+                .partial_cmp(&b_score)
+                .expect("floating point comparison exploded")
         })
 }
 
@@ -403,7 +406,7 @@ where
         // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = match player_color {
             PlayerColor::Black => select_to_leaf_uninverted(root, player_color),
-            PlayerColor::White => select_to_leaf_rand(root, player_color, rng),
+            PlayerColor::White => select_to_leaf_uninverted(root, player_color),
         };
 
         let leaf = leaf.borrow();
@@ -451,13 +454,7 @@ where
 pub mod tests {
     use super::*;
 
-    use lib_tic_tac_toe::{
-        tic_tac_toe::TicTacToe,
-        tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState},
-        TicTacToePiece,
-    };
-
-    use lib_reversi::{reversi_gamestate::ReversiState, ReversiPlayerAction};
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::{TicTacToeAction, TicTacToeState};
 
     use std::str::FromStr;
 
@@ -752,8 +749,6 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let player_agent_color = PlayerColor::White;
-
         // all children of the same parent
         let child_a = tree_root.new_child(data.clone());
         let child_b = tree_root.new_child(data.clone());
@@ -776,7 +771,7 @@ pub mod tests {
 
         assert_eq!(1.0929347, score_node_simple(child_a.borrow()));
         assert_eq!(1.3385662, score_node_simple(child_b.borrow()));
-        assert_eq!(1.8930185, score_node_simple(child_c.borrow()));
+        assert_eq!(1.8930184, score_node_simple(child_c.borrow()));
         assert_eq!(
             340282350000000000000000000000000000000f32,
             score_node_simple(child_d.borrow())
@@ -901,10 +896,5 @@ pub mod tests {
 
             traversal.extend(node.children());
         }
-    }
-
-    #[test]
-    fn doesnt_make_stupid_move() {
-        let mut state = ReversiState::new();
     }
 }

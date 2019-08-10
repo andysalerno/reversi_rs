@@ -513,4 +513,18 @@ mod tests {
         assert_eq!(ReversiPiece::Black, state.get_piece(pos(3, 4)).unwrap());
         assert_eq!(ReversiPiece::Black, state.get_piece(pos(4, 5)).unwrap());
     }
+
+    #[test]
+    fn cloning_state_is_deep_clone() {
+        let state = ReversiState::initial_state();
+        let mut cloned = state.clone();
+
+        let legal_moves = cloned.legal_moves(cloned.current_player_turn());
+        cloned.apply_move(legal_moves[0]);
+
+        let orig_piece_count = state.white_pieces_count() + state.black_pieces_count();
+        let modified_piece_count = cloned.white_pieces_count() + cloned.black_pieces_count();
+
+        assert_eq!(orig_piece_count + 1, modified_piece_count, "The original state must not have been mutated when we mutated the cloned state.");
+    }
 }

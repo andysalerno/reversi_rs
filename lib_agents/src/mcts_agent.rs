@@ -123,12 +123,18 @@ where
         );
 
         for r in &results {
+            let sat_display = match r.is_saturated {
+                true => "(S)",
+                false => "",
+            };
+
             println!(
-                "Action: {:?} Plays: {} Wins: {} ({:.2})",
+                "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
                 r.action,
                 r.plays,
                 r.wins,
                 r.wins as f32 / r.plays as f32,
+                sat_display,
             );
         }
 

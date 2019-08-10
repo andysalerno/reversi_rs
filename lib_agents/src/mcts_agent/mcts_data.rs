@@ -7,9 +7,12 @@ pub trait Data<T: GameState> {
     fn plays(&self) -> usize;
     fn wins(&self) -> usize;
     fn action(&self) -> Option<T::Move>;
+
+    // TODO: this should take ownership of the state, instead of cloning.
     fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
     fn end_state_result(&self) -> Option<GameResult>;
     fn worst_case_result(&self) -> Option<GameResult>;
+    fn is_saturated(&self) -> bool;
 }
 
 /// MCTS-related data that every Node will have.
@@ -34,6 +37,7 @@ pub struct MctsResult<TState: GameState> {
     pub action: TState::Move,
     pub wins: usize,
     pub plays: usize,
+    pub is_saturated: bool,
 }
 
 impl<TData, TState> From<&TData> for MctsResult<TState>
@@ -47,6 +51,7 @@ TState: GameState,
             wins: data.wins(),
             result: data.end_state_result(), // TODO
             action: data.action().expect("todo"),
+            is_saturated: data.is_saturated(),
         }
     }
 }
@@ -66,21 +71,6 @@ impl<T: GameState> MctsData<T> {
 
     pub fn set_end_state_result(&self, result: GameResult) {
         self.end_state_result.set(Some(result));
-    }
-
-    /// A node is considered saturated if:
-    ///     * it is a terminal node (i.e. has been expanded and still has no children), OR
-    ///     * every one of its children is saturated
-    /// During MCTS, we should not traverse down saturated nodes,
-    /// since we have already seen every outcome.
-    /// Nodes should not be marked saturated until AFTER their result
-    /// has been backpropagated.
-    pub fn is_saturated(&self) -> bool {
-        let children_count = self.children_count();
-        let saturated_children_count = self.children_saturated_count.get();
-        assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");
-
-        self.is_expanded.get() && saturated_children_count >= children_count
     }
 
     /// The owner of the tree search should call this
@@ -158,6 +148,21 @@ impl<T: GameState> Data<T> for MctsData<T> {
 
     fn worst_case_result(&self) -> Option<GameResult> {
         self.worst_case_result.get()
+    }
+
+    /// A node is considered saturated if:
+    ///     * it is a terminal node (i.e. has been expanded and still has no children), OR
+    ///     * every one of its children is saturated
+    /// During MCTS, we should not traverse down saturated nodes,
+    /// since we have already seen every outcome.
+    /// Nodes should not be marked saturated until AFTER their result
+    /// has been backpropagated.
+    fn is_saturated(&self) -> bool {
+        let children_count = self.children_count();
+        let saturated_children_count = self.children_saturated_count.get();
+        assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");
+
+        self.is_expanded.get() && saturated_children_count >= children_count
     }
 }
 
