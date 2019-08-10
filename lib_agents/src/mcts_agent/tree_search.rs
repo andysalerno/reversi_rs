@@ -233,7 +233,7 @@ where
 
     child_nodes
         .into_iter()
-        // .filter(|n| !n.borrow().data().is_saturated())
+        .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
             let a_score = score_node_simple(a.borrow());
             let b_score = score_node_simple(b.borrow());
@@ -292,9 +292,6 @@ where
 {
     let child_nodes = root.children();
 
-    // TODO: guess for bad behavior. When many subtrees are saturated,
-    // we are de-preferencing them, since they won't get as many plays
-    // as larger subtrees, and we will pick by play count.
     let unsaturated_children = child_nodes
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
@@ -406,7 +403,7 @@ where
         // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = match player_color {
             PlayerColor::Black => select_to_leaf_uninverted(root, player_color),
-            PlayerColor::White => select_to_leaf_uninverted(root, player_color),
+            PlayerColor::White => select_to_leaf_rand(root, player_color, rng),
         };
 
         let leaf = leaf.borrow();
