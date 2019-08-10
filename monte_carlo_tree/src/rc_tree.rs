@@ -62,9 +62,16 @@ impl<T: Clone> Node for RcNode<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt;
 
     #[derive(Copy, Clone, PartialEq, Debug)]
     struct TestData(i32);
+
+    impl std::fmt::Display for TestData {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
 
     #[test]
     fn node_holds_data() {
@@ -140,5 +147,25 @@ mod tests {
                 .data(),
             &TestData(1),
         );
+    }
+
+    #[test]
+    fn to_dot_file_str_expects_valid_dotfile() {
+        use crate::dot_visualize::TreeToDotFileFormat;
+
+        let root = RcNode::new_root(TestData(1));
+
+        let root_child_1 = root.new_child(TestData(2));
+        let root_child_1_child_a = root_child_1.new_child(TestData(5));
+
+        let root_child_2 = root.new_child(TestData(3));
+        let root_child_2_child_a = root_child_2.new_child(TestData(5));
+
+        let root_child_3 = root.new_child(TestData(4));
+        let root_child_3_child_a = root_child_3.new_child(TestData(5));
+
+        let dot_file_str = root.to_dot_file_str();
+
+        assert_eq!("", dot_file_str);
     }
 }
