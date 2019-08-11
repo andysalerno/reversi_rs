@@ -2,20 +2,6 @@ use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
 use std::fmt;
 
-// TODO: get rid of this, it is pointless...
-pub trait Data<T: GameState> {
-    fn state(&self) -> &T;
-    fn plays(&self) -> usize;
-    fn wins(&self) -> usize;
-    fn action(&self) -> Option<T::Move>;
-
-    // TODO: this should take ownership of the state, instead of cloning.
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self;
-    fn end_state_result(&self) -> Option<GameResult>;
-    fn worst_case_result(&self) -> Option<GameResult>;
-    fn is_saturated(&self) -> bool;
-}
-
 /// MCTS-related data that every Node will have.
 #[derive(Default, Clone)]
 pub struct MctsData<T: GameState> {
@@ -41,12 +27,11 @@ pub struct MctsResult<TState: GameState> {
     pub is_saturated: bool,
 }
 
-impl<TData, TState> From<&TData> for MctsResult<TState>
+impl<TState> From<&MctsData<TState>> for MctsResult<TState>
 where 
-TData: Data<TState>,
 TState: GameState,
 {
-    fn from(data: &TData) -> Self {
+    fn from(data: &MctsData<TState>) -> Self {
         Self {
             plays: data.plays(),
             wins: data.wins(),
@@ -105,33 +90,27 @@ impl<T: GameState> MctsData<T> {
         assert!(self.children_saturated_count.get() <= self.children_count.get());
     }
 
-    fn set_worst_case_result(&self, wcr: GameResult) {
+    pub fn set_worst_case_result(&self, wcr: GameResult) {
         self.worst_case_result.set(Some(wcr))
     }
-}
 
-impl<T: GameState> Data<T> for MctsData<T> {
-    fn state(&self) -> &T {
+    pub fn state(&self) -> &T {
         &self.state
     }
 
-    fn plays(&self) -> usize {
+    pub fn plays(&self) -> usize {
         self.plays.get()
     }
 
-    fn wins(&self) -> usize {
+    pub fn wins(&self) -> usize {
         self.wins.get()
     }
 
-    fn action(&self) -> Option<T::Move> {
+    pub fn action(&self) -> Option<T::Move> {
         self.action
     }
 
-    fn end_state_result(&self) -> Option<GameResult> {
-        self.end_state_result.get()
-    }
-
-    fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
+    pub fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
         Self {
             state: state.clone(),
             plays: Cell::new(plays),
@@ -147,7 +126,7 @@ impl<T: GameState> Data<T> for MctsData<T> {
         }
     }
 
-    fn worst_case_result(&self) -> Option<GameResult> {
+    pub fn worst_case_result(&self) -> Option<GameResult> {
         self.worst_case_result.get()
     }
 
@@ -158,7 +137,7 @@ impl<T: GameState> Data<T> for MctsData<T> {
     /// since we have already seen every outcome.
     /// Nodes should not be marked saturated until AFTER their result
     /// has been backpropagated.
-    fn is_saturated(&self) -> bool {
+    pub fn is_saturated(&self) -> bool {
         let children_count = self.children_count();
         let saturated_children_count = self.children_saturated_count.get();
         assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");

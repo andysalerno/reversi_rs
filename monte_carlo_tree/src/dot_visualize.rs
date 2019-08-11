@@ -1,4 +1,5 @@
-use crate::Node;
+use crate::tree::Node;
+use crate::monte_carlo_data::MctsData;
 use std::borrow::Borrow;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::Display;
@@ -17,35 +18,12 @@ where
         const HEADER: &str = "digraph prof {\nratio = fill;\nnode [style=filled];\n";
         const FOOTER: &str = "}";
 
-        let mut node_id_mappings = String::new();
-        let mut node_labels = String::new();
+        let mut node_id_map_buf = String::new();
+        let mut node_labels_buf = String::new();
 
-        let mut node_handles_queue = vec![self.get_handle()];
+        depth_first_tree_walk(self, 0, &mut node_labels_buf, &mut node_id_map_buf);
 
-        while let Some(cur_handle) = node_handles_queue.pop() {
-            let node = cur_handle.borrow();
-            let n_repr = node_repr(node);
-            let n_id = node_id(node);
-
-            for c in node.children() {
-                // Every node's unique ID will be hash(parent_repr) + hash(node_repr)
-                // This is to avoid creating nodes with multiple parents
-                // (e.g. if both State_X and State_Y have some action that brings them to an identical State_Z)
-                let child_node = c.borrow();
-                let child_id = node_id(child_node);
-
-                let node_id_mapping = format!("{} -> {};\n", n_id, child_id);
-
-                node_id_mappings.push_str(&node_id_mapping);
-
-                node_handles_queue.push(c);
-            }
-
-            let node_label = format!("{} [label = \"{}\"]\n", n_id, n_repr);
-            node_labels.push_str(&node_label);
-        }
-
-        format!("{}{}{}{}", HEADER, node_labels, node_id_mappings, FOOTER)
+        format!("{}{}{}{}", HEADER, node_labels_buf, node_id_map_buf, FOOTER)
     }
 }
 
@@ -55,14 +33,14 @@ where
     T::Data: Display,
 {
     let label = node_label(node);
-    let id = hash_str(label) + path_hash;
+    let id = hash_str(&label).wrapping_add(path_hash);
 
     let label_str = format!("{} [label = \"{}\"]\n", id, label);
     node_labels_buf.push_str(&label_str);
 
     for child in node.children() {
         let child_label = node_label(child.borrow());
-        let child_id = hash_str(child_label) + id;
+        let child_id = hash_str(child_label).wrapping_add(id);
 
         let id_mapping_str = format!("{} -> {};\n", id, child_id);
 
@@ -85,34 +63,10 @@ fn hash_str<T: AsRef<str>>(s: T) -> u64 {
 fn node_label<T>(node: &T) -> String
 where
     T: Node,
-    T::Data: Display,
+    T::Data: Display
 {
-    sanitize_newlines(format!("{}", node.data()))
-}
-
-fn node_id<T>(node: &T) -> u64
-where
-    T: Node,
-    T::Data: Display,
-{
-    // node_id is the combined hash of its parent repr and its own repr
-    let path_to_parent = Vec::new();
-
-    let mut node_walker = Some(node.get_handle());
-    
-    while let Some(cur_node) = node_walker {
-        let node_str = node_repr(cur_node.borrow());
-    }
-
-
-
-    let child_repr = node_repr(node);
-
-    let parent_repr = if let Some(parent) = node.parent() {
-        node_repr(parent.borrow())
-    } else {
-        String::new()
-    };
-
-    hash_str(child_repr) + hash_str(parent_repr)
+    // let data = node.data();
+    // let label = format!("{}\n{}\n{}", data.wins(), data.plays(), data);
+    let label = format!("{}", node.data());
+    sanitize_newlines(label)
 }

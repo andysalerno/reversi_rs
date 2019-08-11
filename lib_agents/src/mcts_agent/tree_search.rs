@@ -1,9 +1,8 @@
-use crate::mcts_agent::mcts_data::{Data, MctsData, MctsResult};
 use crate::util;
 
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::Node;
+use monte_carlo_tree::{tree::Node, monte_carlo_data::{MctsData, MctsResult}};
 use monte_carlo_tree::dot_visualize::TreeToDotFileFormat;
 use std::borrow::Borrow;
 
@@ -372,10 +371,9 @@ where
         use std::fs::File;
 
         let dot_file_str = root.to_dot_file_str();
-        let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
-        file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
+        // let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
+        // file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
     }
-
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();
 
@@ -411,7 +409,6 @@ where
         // If we have completely explored this entire tree,
         // there's nothing left to do.
         if root.data().is_saturated() {
-            dbg!("Total saturation (full tree explored)");
             break;
         }
 
@@ -826,7 +823,7 @@ pub mod tests {
 
         assert!(
             root.data().is_saturated(),
-            "The node must become saturated after sufficient MCTS traversal."
+            "The node must become saturated after sufficient MCTS traversal. (Is the test being run with an adequate amount of simulations?)"
         );
     }
 
@@ -850,7 +847,7 @@ pub mod tests {
 
         assert!(
             root.data().is_saturated(),
-            "The node must become saturated for this test to be valid."
+            "The node must become saturated for this test to be valid. (Is the test being run with an adequate amount of simulations?)"
         );
 
         let mut traversal = vec![root.get_handle()];
@@ -891,7 +888,7 @@ pub mod tests {
 
         assert!(
             root.data().is_saturated(),
-            "The node must become saturated for this test to be valid."
+            "The node must become saturated for this test to be valid. (Is the test being run with an adequate amount of simulations?)"
         );
 
         let mut traversal = vec![root.get_handle()];

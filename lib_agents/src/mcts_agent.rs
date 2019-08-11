@@ -1,9 +1,7 @@
-mod mcts_data;
 pub mod tree_search;
 
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
-use mcts_data::MctsData;
-use monte_carlo_tree::{rc_tree::RcNode, Node};
+use monte_carlo_tree::{rc_tree::RcNode, tree::Node, monte_carlo_data::MctsData};
 use std::marker::PhantomData;
 use std::time::Instant;
 

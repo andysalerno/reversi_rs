@@ -1,5 +1,5 @@
 /// This is a simple, generic reference-counted implementation of the Node trait.
-use crate::Node;
+use crate::tree::Node;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
