@@ -11,7 +11,7 @@ use std::borrow::Borrow;
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const TOTAL_SIMS: usize = 500;
+pub(super) const TOTAL_SIMS: usize = 50000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -370,7 +370,7 @@ where
         use std::io::Write;
         use std::fs::File;
 
-        let dot_file_str = root.to_dot_file_str(Some(2));
+        let dot_file_str = root.to_dot_file_str(Some(3));
         let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
         file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
         dbg!("Done writing dot file.");
@@ -755,6 +755,8 @@ pub mod tests {
     }
 
     #[test]
+    #[allow(clippy::unreadable_literal)]
+    #[allow(clippy::float_cmp)]
     fn score_node_expects_always_prefers_univisted_node() {
         let data = make_test_data();
 

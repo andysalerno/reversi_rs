@@ -53,9 +53,7 @@ impl BoardPosition {
 #[derive(Copy, Clone, PartialEq)]
 pub enum ReversiPlayerAction {
     PassTurn,
-    Move {
-        position: BoardPosition,
-    },
+    Move { position: BoardPosition },
 }
 
 impl GameMove for ReversiPlayerAction {}
@@ -69,6 +67,11 @@ impl fmt::Debug for ReversiPlayerAction {
         };
 
         write!(f, "{}", msg)
+    }
+}
+impl fmt::Display for ReversiPlayerAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

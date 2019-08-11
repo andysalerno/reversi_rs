@@ -15,6 +15,12 @@ pub struct TicTacToeState {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TicTacToeAction(pub BoardPosition);
 
+impl fmt::Display for TicTacToeAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 impl GameMove for TicTacToeAction {}
 
 #[derive(Copy, Clone, PartialEq, Debug)]

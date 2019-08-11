@@ -16,6 +16,12 @@ impl Display for TestGameState {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TestMove;
 
+impl Display for TestMove {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
 #[derive(Clone, Default, Debug)]
 pub struct TestActionResult {
     action: TestMove,

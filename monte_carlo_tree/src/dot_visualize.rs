@@ -64,13 +64,33 @@ fn depth_first_tree_walk<T, TState>(
 
         node_id_map_buf.push_str(&id_mapping_str);
 
-        depth_first_tree_walk(
-            child.borrow(),
-            id,
-            node_labels_buf,
-            node_id_map_buf,
-            depth_remaining.and_then(|v| Some(v - 1)),
-        );
+        if depth_remaining.is_some() {
+            depth_first_tree_walk(
+                child.borrow(),
+                id,
+                node_labels_buf,
+                node_id_map_buf,
+                depth_remaining.and_then(|v| Some(v - 1)),
+            );
+        }
+    }
+
+    if let Some(d) = depth_remaining {
+        let max_child = node
+            .children()
+            .into_iter()
+            .max_by_key(|n| n.borrow().data().plays());
+
+        if d == 1 && max_child.is_some() {
+            // If we're the very last layer, add one more layer for good measure for the best option
+            depth_first_tree_walk(
+                max_child.unwrap().borrow(),
+                id,
+                node_labels_buf,
+                node_id_map_buf,
+                None,
+            );
+        }
     }
 }
 
@@ -90,7 +110,18 @@ where
     TState: GameState,
 {
     let data = node.data();
-    let label = format!("{}\n{}\n{}", data.wins(), data.plays(), data);
+    let action_str = match data.action() {
+        Some(a) => format!("{}", a),
+        None => "n/a".into(),
+    };
+
+    let label = format!(
+        "A: {}\nWins: {}\nPlays: {}\n{}",
+        action_str,
+        data.wins(),
+        data.plays(),
+        data
+    );
 
     sanitize_newlines(label)
 }

@@ -121,10 +121,7 @@ where
         );
 
         for r in &results {
-            let sat_display = match r.is_saturated {
-                true => "(S)",
-                false => "",
-            };
+            let sat_display = if r.is_saturated { "(S)" } else { "" };
 
             println!(
                 "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
