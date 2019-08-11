@@ -371,8 +371,8 @@ where
         use std::fs::File;
 
         let dot_file_str = root.to_dot_file_str();
-        // let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
-        // file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
+        let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
+        file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
     }
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();

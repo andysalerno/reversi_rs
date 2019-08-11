@@ -1,18 +1,19 @@
 use crate::tree::Node;
-use crate::monte_carlo_data::MctsData;
 use std::borrow::Borrow;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::Display;
 use std::hash::{Hash, Hasher};
+use crate::monte_carlo_data::MctsData;
+use lib_boardgame::GameState;
 
 pub trait TreeToDotFileFormat {
     fn to_dot_file_str(&self) -> String;
 }
 
-impl<T> TreeToDotFileFormat for T
+impl<T, TState> TreeToDotFileFormat for T
 where
-    T: Node,
-    T::Data: Display,
+    T: Node<Data=MctsData<TState>>,
+    TState: GameState,
 {
     fn to_dot_file_str(&self) -> String {
         const HEADER: &str = "digraph prof {\nratio = fill;\nnode [style=filled];\n";
@@ -27,10 +28,10 @@ where
     }
 }
 
-fn depth_first_tree_walk<T>(node: &T, path_hash: u64, node_labels_buf: &mut String, node_id_map_buf: &mut String)
+fn depth_first_tree_walk<T, TState>(node: &T, path_hash: u64, node_labels_buf: &mut String, node_id_map_buf: &mut String)
 where
-    T: Node,
-    T::Data: Display,
+    T: Node<Data=MctsData<TState>>,
+    TState: GameState,
 {
     let label = node_label(node);
     let id = hash_str(&label).wrapping_add(path_hash);
@@ -60,13 +61,13 @@ fn hash_str<T: AsRef<str>>(s: T) -> u64 {
     hasher.finish()
 }
 
-fn node_label<T>(node: &T) -> String
+fn node_label<T, TState>(node: &T) -> String
 where
-    T: Node,
-    T::Data: Display
+    T: Node<Data=MctsData<TState>>,
+    TState: GameState,
 {
-    // let data = node.data();
-    // let label = format!("{}\n{}\n{}", data.wins(), data.plays(), data);
-    let label = format!("{}", node.data());
+    let data = node.data();
+    let label = format!("{}\n{}\n{}", data.wins(), data.plays(), data);
+
     sanitize_newlines(label)
 }
