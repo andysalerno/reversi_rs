@@ -1,5 +1,6 @@
 use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
+use std::fmt;
 
 // TODO: get rid of this, it is pointless...
 pub trait Data<T: GameState> {
@@ -163,6 +164,12 @@ impl<T: GameState> Data<T> for MctsData<T> {
         assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");
 
         self.is_expanded.get() && saturated_children_count >= children_count
+    }
+}
+
+impl<T: GameState + fmt::Display> fmt::Display for MctsData<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.state())
     }
 }
 

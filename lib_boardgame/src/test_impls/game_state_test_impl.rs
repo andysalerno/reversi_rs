@@ -1,14 +1,22 @@
 use crate::*;
 
-#[derive(Clone, Default)]
+use std::fmt::Display;
+
+#[derive(Clone, Default, Debug)]
 pub struct TestGameState {
     child_states: Vec<TestActionResult>,
+}
+
+impl Display for TestGameState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.child_states)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct TestMove;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct TestActionResult {
     action: TestMove,
     result_state: TestGameState,

@@ -1,5 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
+use std::fmt::Display;
+
 pub mod test_impls;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -45,7 +47,7 @@ pub trait GameMoveFromStr: GameMove + FromStr {
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
 /// or any other relevant info.
-pub trait GameState: Clone + Send {
+pub trait GameState: Clone + Send + Display {
     type Move: GameMove;
 
     /// Returns a human-friendly string for representing the state.

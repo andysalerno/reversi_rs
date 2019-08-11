@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::{TicTacToePiece, BOARD_SIZE};
 use lib_boardgame::{GameMove, GameMoveFromStr, GameState, PlayerColor};
 
@@ -339,5 +340,11 @@ impl GameState for TicTacToeState {
     fn is_game_over(&self) -> bool {
         self.get_winner().is_some()
             || self.x_piece_count + self.o_piece_count == (BOARD_SIZE * BOARD_SIZE)
+    }
+}
+
+impl fmt::Display for TicTacToeState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.human_friendly())
     }
 }

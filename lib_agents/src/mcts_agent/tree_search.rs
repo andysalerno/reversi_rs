@@ -4,6 +4,7 @@ use crate::util;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::Node;
+use monte_carlo_tree::dot_visualize::TreeToDotFileFormat;
 use std::borrow::Borrow;
 
 // todo: mcts() should return the actual winning node,
@@ -362,8 +363,19 @@ where
 {
     let root_handle = TNode::new_root(MctsData::new(&state, 0, 0, None));
     let root = root_handle.borrow();
+    let print_dot_file = true;
 
     mcts(root, player_color, rng);
+
+    if print_dot_file {
+        use std::io::Write;
+        use std::fs::File;
+
+        let dot_file_str = root.to_dot_file_str();
+        let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
+        file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
+    }
+
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();
 

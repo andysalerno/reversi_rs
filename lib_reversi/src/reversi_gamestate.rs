@@ -1,3 +1,4 @@
+use std::fmt;
 use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
 use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
@@ -391,6 +392,12 @@ impl GameState for ReversiState {
         }
 
         false
+    }
+}
+
+impl fmt::Display for ReversiState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.human_friendly())
     }
 }
 
