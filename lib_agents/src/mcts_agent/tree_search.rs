@@ -11,7 +11,7 @@ use std::borrow::Borrow;
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const TOTAL_SIMS: usize = 5000;
+pub(super) const TOTAL_SIMS: usize = 500;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -370,9 +370,11 @@ where
         use std::io::Write;
         use std::fs::File;
 
-        let dot_file_str = root.to_dot_file_str();
+        let dot_file_str = root.to_dot_file_str(Some(2));
         let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
         file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
+        dbg!("Done writing dot file.");
+        std::thread::sleep_ms(5_000);
     }
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();
