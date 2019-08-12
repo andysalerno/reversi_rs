@@ -65,10 +65,7 @@ impl<T: GameState> MctsData<T> {
     /// nodes that have been expanded but have no more children (terminal nodes)
     /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
     pub fn mark_expanded(&self) {
-        // TODO: redundant
-        assert!(!self.is_expanded.get());
-        if self.is_expanded() { panic!("Attempted to expand an already-expanded node."); }
-
+        debug_assert!(!self.is_expanded.get());
         self.is_expanded.set(true);
     }
 
@@ -111,9 +108,9 @@ impl<T: GameState> MctsData<T> {
         self.action
     }
 
-    pub fn new(state: &T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
+    pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
         Self {
-            state: state.clone(),
+            state: state,
             plays: Cell::new(plays),
             wins: Cell::new(wins),
             action,
@@ -160,7 +157,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_on_default_node() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
 
         assert!(
             !data.is_saturated(),
@@ -170,7 +167,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_for_expanded_childless_node() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         assert!(
@@ -181,7 +178,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_for_expanded_node_with_children() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
         data.set_children_count(7);
 
@@ -193,7 +190,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_after_incrementing_saturation_count_fully() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         // we mark the data as having 7 children
@@ -210,7 +207,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_after_incrementing_saturation_count_partially() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);
@@ -226,7 +223,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn increment_saturated_children_count_explodes_if_over_saturated() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);

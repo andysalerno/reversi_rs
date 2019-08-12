@@ -1,6 +1,6 @@
 use std::fmt;
 use crate::{TicTacToePiece, BOARD_SIZE};
-use lib_boardgame::{GameMove, GameMoveFromStr, GameState, PlayerColor};
+use lib_boardgame::{GameMove, GameState, PlayerColor};
 
 type Board = [[Option<TicTacToePiece>; BOARD_SIZE]; BOARD_SIZE];
 
@@ -67,14 +67,6 @@ impl std::str::FromStr for TicTacToeAction {
             println!("Didn't recognize input as a board position: {}", s);
             return Err(());
         }
-    }
-}
-
-impl GameMoveFromStr for TicTacToeAction {
-    fn from_str(s: &str, _player_color: PlayerColor) -> Result<Self, Self::Err> {
-        let action: TicTacToeAction = std::str::FromStr::from_str(s)?;
-
-        Ok(action)
     }
 }
 

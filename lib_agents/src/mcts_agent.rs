@@ -1,9 +1,11 @@
 pub mod tree_search;
 
+use crate::util::get_rng;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
-use monte_carlo_tree::{rc_tree::RcNode, tree::Node, monte_carlo_data::MctsData};
+use monte_carlo_tree::{
+    monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
+};
 use std::marker::PhantomData;
-use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
@@ -36,117 +38,20 @@ where
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-        use crate::util::get_rng;
-
-        let now = Instant::now();
-
-        let color = self.color;
-
-        let mut results = {
-            let mut result_1 = None;
-            // let mut result_2 = None;
-            // let mut result_3 = None;
-            // let mut result_4 = None;
-
-            let state_1 = state.clone();
-            // let state_2 = state.clone();
-            // let state_3 = state.clone();
-            // let state_4 = state.clone();
-
-            rayon::scope(|s| {
-                s.spawn(|_| {
-                    result_1 = Some(tree_search::mcts_result::<TNode, TState, _>(
-                        state_1,
-                        color,
-                        &mut get_rng(),
-                    ))
-                });
-                // s.spawn(|_| {
-                //     result_2 = Some(tree_search::mcts::<TNode, TState, _>(
-                //         state_2,
-                //         color,
-                //         &mut get_rng(),
-                //     ))
-                // });
-                // s.spawn(|_| {
-                //     result_3 = Some(tree_search::mcts::<TNode, TState, _>(
-                //         state_3,
-                //         color,
-                //         &mut get_rng(),
-                //     ))
-                // });
-                // s.spawn(|_| {
-                //     result_4 = Some(tree_search::mcts::<TNode, TState, _>(
-                //         state_4,
-                //         color,
-                //         &mut get_rng(),
-                //     ))
-                // });
-            });
-
-            let mut result_1 = result_1.unwrap();
-
-            let actions_count = result_1.len();
-
-            // let subsequent_results = vec![result_2, result_3, result_4];
-
-            // // aggregate all the action play/win values into result_1
-            // for i in 0..actions_count {
-            //     let result_1_action = result_1.get_mut(i).unwrap();
-
-            //     for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
-            //         let matching_action = subsequent_result
-            //             .as_ref()
-            //             .unwrap()
-            //             .iter()
-            //             .find(|r| r.action == result_1_action.action)
-            //             .unwrap();
-
-            //         result_1_action.plays += matching_action.plays;
-            //         result_1_action.wins += matching_action.wins;
-            //     }
-            // }
-
-            result_1
+        let result = match self.color {
+            PlayerColor::Black => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
+            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color),
         };
 
-        let sims_count = tree_search::TOTAL_SIMS;
-        println!("Thread count: {}", rayon::current_num_threads());
-
-        let elapsed_micros = now.elapsed().as_micros();
-        println!(
-            "{} sims total. {:.2} sims/sec.",
-            sims_count,
-            ((sims_count) as f64 / elapsed_micros as f64) * 1_000_000f64
-        );
-
-        for r in &results {
-            let sat_display = if r.is_saturated { "(S)" } else { "" };
-
-            println!(
-                "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
-                r.action,
-                r.plays,
-                r.wins,
-                r.wins as f32 / r.plays as f32,
-                sat_display,
-            );
-        }
-
-        let max_scoring_result = results.pop().expect("Must have been at least one action.");
-
-        let white_wins = if color == PlayerColor::White {
-            max_scoring_result.wins
+        let white_wins = if self.color == PlayerColor::White {
+            result.wins
         } else {
-            max_scoring_result.plays - max_scoring_result.wins
+            result.plays - result.wins
         };
 
-        println!(
-            "{}",
-            pretty_ratio_bar_text(20, white_wins, max_scoring_result.plays)
-        );
+        println!("{}", pretty_ratio_bar_text(20, white_wins, result.plays));
 
-        max_scoring_result.action
+        result.action
     }
 }
 
@@ -170,6 +75,127 @@ fn pretty_ratio_bar_text(
     text_bar.push_str("] W");
 
     text_bar
+}
+
+fn perform_mcts_single_threaded<TNode, TState>(
+    state: &TState,
+    color: PlayerColor,
+) -> MctsResult<TState>
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState,
+{
+    let mut results =
+        tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng());
+
+    for r in &results {
+        let sat_display = if r.is_saturated { "(S)" } else { "" };
+
+        println!(
+            "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
+            r.action,
+            r.plays,
+            r.wins,
+            r.wins as f32 / r.plays as f32,
+            sat_display,
+        );
+    }
+
+    results.pop().expect("Must be at least one result")
+}
+
+fn perform_mcts_multithreaded<TNode, TState>(
+    state: &TState,
+    player_color: PlayerColor,
+) -> MctsResult<TState>
+where
+    TNode: Node<Data = MctsData<TState>>,
+    TState: GameState + Sync,
+{
+    let color = player_color;
+
+    let mut results = {
+        let mut result_1 = None;
+        let mut result_2 = None;
+        let mut result_3 = None;
+        let mut result_4 = None;
+
+        let state_1 = state.clone();
+        let state_2 = state.clone();
+        let state_3 = state.clone();
+        let state_4 = state.clone();
+
+        rayon::scope(|s| {
+            s.spawn(|_| {
+                result_1 = Some(tree_search::mcts_result::<TNode, TState, _>(
+                    state_1,
+                    color,
+                    &mut get_rng(),
+                ))
+            });
+            s.spawn(|_| {
+                result_2 = Some(tree_search::mcts_result::<TNode, TState, _>(
+                    state_2,
+                    color,
+                    &mut get_rng(),
+                ))
+            });
+            s.spawn(|_| {
+                result_3 = Some(tree_search::mcts_result::<TNode, TState, _>(
+                    state_3,
+                    color,
+                    &mut get_rng(),
+                ))
+            });
+            s.spawn(|_| {
+                result_4 = Some(tree_search::mcts_result::<TNode, TState, _>(
+                    state_4,
+                    color,
+                    &mut get_rng(),
+                ))
+            });
+        });
+
+        let mut result_1 = result_1.unwrap();
+
+        let actions_count = result_1.len();
+
+        let subsequent_results = vec![result_2, result_3, result_4];
+
+        // aggregate all the action play/win values into result_1
+        for i in 0..actions_count {
+            let result_1_action = result_1.get_mut(i).unwrap();
+
+            for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
+                let matching_action = subsequent_result
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .find(|r| r.action == result_1_action.action)
+                    .unwrap();
+
+                result_1_action.plays += matching_action.plays;
+                result_1_action.wins += matching_action.wins;
+            }
+        }
+
+        result_1
+    };
+
+    for r in &results {
+        let sat_display = if r.is_saturated { "(S)" } else { "" };
+
+        println!(
+            "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
+            r.action,
+            r.plays,
+            r.wins,
+            r.wins as f32 / r.plays as f32,
+            sat_display,
+        );
+    }
+
+    results.pop().expect("Must have been at least one action.")
 }
 
 #[cfg(test)]

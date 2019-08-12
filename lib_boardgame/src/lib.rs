@@ -40,10 +40,6 @@ impl GameResult {
 /// I.e., in Reversi, a move could be at position (3,7).
 pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {}
 
-pub trait GameMoveFromStr: GameMove + FromStr {
-    fn from_str(s: &str, player_color: PlayerColor) -> Result<Self, Self::Err>;
-}
-
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
 /// or any other relevant info.

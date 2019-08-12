@@ -1,5 +1,6 @@
 use crate::util;
 
+use std::time::{Duration, Instant};
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::{tree::Node, monte_carlo_data::{MctsData, MctsResult}};
@@ -11,7 +12,8 @@ use std::borrow::Borrow;
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const TOTAL_SIMS: usize = 50000;
+const TOTAL_SIMS: usize = 50_000;
+const SIM_TIME_MS: u64 = 10_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -39,7 +41,7 @@ where
     // create a new child node for every available action->state transition
     for action in legal_actions {
         let resulting_state = state.next_state(action);
-        let data = MctsData::new(&resulting_state, 0, 0, Some(action));
+        let data = MctsData::new(resulting_state, 0, 0, Some(action));
         let _child_node = node.new_child(data);
     }
 
@@ -254,14 +256,17 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    // TODO: If the only play is "pass turn", then even if parent color is enemy, don't be pessimistic
+    // since being forced to pass a turn is very bad for the enemy and good for the player
+    let parent_is_player_color = root.borrow().data().state().current_player_turn() == player_color;
     let child_nodes = root.children();
 
     child_nodes
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            let a_score = score_node_pessimistic(a.borrow(), player_color);
-            let b_score = score_node_pessimistic(b.borrow(), player_color);
+            let a_score = score_node_pessimistic(a.borrow(), parent_is_player_color);
+            let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
         })
@@ -326,7 +331,7 @@ where
 }
 
 #[allow(unused)]
-fn score_node_pessimistic<TNode, TState>(node: &TNode, player_color: PlayerColor) -> f32
+fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -337,7 +342,7 @@ where
         return std::f32::MAX;
     }
 
-    let wins = if player_color == node.data().state().current_player_turn() {
+    let wins = if parent_is_player_color {
         node.data().wins() as f32
     } else {
         assert!(node.data().plays() >= node.data().wins());
@@ -360,9 +365,9 @@ where
     TState: GameState,
     Rng: rand::Rng,
 {
-    let root_handle = TNode::new_root(MctsData::new(&state, 0, 0, None));
+    let root_handle = TNode::new_root(MctsData::new(state, 0, 0, None));
     let root = root_handle.borrow();
-    let print_dot_file = true;
+    let print_dot_file = false;
 
     mcts(root, player_color, rng);
 
@@ -370,11 +375,10 @@ where
         use std::io::Write;
         use std::fs::File;
 
-        let dot_file_str = root.to_dot_file_str(Some(3));
+        let dot_file_str = root.to_dot_file_str(3);
         let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
         file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
         dbg!("Done writing dot file.");
-        std::thread::sleep_ms(5_000);
     }
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();
@@ -407,7 +411,11 @@ where
     TState: GameState,
     Rng: rand::Rng,
 {
-    for _ in 0..TOTAL_SIMS {
+    let now = Instant::now();
+    let exec_duration = Duration::from_millis(SIM_TIME_MS); 
+
+    // for _ in 0..TOTAL_SIMS {
+    while now.elapsed() < exec_duration {
         // If we have completely explored this entire tree,
         // there's nothing left to do.
         if root.data().is_saturated() {
@@ -415,11 +423,7 @@ where
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = match player_color {
-            PlayerColor::Black => select_to_leaf_uninverted(root, player_color),
-            PlayerColor::White => select_to_leaf_uninverted(root, player_color),
-        };
-
+        let leaf = select_to_leaf_inverted(root, player_color);
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -480,7 +484,7 @@ pub mod tests {
     }
 
     fn make_test_data() -> MctsData<impl GameState> {
-        MctsData::new(&make_test_state(), 0, 0, None)
+        MctsData::new(make_test_state(), 0, 0, None)
     }
 
     #[test]
@@ -595,7 +599,7 @@ pub mod tests {
 
     #[test]
     fn select_child_max_score_expects_picks_less_explored_node() {
-        let data = MctsData::new(&TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
 
         let tree_root = RcNode::new_root(data.clone());
 
@@ -673,7 +677,7 @@ pub mod tests {
 
     #[test]
     fn select_to_leaf_expects_when_already_leaf_returns_self() {
-        let data = MctsData::new(&make_test_state(), 10, 10, None);
+        let data = MctsData::new(make_test_state(), 10, 10, None);
 
         let tree_root = make_node(data.clone());
 
@@ -729,7 +733,7 @@ pub mod tests {
             // XOX
             state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
 
-            MctsData::new(&state, 0, 0, None)
+            MctsData::new(state, 0, 0, None)
         };
 
         let tree_root = make_node(data.clone());
@@ -815,7 +819,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &RcNode<_> = root_handle.borrow();
 
         assert!(
@@ -844,7 +848,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &RcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
@@ -885,7 +889,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(&state, 0, 0, None));
+        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &RcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());

@@ -6,7 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
 pub trait TreeToDotFileFormat {
-    fn to_dot_file_str(&self, depth_limit: Option<usize>) -> String;
+    fn to_dot_file_str(&self, depth_limit: usize) -> String;
 }
 
 impl<T, TState> TreeToDotFileFormat for T
@@ -14,7 +14,7 @@ where
     T: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    fn to_dot_file_str(&self, depth_limit: Option<usize>) -> String {
+    fn to_dot_file_str(&self, depth_limit: usize) -> String {
         const HEADER: &str =
             "digraph prof {\nratio = fill;\nnode [style=filled, shape=box, fontname=courier];\n";
         const FOOTER: &str = "}";
@@ -39,15 +39,13 @@ fn depth_first_tree_walk<T, TState>(
     path_hash: u64,
     node_labels_buf: &mut String,
     node_id_map_buf: &mut String,
-    depth_remaining: Option<usize>,
+    depth_remaining: usize,
 ) where
     T: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    if let Some(d) = depth_remaining {
-        if d == 0 {
-            return;
-        }
+    if depth_remaining == 0 {
+        return;
     }
 
     let label = node_label(node);
@@ -58,50 +56,24 @@ fn depth_first_tree_walk<T, TState>(
     // Add the label for this node
     node_labels_buf.push_str(&label_str);
 
-    if depth_remaining.is_none() || depth_remaining.unwrap() > 1 {
-        for child in node.children() {
-            let child_label = node_label(child.borrow());
-            let child_id = hash_str(&child_label).wrapping_add(id);
+    for child in node.children() {
+        let child_label = node_label(child.borrow());
+        let child_id = hash_str(&child_label).wrapping_add(id);
 
-            if depth_remaining.is_none() {
-                // We're not recursing anymore, so we need to define child labels here
-                let label_str = format!("{} [label = \"{}\"]\n", child_id, child_label);
-                node_labels_buf.push_str(&label_str);
-            }
-
+        if depth_remaining > 1 {
             let id_mapping_str = format!("{} -> {};\n", id, child_id);
 
             // Add the mapping from this node to the child node
             node_id_map_buf.push_str(&id_mapping_str);
-
-            if depth_remaining.is_some() {
-                depth_first_tree_walk(
-                    child.borrow(),
-                    id,
-                    node_labels_buf,
-                    node_id_map_buf,
-                    depth_remaining.and_then(|v| Some(v - 1)),
-                );
-            }
         }
-    }
 
-    if let Some(d) = depth_remaining {
-        let max_child = node
-            .children()
-            .into_iter()
-            .max_by_key(|n| n.borrow().data().plays());
-
-        if d == 1 && max_child.is_some() {
-            // If we're the very last layer, add one more layer for good measure for the best option
-            depth_first_tree_walk(
-                max_child.unwrap().borrow(),
-                id,
-                node_labels_buf,
-                node_id_map_buf,
-                None,
-            );
-        }
+        depth_first_tree_walk(
+            child.borrow(),
+            id,
+            node_labels_buf,
+            node_id_map_buf,
+            depth_remaining - 1,
+        );
     }
 }
 
