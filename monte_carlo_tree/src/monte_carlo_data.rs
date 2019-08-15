@@ -65,7 +65,7 @@ impl<T: GameState> MctsData<T> {
     /// nodes that have been expanded but have no more children (terminal nodes)
     /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
     pub fn mark_expanded(&self) {
-        debug_assert!(!self.is_expanded.get());
+        assert!(!self.is_expanded());
         self.is_expanded.set(true);
     }
 

@@ -1,18 +1,20 @@
 use crate::util;
 
-use std::time::{Duration, Instant};
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::{tree::Node, monte_carlo_data::{MctsData, MctsResult}};
 use monte_carlo_tree::dot_visualize::TreeToDotFileFormat;
+use monte_carlo_tree::{
+    monte_carlo_data::{MctsData, MctsResult},
+    tree::Node,
+};
 use std::borrow::Borrow;
+use std::time::{Duration, Instant};
 
 // todo: mcts() should return the actual winning node,
 // and if the subtree from the root is saturated
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-const TOTAL_SIMS: usize = 50_000;
 pub(super) const SIM_TIME_MS: u64 = 5_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
@@ -122,7 +124,6 @@ where
 
 /// Always chooses to select the child with the best win/plays ratio,
 /// even on the opponent's turn (i.e. no pessimism).
-#[allow(unused)]
 fn select_to_leaf_uninverted<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
@@ -145,7 +146,6 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn picks randomly.
-#[allow(unused)]
 fn select_to_leaf_rand<TNode, TState, Rng>(
     root: &TNode,
     player_color: PlayerColor,
@@ -175,7 +175,6 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
-#[allow(unused)]
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -185,11 +184,7 @@ where
 
     loop {
         let selected_child =
-            if player_color == cur_node.borrow().data().state().current_player_turn() {
-                select_child_max_score::<TNode, TState>(cur_node.borrow())
-            } else {
-                select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color)
-            };
+            select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color);
 
         match selected_child {
             Some(c) => cur_node = c,
@@ -198,7 +193,6 @@ where
     }
 }
 
-#[allow(unused)]
 fn select_to_leaf_inverted_reversed<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
@@ -247,7 +241,6 @@ where
         })
 }
 
-#[allow(unused)]
 fn select_child_max_score_inverted<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
@@ -272,7 +265,6 @@ where
         })
 }
 
-#[allow(unused)]
 fn select_child_max_score_reversed<TNode, TState>(root: &TNode) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -291,7 +283,6 @@ where
         })
 }
 
-#[allow(unused)]
 fn select_child_rand<TNode, TState, Rng>(root: &TNode, rng: &mut Rng) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -330,23 +321,23 @@ where
     (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays)
 }
 
-#[allow(unused)]
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let plays = node.data().plays() as f32;
+    let data = node.data();
+    let plays = data.plays() as f32;
 
     if plays == 0f32 {
         return std::f32::MAX;
     }
 
     let wins = if parent_is_player_color {
-        node.data().wins() as f32
+        data.wins() as f32
     } else {
-        assert!(node.data().plays() >= node.data().wins());
-        (node.data().plays() - node.data().wins()) as f32
+        debug_assert!(data.plays() >= data.wins());
+        (data.plays() - data.wins()) as f32
     };
 
     let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
@@ -372,12 +363,13 @@ where
     mcts(root, player_color, rng);
 
     if print_dot_file {
-        use std::io::Write;
         use std::fs::File;
+        use std::io::Write;
 
         let dot_file_str = root.to_dot_file_str(3);
         let mut file = File::create("dotfile.dot").expect("Could not open file dotfile.dot");
-        file.write_all(dot_file_str.as_bytes()).expect("Could not write to dotfile.dot");
+        file.write_all(dot_file_str.as_bytes())
+            .expect("Could not write to dotfile.dot");
         dbg!("Done writing dot file.");
     }
 
@@ -412,7 +404,7 @@ where
     Rng: rand::Rng,
 {
     let now = Instant::now();
-    let exec_duration = Duration::from_millis(SIM_TIME_MS); 
+    let exec_duration = Duration::from_millis(SIM_TIME_MS);
 
     let mut sim_count: usize = 0;
     // for _ in 0..TOTAL_SIMS {
@@ -439,13 +431,6 @@ where
             if leaf.data().plays() == 0 {
                 let is_win = sim_result.is_win_for_player(player_color);
                 backprop_sim_result(leaf, is_win);
-            } else {
-                // panic!("How is this possible?");
-                // A: It's possible if the node is a terminal node.
-                // no.. really, how is this possible???
-                // add to the reversi gamestate a "cached_black_legal_moves" and one for white
-                // and get from the cache if it's not invalidated, instead of recalculating
-                // that, or pre-calculate and store them any time you do any type of update
             }
 
             // Update the terminating node so it knows its own end game result.
