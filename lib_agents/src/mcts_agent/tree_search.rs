@@ -13,7 +13,7 @@ use std::borrow::Borrow;
 // as the score.
 
 const TOTAL_SIMS: usize = 50_000;
-const SIM_TIME_MS: u64 = 10_000;
+pub(super) const SIM_TIME_MS: u64 = 5_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -414,8 +414,10 @@ where
     let now = Instant::now();
     let exec_duration = Duration::from_millis(SIM_TIME_MS); 
 
+    let mut sim_count: usize = 0;
     // for _ in 0..TOTAL_SIMS {
     while now.elapsed() < exec_duration {
+        sim_count += 1;
         // If we have completely explored this entire tree,
         // there's nothing left to do.
         if root.data().is_saturated() {
@@ -440,6 +442,10 @@ where
             } else {
                 // panic!("How is this possible?");
                 // A: It's possible if the node is a terminal node.
+                // no.. really, how is this possible???
+                // add to the reversi gamestate a "cached_black_legal_moves" and one for white
+                // and get from the cache if it's not invalidated, instead of recalculating
+                // that, or pre-calculate and store them any time you do any type of update
             }
 
             // Update the terminating node so it knows its own end game result.
@@ -463,6 +469,8 @@ where
         let is_win = sim_result.is_win_for_player(player_color);
         backprop_sim_result(sim_node, is_win);
     }
+
+    dbg!(sim_count);
 }
 
 #[cfg(test)]

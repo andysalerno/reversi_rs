@@ -1,5 +1,6 @@
 pub mod tree_search;
 
+use std::time::{Duration, Instant};
 use crate::util::get_rng;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
@@ -40,7 +41,8 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
-            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color),
+            // PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color),
+            PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -85,8 +87,16 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
+    let now = Instant::now();
     let mut results =
         tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng());
+    let elapsed = now.elapsed();
+    
+    let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
+    dbg!(total_plays);
+
+    let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
+    println!("Plays per sec: {:.0}", plays_per_sec);
 
     for r in &results {
         let sat_display = if r.is_saturated { "(S)" } else { "" };
