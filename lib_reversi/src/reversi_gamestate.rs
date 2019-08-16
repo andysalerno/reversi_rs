@@ -17,6 +17,10 @@ pub struct ReversiState {
 
     /// The count of black pieces on the board.
     black_pieces_count: usize,
+
+    cur_state_legal_moves: Vec<ReversiPlayerAction>,
+
+    is_game_over: bool,
 }
 
 impl ReversiState {
@@ -30,6 +34,8 @@ impl ReversiState {
             current_player_turn: PlayerColor::Black,
             white_pieces_count: 0,
             black_pieces_count: 0,
+            cur_state_legal_moves: Vec::new(),
+            is_game_over: false,
         }
     }
 
@@ -161,6 +167,86 @@ impl ReversiState {
 
         None
     }
+
+    /// Returns the possible moves the given player can make for the current state.
+    fn calc_legal_moves(&self, player: PlayerColor) -> Vec<ReversiPlayerAction> {
+        let piece_color = match player {
+            PlayerColor::Black => ReversiPiece::Black,
+            PlayerColor::White => ReversiPiece::White,
+        };
+
+        let all_directions = [POSITIVE, NEGATIVE, SAME];
+
+        // (0,0), (0,1) ... (4, 7), (5, 0) ... (7, 7)
+        let all_positions = (0..(Self::BOARD_SIZE * Self::BOARD_SIZE))
+            .map(|index| ((index / Self::BOARD_SIZE), (index % Self::BOARD_SIZE)))
+            .map(|(col, row)| BoardPosition::new(col, row));
+
+        let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
+
+        let mut moves: Vec<_> = empty_positions
+            .filter(|pos| {
+                for col_dir in all_directions.iter() {
+                    for row_dir in all_directions.iter() {
+                        if *col_dir == SAME && *row_dir == SAME {
+                            continue;
+                        }
+
+                        let direction = Directions {
+                            col_dir: *col_dir,
+                            row_dir: *row_dir,
+                        };
+
+                        if self
+                            .find_sibling_piece_pos(*pos, piece_color, direction)
+                            .is_some()
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                false
+            })
+            .map(|position| ReversiPlayerAction::Move { position })
+            .collect();
+
+        if moves.is_empty() {
+            // There's always at least one legal choice: pass the turn
+            moves.push(ReversiPlayerAction::PassTurn);
+        }
+
+        moves
+    }
+
+    /// True if the the game has ended, either due to a forced win,
+    /// draw, or forfeit.
+    fn calc_is_game_over(&self) -> bool {
+        if self.white_pieces_count() + self.black_pieces_count()
+            == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
+        {
+            // if the board is full, no player has a legal move by definition, so the game is over.
+            return true;
+        }
+
+        let white_legal_moves = self.legal_moves(PlayerColor::White);
+        let black_legal_moves = self.legal_moves(PlayerColor::Black);
+
+        if white_legal_moves.len() == 1
+            && black_legal_moves.len() == 1
+            && white_legal_moves[0] == ReversiPlayerAction::PassTurn
+            && black_legal_moves[0] == ReversiPlayerAction::PassTurn
+        {
+            return true;
+        }
+
+        false
+    }
+
+    fn update_stored_state_values(&mut self) {
+        self.cur_state_legal_moves = self.calc_legal_moves(self.current_player_turn);
+        self.is_game_over = self.calc_is_game_over();
+    }
 }
 
 impl GameState for ReversiState {
@@ -211,55 +297,8 @@ impl GameState for ReversiState {
         result
     }
 
-    /// Returns the possible moves the given player can make for the current state.
-    fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move> {
-        let piece_color = match player {
-            PlayerColor::Black => ReversiPiece::Black,
-            PlayerColor::White => ReversiPiece::White,
-        };
-
-        let all_directions = [POSITIVE, NEGATIVE, SAME];
-
-        // (0,0), (0,1) ... (4, 7), (5, 0) ... (7, 7)
-        let all_positions = (0..(Self::BOARD_SIZE * Self::BOARD_SIZE))
-            .map(|index| ((index / Self::BOARD_SIZE), (index % Self::BOARD_SIZE)))
-            .map(|(col, row)| BoardPosition::new(col, row));
-
-        let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
-
-        let mut moves: Vec<_> = empty_positions
-            .filter(|pos| {
-                for col_dir in all_directions.iter() {
-                    for row_dir in all_directions.iter() {
-                        if *col_dir == SAME && *row_dir == SAME {
-                            continue;
-                        }
-
-                        let direction = Directions {
-                            col_dir: *col_dir,
-                            row_dir: *row_dir,
-                        };
-
-                        if self
-                            .find_sibling_piece_pos(*pos, piece_color, direction)
-                            .is_some()
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                false
-            })
-            .map(|position| ReversiPlayerAction::Move { position })
-            .collect();
-
-        if moves.is_empty() {
-            // There's always at least one legal choice: pass the turn
-            moves.push(ReversiPlayerAction::PassTurn);
-        }
-
-        moves
+    fn legal_moves(&self, player: PlayerColor) -> &[Self::Move] {
+        self.cur_state_legal_moves.as_slice()
     }
 
     /// Apply the given move (or 'action') to this state, mutating this state
@@ -285,6 +324,7 @@ impl GameState for ReversiState {
             ReversiPlayerAction::PassTurn => {
                 // Passing a turn implies giving control to the other player, and doing nothing else.
                 self.current_player_turn = opponent(self.current_player_turn);
+                self.update_stored_state_values();
                 return;
             }
         };
@@ -336,6 +376,7 @@ impl GameState for ReversiState {
 
         // advance the player turn to the next player
         self.current_player_turn = opponent(self.current_player_turn);
+        self.update_stored_state_values();
     }
 
     /// Returns the current player whose turn it currently is.
@@ -364,34 +405,19 @@ impl GameState for ReversiState {
 
         self.set_piece(BoardPosition::new(3, 3), Some(ReversiPiece::Black));
         self.set_piece(BoardPosition::new(4, 3), Some(ReversiPiece::White));
+
+        self.update_stored_state_values();
     }
 
     fn skip_turn(&mut self) {
         self.current_player_turn = self.current_player_turn.opponent();
+        self.update_stored_state_values();
     }
 
     /// True if the the game has ended, either due to a forced win,
     /// draw, or forfeit.
     fn is_game_over(&self) -> bool {
-        if self.white_pieces_count() + self.black_pieces_count()
-            == ReversiState::BOARD_SIZE * ReversiState::BOARD_SIZE
-        {
-            // if the board is full, no player has a legal move by definition, so the game is over.
-            return true;
-        }
-
-        let white_legal_moves = self.legal_moves(PlayerColor::White);
-        let black_legal_moves = self.legal_moves(PlayerColor::Black);
-
-        if white_legal_moves.len() == 1
-            && black_legal_moves.len() == 1
-            && white_legal_moves[0] == ReversiPlayerAction::PassTurn
-            && black_legal_moves[0] == ReversiPlayerAction::PassTurn
-        {
-            return true;
-        }
-
-        false
+        self.is_game_over
     }
 }
 

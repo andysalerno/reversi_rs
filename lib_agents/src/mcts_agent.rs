@@ -1,12 +1,12 @@
 pub mod tree_search;
 
-use std::time::{Duration, Instant};
 use crate::util::get_rng;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
     monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
 };
 use std::marker::PhantomData;
+use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
@@ -91,7 +91,6 @@ where
     let mut results =
         tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng());
     let elapsed = now.elapsed();
-    
     let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
     dbg!(total_plays);
 

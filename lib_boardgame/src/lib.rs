@@ -2,8 +2,6 @@ use std::fmt;
 use std::str::FromStr;
 use std::fmt::Display;
 
-pub mod test_impls;
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PlayerColor {
     Black,
@@ -57,7 +55,7 @@ pub trait GameState: Clone + Send + Display {
     fn initial_state() -> Self;
 
     /// Returns the possible moves the given player can make for the current state.
-    fn legal_moves(&self, player: PlayerColor) -> Vec<Self::Move>;
+    fn legal_moves(&self, player: PlayerColor) -> &[Self::Move];
 
     /// Apply the given move (or 'action') to this state, mutating this state
     /// and advancing it to the resulting state.
@@ -141,8 +139,8 @@ where
         let legal_moves = state.legal_moves(player);
 
         let picked_action = match player {
-            PlayerColor::Black => self.black_agent().pick_move(state, &legal_moves),
-            PlayerColor::White => self.white_agent().pick_move(state, &legal_moves),
+            PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
+            PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
         };
 
         if legal_moves.iter().find(|&&m| m == picked_action).is_none() {

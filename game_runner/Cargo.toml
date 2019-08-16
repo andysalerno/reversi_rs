@@ -8,5 +8,4 @@ edition = "2018"
 lib_reversi = { path = "../lib_reversi" }
 lib_boardgame = { path = "../lib_boardgame" }
 lib_agents = { path = "../lib_agents" }
-lib_tic_tac_toe = { path = "../lib_tic_tac_toe" }
 rayon = "1.1.0"

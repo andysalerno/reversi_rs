@@ -41,7 +41,7 @@ where
     node.data().set_children_count(legal_actions.len());
 
     // create a new child node for every available action->state transition
-    for action in legal_actions {
+    for &action in legal_actions {
         let resulting_state = state.next_state(action);
         let data = MctsData::new(resulting_state, 0, 0, Some(action));
         let _child_node = node.new_child(data);

@@ -6,4 +6,3 @@ edition = "2018"
 
 [dependencies]
 lib_boardgame = {path = "../lib_boardgame" }
-lib_tic_tac_toe = {path = "../lib_tic_tac_toe" }
