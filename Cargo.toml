@@ -5,4 +5,5 @@ members = [
    "lib_boardgame",
    "monte_carlo_tree",
    "lib_agents",
+   "lib_tic_tac_toe",
 ]

@@ -469,7 +469,7 @@ pub mod tests {
     use monte_carlo_tree::rc_tree::RcNode;
 
     fn make_test_state() -> impl GameState {
-        TicTacToeState::new()
+        TicTacToeState::initial_state()
     }
 
     fn make_node<G: GameState>(data: MctsData<G>) -> impl Node<Data = MctsData<G>> {
