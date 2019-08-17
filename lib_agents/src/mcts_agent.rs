@@ -1,13 +1,13 @@
 pub mod tree_search;
 
-use std::time::{Duration, Instant};
-use rayon::prelude::*;
 use crate::util::get_rng;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
     monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
 };
+use rayon::prelude::*;
 use std::marker::PhantomData;
+use std::time::{Duration, Instant};
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
@@ -41,7 +41,7 @@ where
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
+            PlayerColor::Black => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
             PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 1),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
@@ -154,7 +154,11 @@ where
     println!("Plays per sec: {:.0}", plays_per_sec);
 
     for action_result in &first_thread_result {
-        let sat_display = if action_result.is_saturated { "(S)" } else { "" };
+        let sat_display = if action_result.is_saturated {
+            "(S)"
+        } else {
+            ""
+        };
 
         println!(
             "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
@@ -166,7 +170,19 @@ where
         );
     }
 
-    first_thread_result.iter().max_by_key(|r| r.plays).expect("Must have been a max result").clone()
+    if first_thread_result.iter().all(|r| r.is_saturated) {
+        first_thread_result
+            .iter()
+            .max_by_key(|r| (r.wins * 10000) / r.plays)
+            .expect("Must have been a max result")
+            .clone()
+    } else {
+        first_thread_result
+            .iter()
+            .max_by_key(|r| r.plays)
+            .expect("Must have been a max result")
+            .clone()
+    }
 }
 
 #[cfg(test)]

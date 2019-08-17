@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const SIM_TIME_MS: u64 = 10_000;
+pub(super) const SIM_TIME_MS: u64 = 5_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
