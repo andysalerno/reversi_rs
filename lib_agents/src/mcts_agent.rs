@@ -1,12 +1,13 @@
 pub mod tree_search;
 
+use std::time::{Duration, Instant};
+use rayon::prelude::*;
 use crate::util::get_rng;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
     monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
 };
 use std::marker::PhantomData;
-use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where
@@ -41,8 +42,8 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
-            // PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color),
-            PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
+            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 1),
+            // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -116,6 +117,7 @@ where
 fn perform_mcts_multithreaded<TNode, TState>(
     state: &TState,
     player_color: PlayerColor,
+    thread_count: usize,
 ) -> MctsResult<TState>
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -123,88 +125,48 @@ where
 {
     let color = player_color;
 
-    let mut results = {
-        let mut result_1 = None;
-        let mut result_2 = None;
-        let mut result_3 = None;
-        let mut result_4 = None;
+    let now = Instant::now();
+    let mut all_thread_results = (0..thread_count)
+        .into_par_iter()
+        .map(|_| tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng()))
+        .collect::<Vec<_>>();
+    let elapsed = now.elapsed();
 
-        let state_1 = state.clone();
-        let state_2 = state.clone();
-        let state_3 = state.clone();
-        let state_4 = state.clone();
+    // Make a result that is the aggregation of the many results
+    let mut first_thread_result = all_thread_results.remove(0);
 
-        rayon::scope(|s| {
-            s.spawn(|_| {
-                result_1 = Some(tree_search::mcts_result::<TNode, TState, _>(
-                    state_1,
-                    color,
-                    &mut get_rng(),
-                ))
-            });
-            s.spawn(|_| {
-                result_2 = Some(tree_search::mcts_result::<TNode, TState, _>(
-                    state_2,
-                    color,
-                    &mut get_rng(),
-                ))
-            });
-            s.spawn(|_| {
-                result_3 = Some(tree_search::mcts_result::<TNode, TState, _>(
-                    state_3,
-                    color,
-                    &mut get_rng(),
-                ))
-            });
-            s.spawn(|_| {
-                result_4 = Some(tree_search::mcts_result::<TNode, TState, _>(
-                    state_4,
-                    color,
-                    &mut get_rng(),
-                ))
-            });
-        });
+    for mut each_action_result in first_thread_result.iter_mut() {
+        for other_threads_results in &all_thread_results {
+            let same_move_result = other_threads_results
+                .iter()
+                .find(|&r| r.action == each_action_result.action)
+                .expect("All results must contain the same moves.");
 
-        let mut result_1 = result_1.unwrap();
-
-        let actions_count = result_1.len();
-
-        let subsequent_results = vec![result_2, result_3, result_4];
-
-        // aggregate all the action play/win values into result_1
-        for i in 0..actions_count {
-            let result_1_action = result_1.get_mut(i).unwrap();
-
-            for subsequent_result in subsequent_results.iter().filter(|r| r.is_some()) {
-                let matching_action = subsequent_result
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .find(|r| r.action == result_1_action.action)
-                    .unwrap();
-
-                result_1_action.plays += matching_action.plays;
-                result_1_action.wins += matching_action.wins;
-            }
+            each_action_result.plays += same_move_result.plays;
+            each_action_result.wins += same_move_result.wins;
         }
+    }
 
-        result_1
-    };
+    let total_plays = first_thread_result.iter().map(|r| r.plays).sum::<usize>();
+    dbg!(total_plays);
 
-    for r in &results {
-        let sat_display = if r.is_saturated { "(S)" } else { "" };
+    let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
+    println!("Plays per sec: {:.0}", plays_per_sec);
+
+    for action_result in &first_thread_result {
+        let sat_display = if action_result.is_saturated { "(S)" } else { "" };
 
         println!(
             "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
-            r.action,
-            r.plays,
-            r.wins,
-            r.wins as f32 / r.plays as f32,
+            action_result.action,
+            action_result.plays,
+            action_result.wins,
+            action_result.wins as f32 / action_result.plays as f32,
             sat_display,
         );
     }
 
-    results.pop().expect("Must have been at least one action.")
+    first_thread_result.iter().max_by_key(|r| r.plays).expect("Must have been a max result").clone()
 }
 
 #[cfg(test)]

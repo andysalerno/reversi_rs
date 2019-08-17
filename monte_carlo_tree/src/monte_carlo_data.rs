@@ -18,7 +18,7 @@ pub struct MctsData<T: GameState> {
     worst_case_result: Cell<Option<GameResult>>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MctsResult<TState: GameState> {
     pub result: Option<GameResult>,
     pub action: TState::Move,
