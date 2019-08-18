@@ -42,7 +42,7 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
-            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 1),
+            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 

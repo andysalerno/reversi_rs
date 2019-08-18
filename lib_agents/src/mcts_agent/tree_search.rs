@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 // it should use ratio of wins/plays inatead of sum(plays)
 // as the score.
 
-pub(super) const SIM_TIME_MS: u64 = 5_000;
+pub(super) const SIM_TIME_MS: u64 = 3_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -122,58 +122,6 @@ where
     }
 }
 
-/// Always chooses to select the child with the best win/plays ratio,
-/// even on the opponent's turn (i.e. no pessimism).
-fn select_to_leaf_uninverted<TNode, TState>(
-    root: &TNode,
-    player_color: PlayerColor,
-) -> TNode::Handle
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let mut cur_node = root.get_handle();
-
-    loop {
-        let selected_child = select_child_max_score::<TNode, TState>(cur_node.borrow());
-
-        if selected_child.is_none() {
-            return cur_node;
-        }
-
-        cur_node = selected_child.unwrap();
-    }
-}
-
-/// Selects using max UCB, but on opponent's turn picks randomly.
-fn select_to_leaf_rand<TNode, TState, Rng>(
-    root: &TNode,
-    player_color: PlayerColor,
-    rng: &mut Rng,
-) -> TNode::Handle
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-    Rng: rand::Rng,
-{
-    let mut cur_node = root.get_handle();
-
-    loop {
-        let selected_child =
-            if player_color == cur_node.borrow().data().state().current_player_turn() {
-                select_child_max_score::<TNode, TState>(cur_node.borrow())
-            } else {
-                select_child_rand::<TNode, TState, _>(cur_node.borrow(), rng)
-            };
-
-        if selected_child.is_none() {
-            return cur_node;
-        }
-
-        cur_node = selected_child.unwrap();
-    }
-}
-
 /// Selects using max UCB, but on opponent's turn inverts the score.
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
@@ -191,54 +139,6 @@ where
             None => return cur_node,
         }
     }
-}
-
-fn select_to_leaf_inverted_reversed<TNode, TState>(
-    root: &TNode,
-    player_color: PlayerColor,
-) -> TNode::Handle
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let mut cur_node = root.get_handle();
-
-    loop {
-        let selected_child =
-            if player_color == cur_node.borrow().data().state().current_player_turn() {
-                select_child_max_score::<TNode, TState>(cur_node.borrow())
-            } else {
-                select_child_max_score_reversed::<TNode, TState>(cur_node.borrow())
-            };
-
-        match selected_child {
-            Some(c) => cur_node = c,
-            None => return cur_node,
-        }
-    }
-}
-
-/// For all children of the given node, assign each one a score,
-/// and return the child with the highest score (ties broken by the first)
-/// or None if there are no unsaturated children.
-fn select_child_max_score<TNode, TState>(root: &TNode) -> Option<TNode::Handle>
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let child_nodes = root.children();
-
-    child_nodes
-        .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .max_by(|a, b| {
-            let a_score = score_node_simple(a.borrow());
-            let b_score = score_node_simple(b.borrow());
-
-            a_score
-                .partial_cmp(&b_score)
-                .expect("floating point comparison exploded")
-        })
 }
 
 fn select_child_max_score_inverted<TNode, TState>(
@@ -263,62 +163,6 @@ where
 
             a_score.partial_cmp(&b_score).unwrap()
         })
-}
-
-fn select_child_max_score_reversed<TNode, TState>(root: &TNode) -> Option<TNode::Handle>
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let child_nodes = root.children();
-
-    child_nodes
-        .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .min_by(|a, b| {
-            let a_score = score_node_simple(a.borrow());
-            let b_score = score_node_simple(b.borrow());
-
-            a_score.partial_cmp(&b_score).unwrap()
-        })
-}
-
-fn select_child_rand<TNode, TState, Rng>(root: &TNode, rng: &mut Rng) -> Option<TNode::Handle>
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-    Rng: rand::Rng,
-{
-    let child_nodes = root.children();
-
-    let unsaturated_children = child_nodes
-        .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .collect::<Vec<_>>();
-
-    let selected_child = util::random_pick(&unsaturated_children, rng);
-    selected_child.cloned()
-}
-
-/// Given a node, score it in such a way that encourages
-/// both exploration and exploitation of the state space.
-fn score_node_simple<TNode, TState>(node: &TNode) -> f32
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let plays = node.data().plays() as f32;
-
-    if plays == 0f32 {
-        return std::f32::MAX;
-    }
-
-    let wins = node.data().wins() as f32;
-    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
-    let bias = f32::sqrt(2_f32);
-
-    // TODO: test with the bias of '2' inside the sqrt(ln(parent_plays) / plays) part
-    (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays)
 }
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
@@ -418,6 +262,7 @@ where
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = select_to_leaf_inverted(root, player_color);
+
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
@@ -626,7 +471,7 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score::<RcNode<_>, TicTacToeState>(&child_level_3_handle)
+        let selected = select_child_max_score_inverted::<RcNode<_>, TicTacToeState>(&child_level_3_handle, PlayerColor::Black)
             .expect("the child should have been selected.");
 
         let selected: &RcNode<_> = selected.borrow();
@@ -661,7 +506,7 @@ pub mod tests {
         backprop_sim_result(child_level_4b.borrow(), is_win);
         backprop_sim_result(child_level_4b.borrow(), is_win);
 
-        let leaf = select_to_leaf_uninverted(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
 
         let leaf = leaf.borrow();
 
@@ -674,7 +519,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let leaf = select_to_leaf_uninverted(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
         let leaf = leaf.borrow();
 
         assert_eq!(10, leaf.data().plays());
@@ -779,12 +624,12 @@ pub mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), is_win);
 
-        assert_eq!(1.0929347, score_node_simple(child_a.borrow()));
-        assert_eq!(1.3385662, score_node_simple(child_b.borrow()));
-        assert_eq!(1.8930184, score_node_simple(child_c.borrow()));
+        assert_eq!(1.0929347, score_node_pessimistic(child_a.borrow(), true));
+        assert_eq!(1.3385662, score_node_pessimistic(child_b.borrow(), true));
+        assert_eq!(1.8930184, score_node_pessimistic(child_c.borrow(), true));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node_simple(child_d.borrow())
+            score_node_pessimistic(child_d.borrow(), true)
         );
     }
 
