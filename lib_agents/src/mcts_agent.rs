@@ -42,7 +42,7 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
-            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
+            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 1),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
@@ -78,40 +78,6 @@ fn pretty_ratio_bar_text(
     text_bar.push_str("] W");
 
     text_bar
-}
-
-fn perform_mcts_single_threaded<TNode, TState>(
-    state: &TState,
-    color: PlayerColor,
-) -> MctsResult<TState>
-where
-    TNode: Node<Data = MctsData<TState>>,
-    TState: GameState,
-{
-    let now = Instant::now();
-    let mut results =
-        tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng());
-    let elapsed = now.elapsed();
-    let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
-    dbg!(total_plays);
-
-    let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
-    println!("Plays per sec: {:.0}", plays_per_sec);
-
-    for r in &results {
-        let sat_display = if r.is_saturated { "(S)" } else { "" };
-
-        println!(
-            "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
-            r.action,
-            r.plays,
-            r.wins,
-            r.wins as f32 / r.plays as f32,
-            sat_display,
-        );
-    }
-
-    results.pop().expect("Must be at least one result")
 }
 
 fn perform_mcts_multithreaded<TNode, TState>(

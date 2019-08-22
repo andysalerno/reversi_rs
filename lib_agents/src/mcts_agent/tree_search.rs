@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 // as the score.
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
+const EXTRA_TIME_MS: u64 = 3_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
@@ -249,10 +250,21 @@ where
 {
     let now = Instant::now();
     let exec_duration = Duration::from_millis(SIM_TIME_MS);
+    let extra_time = Duration::from_millis(EXTRA_TIME_MS);
 
     let mut sim_count: usize = 0;
     // for _ in 0..TOTAL_SIMS {
-    while now.elapsed() < exec_duration {
+    loop {
+        if now.elapsed() >= exec_duration {
+            let data = root.data();
+
+            if (data.wins() * 1000) / data.plays() > 500
+                || now.elapsed() >= exec_duration + extra_time
+            {
+                break;
+            }
+        }
+
         sim_count += 1;
         // If we have completely explored this entire tree,
         // there's nothing left to do.
@@ -471,8 +483,11 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score_inverted::<RcNode<_>, TicTacToeState>(&child_level_3_handle, PlayerColor::Black)
-            .expect("the child should have been selected.");
+        let selected = select_child_max_score_inverted::<RcNode<_>, TicTacToeState>(
+            &child_level_3_handle,
+            PlayerColor::Black,
+        )
+        .expect("the child should have been selected.");
 
         let selected: &RcNode<_> = selected.borrow();
 
