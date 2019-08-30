@@ -3,4 +3,4 @@ pub mod tree;
 pub mod rc_tree;
 pub mod dot_visualize;
 pub mod monte_carlo_data;
-
+pub mod arc_tree;

@@ -4,14 +4,14 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 #[derive(Debug)]
-pub struct NodeContent<T> {
+pub struct RcNodeContent<T> {
     data: T,
     parent: Weak<Self>,
     children: RefCell<Vec<RcNode<T>>>,
 }
 
 /// Wraps a NodeContent with a reference-counted owner.
-pub type RcNode<T> = Rc<NodeContent<T>>;
+pub type RcNode<T> = Rc<RcNodeContent<T>>;
 
 impl<T: Clone> Node for RcNode<T> {
     type ChildrenIter = Vec<Self>;
@@ -39,7 +39,7 @@ impl<T: Clone> Node for RcNode<T> {
     }
 
     fn new_child(&self, data: T) -> RcNode<T> {
-        let child = Rc::new(NodeContent {
+        let child = Rc::new(RcNodeContent {
             parent: Rc::downgrade(self),
             children: RefCell::default(),
             data,
@@ -51,7 +51,7 @@ impl<T: Clone> Node for RcNode<T> {
     }
 
     fn new_root(data: Self::Data) -> RcNode<T> {
-        Rc::new(NodeContent {
+        Rc::new(RcNodeContent {
             parent: Weak::new(),
             children: RefCell::default(),
             data,
