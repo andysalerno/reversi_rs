@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 lib_reversi = { path = "../lib_reversi" }
+lib_tic_tac_toe = { path = "../lib_tic_tac_toe" }
 lib_boardgame = { path = "../lib_boardgame" }
 lib_agents = { path = "../lib_agents" }
 rayon = "1.1.0"
