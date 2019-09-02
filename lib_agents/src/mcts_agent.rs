@@ -1,12 +1,13 @@
 pub mod tree_search;
 
 use crate::util::get_rng;
+use crossbeam::thread;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
     monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
 };
-use rayon::prelude::*;
 use std::marker::PhantomData;
+use std::sync::Mutex;
 use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
@@ -42,7 +43,7 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
-            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 1),
+            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
@@ -91,11 +92,32 @@ where
 {
     let color = player_color;
 
+    let thread_results = Mutex::new(Vec::new());
+
     let now = Instant::now();
-    let mut all_thread_results = (0..thread_count)
-        .into_par_iter()
-        .map(|_| tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng()))
-        .collect::<Vec<_>>();
+    thread::scope(|s| {
+        for _ in 0..thread_count {
+            s.spawn(|_| {
+                let result = tree_search::mcts_result::<TNode, TState, _>(
+                    state.clone(),
+                    color,
+                    &mut get_rng(),
+                );
+                thread_results
+                    .lock()
+                    .expect("Could not lock results")
+                    .push(result);
+            });
+        }
+    })
+    .unwrap();
+
+    let mut all_thread_results = thread_results.into_inner().unwrap();
+
+    // let mut all_thread_results = (0..thread_count)
+    //     .into_par_iter()
+    //     .map(|_| tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng()))
+    //     .collect::<Vec<_>>();
     let elapsed = now.elapsed();
 
     // Make a result that is the aggregation of the many results

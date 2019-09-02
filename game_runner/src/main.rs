@@ -13,9 +13,7 @@ fn main() {
         .parse()
         .expect("Couldn't parse arg as a usize.");
 
-    let results = (0..game_count)
-        .map(|_| play_tic_tac_toe())
-        .collect::<Vec<_>>();
+    let results = (0..game_count).map(|_| play_reversi()).collect::<Vec<_>>();
 
     let white_wins = results
         .iter()
@@ -44,9 +42,9 @@ fn main() {
 
 #[allow(unused)]
 fn play_reversi() -> lib_boardgame::GameResult {
-    let white = HumanAgent::new(PlayerColor::White);
+    // let white = HumanAgent::new(PlayerColor::White);
     let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
-    // let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
+    let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
 
     let mut game = Reversi::new(white, black);
 
