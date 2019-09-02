@@ -1,10 +1,11 @@
-use rand::seq::SliceRandom;
 use rand::rngs::SmallRng;
-use rand::Rng;
+use rand::seq::SliceRandom;
 use rand::FromEntropy;
+use rand::Rng;
 
-pub fn random_pick<'a, T, R>(choices: &'a[T], rng: &mut R) -> Option<&'a T> 
-where R: Rng
+pub fn random_pick<'a, T, R>(choices: &'a [T], rng: &mut R) -> Option<&'a T>
+where
+    R: Rng,
 {
     choices.choose(rng)
 }

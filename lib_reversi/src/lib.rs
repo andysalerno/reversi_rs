@@ -113,14 +113,14 @@ impl std::str::FromStr for ReversiPlayerAction {
                     crate::reversi_gamestate::ReversiState::BOARD_SIZE
                 );
 
-                return Err(9);
+                Err(9)
             } else {
                 let action = ReversiPlayerAction::Move { position };
-                return Ok(action);
+                Ok(action)
             }
         } else {
             println!("Didn't recognize input as a board position: {}", s);
-            return Err(9);
+            Err(9)
         }
     }
 }

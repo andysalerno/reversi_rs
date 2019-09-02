@@ -10,7 +10,7 @@ pub const BOARD_SIZE: usize = 3;
 pub enum TicTacToePiece {
     X,
     O,
-} 
+}
 
 impl TicTacToePiece {
     pub fn player_color(self) -> PlayerColor {
@@ -21,10 +21,9 @@ impl TicTacToePiece {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::tic_tac_toe_gamestate::{TicTacToeState, TicTacToeAction, BoardPosition};
+    use crate::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
     use lib_boardgame::{GameState, PlayerColor};
     use std::str::FromStr;
 
@@ -73,7 +72,10 @@ mod tests {
         let white_score = state.player_score(PlayerColor::White);
         let black_score = state.player_score(PlayerColor::Black);
 
-        assert_eq!(white_score, black_score, "No winner yet, so scores should be equal.");
+        assert_eq!(
+            white_score, black_score,
+            "No winner yet, so scores should be equal."
+        );
 
         // Create this state:
         // XXX
@@ -84,7 +86,10 @@ mod tests {
         let white_score = state.player_score(PlayerColor::White);
         let black_score = state.player_score(PlayerColor::Black);
 
-        assert!(black_score > white_score, "Black has won, so it should have the higher score.");
+        assert!(
+            black_score > white_score,
+            "Black has won, so it should have the higher score."
+        );
     }
 
     #[test]

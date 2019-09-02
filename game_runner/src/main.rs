@@ -13,7 +13,9 @@ fn main() {
         .parse()
         .expect("Couldn't parse arg as a usize.");
 
-    let results = (0..game_count).map(|_| play_tic_tac_toe()).collect::<Vec<_>>();
+    let results = (0..game_count)
+        .map(|_| play_tic_tac_toe())
+        .collect::<Vec<_>>();
 
     let white_wins = results
         .iter()

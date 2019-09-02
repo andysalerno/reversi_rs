@@ -1,8 +1,8 @@
-use std::fmt;
 use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
 use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
 use lib_boardgame::{GameState, PlayerColor};
+use std::fmt;
 
 #[derive(Clone)]
 pub struct ReversiState {
@@ -297,7 +297,7 @@ impl GameState for ReversiState {
         result
     }
 
-    fn legal_moves(&self, player: PlayerColor) -> &[Self::Move] {
+    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
         self.cur_state_legal_moves.as_slice()
     }
 
@@ -558,6 +558,10 @@ mod tests {
         let orig_piece_count = state.white_pieces_count() + state.black_pieces_count();
         let modified_piece_count = cloned.white_pieces_count() + cloned.black_pieces_count();
 
-        assert_eq!(orig_piece_count + 1, modified_piece_count, "The original state must not have been mutated when we mutated the cloned state.");
+        assert_eq!(
+            orig_piece_count + 1,
+            modified_piece_count,
+            "The original state must not have been mutated when we mutated the cloned state."
+        );
     }
 }

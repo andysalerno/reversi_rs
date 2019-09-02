@@ -7,7 +7,7 @@ use monte_carlo_tree::{
 };
 use rayon::prelude::*;
 use std::marker::PhantomData;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
 where

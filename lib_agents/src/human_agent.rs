@@ -18,7 +18,7 @@ where
     pub fn new(player_color: PlayerColor) -> Self {
         Self {
             _phantom: Default::default(),
-            _player_color: player_color
+            _player_color: player_color,
         }
     }
 
@@ -56,8 +56,7 @@ where
 
             if legal_moves.iter().find(|&&m| m == user_input).is_none() {
                 println!("The provided move was not valid. Try again.");
-            }
-            else {
+            } else {
                 return user_input;
             }
         }

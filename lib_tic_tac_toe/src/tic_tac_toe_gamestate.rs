@@ -60,14 +60,14 @@ impl std::str::FromStr for TicTacToeAction {
                     position, BOARD_SIZE
                 );
 
-                return Err(());
+                Err(())
             } else {
                 let action = TicTacToeAction(position);
-                return Ok(action);
+                Ok(action)
             }
         } else {
             println!("Didn't recognize input as a board position: {}", s);
-            return Err(());
+            Err(())
         }
     }
 }

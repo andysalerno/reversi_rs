@@ -28,8 +28,8 @@ pub struct MctsResult<TState: GameState> {
 }
 
 impl<TState> From<&MctsData<TState>> for MctsResult<TState>
-where 
-TState: GameState,
+where
+    TState: GameState,
 {
     fn from(data: &MctsData<TState>) -> Self {
         Self {
@@ -110,7 +110,7 @@ impl<T: GameState> MctsData<T> {
 
     pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
         Self {
-            state: state,
+            state,
             plays: Cell::new(plays),
             wins: Cell::new(wins),
             action,
@@ -138,7 +138,10 @@ impl<T: GameState> MctsData<T> {
     pub fn is_saturated(&self) -> bool {
         let children_count = self.children_count();
         let saturated_children_count = self.children_saturated_count.get();
-        assert!(saturated_children_count <= children_count, "Can't have more saturated children than children");
+        assert!(
+            saturated_children_count <= children_count,
+            "Can't have more saturated children than children"
+        );
 
         self.is_expanded.get() && saturated_children_count >= children_count
     }
