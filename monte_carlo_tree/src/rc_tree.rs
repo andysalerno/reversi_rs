@@ -13,7 +13,7 @@ pub struct RcNodeContent<T> {
 /// Wraps a NodeContent with a reference-counted owner.
 pub type RcNode<T> = Rc<RcNodeContent<T>>;
 
-impl<T: Clone> Node for RcNode<T> {
+impl<T> Node for RcNode<T> {
     type ChildrenIter = Vec<Self>;
     type Handle = Self;
     type Data = T;

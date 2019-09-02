@@ -1,8 +1,7 @@
 use crate::tree::Node;
 
-use std::sync::{Arc, Weak};
 use std::sync::RwLock;
-use core::sync::atomic::AtomicUsize;
+use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
 pub struct ArcNodeContent<T> {
@@ -14,7 +13,7 @@ pub struct ArcNodeContent<T> {
 /// Wraps a NodeContent with a reference-counted owner.
 pub type ArcNode<T> = Arc<ArcNodeContent<T>>;
 
-impl<T: Clone> Node for ArcNode<T> {
+impl<T> Node for ArcNode<T> {
     type ChildrenIter = Vec<Self>;
     type Handle = Self;
     type Data = T;
@@ -44,7 +43,7 @@ impl<T: Clone> Node for ArcNode<T> {
         let child = Arc::new(ArcNodeContent {
             parent: Arc::downgrade(self),
             children: RwLock::default(),
-            data
+            data,
         });
 
         let mut writable_children = self.children.write().expect("Couldn't lock node children.");
@@ -57,7 +56,7 @@ impl<T: Clone> Node for ArcNode<T> {
         Arc::new(ArcNodeContent {
             parent: Weak::new(),
             children: RwLock::default(),
-            data
+            data,
         })
     }
 }
@@ -65,15 +64,25 @@ impl<T: Clone> Node for ArcNode<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-    #[derive(Clone)]
     struct DummyData {
-        visits: AtomicUsize::new(0)
+        visits: AtomicUsize,
     }
 
     impl DummyData {
         fn new() -> Self {
-            DummyData { visits: 0 }
+            DummyData {
+                visits: AtomicUsize::new(0),
+            }
+        }
+
+        fn increment_visits(&self) {
+            self.visits.fetch_add(1, Ordering::Relaxed);
+        }
+
+        fn get_visits(&self) -> usize {
+            self.visits.load(Ordering::SeqCst)
         }
     }
 
@@ -112,18 +121,24 @@ mod tests {
                     let mut node_queue = vec![r.clone()];
 
                     while let Some(walker) = node_queue.pop() {
+                        walker.data().increment_visits();
+
                         let children = walker.children();
                         let children = children.into_iter().collect::<Vec<_>>();
-
-                        for child in children.iter() {
-
-                        }
 
                         node_queue.extend(children);
                     }
                 });
             }
-        });
+        })
+        .expect("Scope didn't terminate properly.");
 
+        assert_eq!(4, r.data().get_visits());
+        assert_eq!(4, r_1.data().get_visits());
+        assert_eq!(4, r_1_1.data().get_visits());
+        assert_eq!(4, r_1_1_1.data().get_visits());
+        assert_eq!(4, r_1_2.data().get_visits());
+        assert_eq!(4, r_1_3.data().get_visits());
+        assert_eq!(4, r_1_3_1.data().get_visits());
     }
 }

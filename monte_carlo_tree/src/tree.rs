@@ -2,7 +2,7 @@ use std::borrow::Borrow;
 
 /// A tree node that can hold data, and refer to
 /// its parent and children.
-pub trait Node: Sized + Clone {
+pub trait Node {
     type ChildrenIter: IntoIterator<Item = Self::Handle>;
     type Handle: Borrow<Self> + Clone;
     type Data;
