@@ -1,15 +1,12 @@
 pub mod tree_search;
 pub mod tree_search_par;
 
-use crate::util::get_rng;
-use crossbeam::thread;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, arc_tree::ArcNode, monte_carlo_data::MctsResult, tree::Node,
+    amonte_carlo_data::AMctsData, arc_tree::ArcNode, monte_carlo_data::MctsResult, tree::Node, atree::ANode,
 };
 use std::marker::PhantomData;
 use std::marker::Sync;
-use std::sync::Mutex;
 use std::time::Instant;
 
 pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
@@ -39,13 +36,13 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 1),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 2),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
@@ -89,7 +86,7 @@ fn perform_mcts_par<TNode, TState>(
     thread_count: usize,
 ) -> MctsResult<TState>
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
     let now = Instant::now();

@@ -3,11 +3,8 @@ use crate::util;
 use crossbeam::thread;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::dot_visualize::TreeToDotFileFormat;
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, atree::ANode};
 use std::borrow::Borrow;
-use std::clone::Clone;
-use std::marker::{Send, Sync};
 use std::time::{Duration, Instant};
 
 // todo: mcts() should return the actual winning node,
@@ -20,7 +17,7 @@ const EXTRA_TIME_MS: u64 = 3_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     node.data().mark_expanded();
@@ -56,7 +53,7 @@ where
 /// follow the same operation for its parent.
 fn backprop_saturation<TNode, TState>(leaf: &TNode)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     assert!(
@@ -82,7 +79,7 @@ where
 
 fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
     R: rand::Rng,
 {
@@ -105,7 +102,7 @@ where
 
 fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut parent_node = Some(node.get_handle());
@@ -126,7 +123,7 @@ where
 /// Selects using max UCB, but on opponent's turn inverts the score.
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
@@ -147,7 +144,7 @@ fn select_child_max_score_inverted<TNode, TState>(
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     // TODO: If the only play is "pass turn", then even if parent color is enemy, don't be pessimistic
@@ -168,7 +165,7 @@ where
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let data = node.data();
@@ -197,7 +194,7 @@ pub fn mcts_result<TNode, TState>(
     thread_count: usize
 ) -> Vec<MctsResult<TState>>
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let root_handle = TNode::new_root(AMctsData::new(state, 0, 0, None));
@@ -231,7 +228,7 @@ where
 
 fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_count: usize)
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     thread::scope(|s| {
@@ -246,7 +243,7 @@ where
 
 fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let now = Instant::now();

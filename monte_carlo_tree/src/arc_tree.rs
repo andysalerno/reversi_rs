@@ -1,4 +1,5 @@
 use crate::tree::Node;
+use crate::atree::ANode;
 
 use std::sync::RwLock;
 use std::sync::{Arc, Weak};
@@ -33,7 +34,7 @@ impl<T> Node for ArcNode<T> {
     fn children(&self) -> Self::ChildrenIter {
         // TODO: perhaps this can return a borrowed slice instead,
         // if the borrow checker will allow.
-        let readable_children = self.children.read().expect("Couldn't lock node children.");
+        let readable_children = self.children.read().expect("Couldn't lock node children for reading.");
         let c: Vec<Self> = readable_children.iter().cloned().collect();
 
         c
@@ -46,7 +47,7 @@ impl<T> Node for ArcNode<T> {
             data,
         });
 
-        let mut writable_children = self.children.write().expect("Couldn't lock node children.");
+        let mut writable_children = self.children.write().expect("Couldn't lock node children for writing.");
         writable_children.push(child.clone());
 
         child
@@ -58,6 +59,12 @@ impl<T> Node for ArcNode<T> {
             children: RwLock::default(),
             data,
         })
+    }
+}
+
+impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {
+    fn children_write_lock(&self) -> std::sync::RwLockWriteGuard<Self::ChildrenIter> {
+        self.children.write().expect("Couldn't lock children for writing.")
     }
 }
 
