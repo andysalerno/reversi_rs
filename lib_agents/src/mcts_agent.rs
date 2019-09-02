@@ -92,7 +92,36 @@ where
     TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
-    let results = tree_search_par::mcts_result::<TNode, TState>(state.clone(), player_color);
+    let now = Instant::now();
+    let results =
+        tree_search_par::mcts_result::<TNode, TState>(state.clone(), player_color, thread_count);
+    let elapsed = now.elapsed();
+
+    // Some friendly UI output
+    {
+        let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
+        dbg!(total_plays);
+
+        let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
+        println!("Plays per sec: {:.0}", plays_per_sec);
+
+        for action_result in &results {
+            let sat_display = if action_result.is_saturated {
+                "(S)"
+            } else {
+                ""
+            };
+
+            println!(
+                "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
+                action_result.action,
+                action_result.plays,
+                action_result.wins,
+                action_result.wins as f32 / action_result.plays as f32,
+                sat_display,
+            );
+        }
+    }
 
     if results.iter().all(|r| r.is_saturated) {
         results

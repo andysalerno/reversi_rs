@@ -194,6 +194,7 @@ where
 pub fn mcts_result<TNode, TState>(
     state: TState,
     player_color: PlayerColor,
+    thread_count: usize
 ) -> Vec<MctsResult<TState>>
 where
     TNode: Node<Data = AMctsData<TState>> + Sync,
@@ -202,7 +203,7 @@ where
     let root_handle = TNode::new_root(AMctsData::new(state, 0, 0, None));
     let root = root_handle.borrow();
 
-    mcts(root, player_color);
+    mcts(root, player_color, thread_count);
 
     let mut state_children = root.children().into_iter().collect::<Vec<_>>();
 
@@ -228,13 +229,13 @@ where
         .collect()
 }
 
-fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor)
+fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_count: usize)
 where
     TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState,
 {
     thread::scope(|s| {
-        for _ in 0..4 {
+        for _ in 0..thread_count {
             s.spawn(|_| {
                 mcts_loop(root, player_color);
             });
