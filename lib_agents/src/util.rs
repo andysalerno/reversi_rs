@@ -1,6 +1,5 @@
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
-use rand::FromEntropy;
 use rand::Rng;
 
 pub fn random_pick<'a, T, R>(choices: &'a [T], rng: &mut R) -> Option<&'a T>
@@ -19,10 +18,12 @@ where
 }
 
 pub(crate) fn get_rng() -> impl rand::Rng {
+    // use rand::FromEntropy;
     // SmallRng::from_entropy()
     rand::thread_rng()
 }
 
+#[allow(unused)]
 pub(crate) fn get_rng_deterministic() -> impl rand::Rng {
     use rand::SeedableRng;
     SmallRng::from_seed([0; 16])
