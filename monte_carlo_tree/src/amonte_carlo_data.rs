@@ -1,63 +1,46 @@
 use lib_boardgame::{GameResult, GameState};
-use std::cell::Cell;
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, AtomicBool};
+use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use std::sync::RwLock;
+use crate::monte_carlo_data::MctsResult;
 
 /// MCTS-related data that every Node will have.
-#[derive(Default, Clone)]
-pub struct MctsData<T: GameState> {
+#[derive(Default)]
+pub struct AMctsData<T: GameState> {
     state: T,
-    plays: Cell<usize>,
-    wins: Cell<usize>,
+    plays: AtomicUsize,
+    wins: AtomicUsize,
     action: Option<T::Move>,
 
-    is_expanded: Cell<bool>,
+    is_expanded: AtomicBool,
 
-    children_count: Cell<usize>,
-    children_saturated_count: Cell<usize>,
-    end_state_result: Cell<Option<GameResult>>,
-    worst_case_result: Cell<Option<GameResult>>,
+    children_count: AtomicUsize,
+    children_saturated_count: AtomicUsize,
+    end_state_result: RwLock<Option<GameResult>>,
 }
 
-#[derive(Default, Clone)]
-pub struct MctsResult<TState: GameState> {
-    pub result: Option<GameResult>,
-    pub action: TState::Move,
-    pub wins: usize,
-    pub plays: usize,
-    pub is_saturated: bool,
-}
-
-impl<TState> From<&MctsData<TState>> for MctsResult<TState>
+impl<TState> From<&AMctsData<TState>> for MctsResult<TState>
 where
     TState: GameState,
 {
-    fn from(data: &MctsData<TState>) -> Self {
+    fn from(data: &AMctsData<TState>) -> Self {
         Self {
             plays: data.plays(),
             wins: data.wins(),
-            result: data.end_state_result(), // TODO
             action: data.action().expect("todo"),
             is_saturated: data.is_saturated(),
+            result: None, // TODO
         }
     }
 }
 
-impl<T: GameState> MctsData<T> {
+impl<T: GameState> AMctsData<T> {
     pub fn increment_plays(&self) {
-        self.plays.set(self.plays.get() + 1);
+        self.plays.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn increment_wins(&self) {
-        self.wins.set(self.wins.get() + 1);
-    }
-
-    pub fn end_state_result(&self) -> Option<GameResult> {
-        self.end_state_result.get()
-    }
-
-    pub fn set_end_state_result(&self, result: GameResult) {
-        self.end_state_result.set(Some(result));
+        self.wins.fetch_add(1, Ordering::Relaxed);
     }
 
     /// The owner of the tree search should call this
@@ -67,30 +50,26 @@ impl<T: GameState> MctsData<T> {
     /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
     pub fn mark_expanded(&self) {
         assert!(!self.is_expanded());
-        self.is_expanded.set(true);
+        self.is_expanded.store(true, Ordering::SeqCst);
     }
 
     pub fn is_expanded(&self) -> bool {
-        self.is_expanded.get()
+        self.is_expanded.load(Ordering::SeqCst)
     }
 
     pub fn set_children_count(&self, count: usize) {
-        self.children_count.set(count);
+        self.children_count.store(count, Ordering::SeqCst);
     }
 
     pub fn children_count(&self) -> usize {
-        self.children_count.get()
+        self.children_count.load(Ordering::SeqCst)
     }
 
     pub fn increment_saturated_children_count(&self) {
         self.children_saturated_count
-            .set(self.children_saturated_count.get() + 1);
+            .fetch_add(1, Ordering::SeqCst);
 
-        assert!(self.children_saturated_count.get() <= self.children_count.get());
-    }
-
-    pub fn set_worst_case_result(&self, wcr: GameResult) {
-        self.worst_case_result.set(Some(wcr))
+        debug_assert!(self.children_saturated_count.load(Ordering::SeqCst) <= self.children_count.load(Ordering::SeqCst));
     }
 
     pub fn state(&self) -> &T {
@@ -98,11 +77,11 @@ impl<T: GameState> MctsData<T> {
     }
 
     pub fn plays(&self) -> usize {
-        self.plays.get()
+        self.plays.load(Ordering::SeqCst)
     }
 
     pub fn wins(&self) -> usize {
-        self.wins.get()
+        self.wins.load(Ordering::SeqCst)
     }
 
     pub fn action(&self) -> Option<T::Move> {
@@ -112,21 +91,16 @@ impl<T: GameState> MctsData<T> {
     pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
         Self {
             state,
-            plays: Cell::new(plays),
-            wins: Cell::new(wins),
             action,
 
             // TODO: why can't I use the sugar `..Default::default()` for the remaining??
+            plays: AtomicUsize::default(),
+            wins: AtomicUsize::default(),
             is_expanded: Default::default(),
-            end_state_result: Default::default(),
             children_count: Default::default(),
             children_saturated_count: Default::default(),
-            worst_case_result: Default::default(),
+            end_state_result: Default::default(),
         }
-    }
-
-    pub fn worst_case_result(&self) -> Option<GameResult> {
-        self.worst_case_result.get()
     }
 
     /// A node is considered saturated if:
@@ -138,17 +112,26 @@ impl<T: GameState> MctsData<T> {
     /// has been backpropagated.
     pub fn is_saturated(&self) -> bool {
         let children_count = self.children_count();
-        let saturated_children_count = self.children_saturated_count.get();
-        assert!(
+        let saturated_children_count = self.children_saturated_count.load(Ordering::SeqCst);
+        debug_assert!(
             saturated_children_count <= children_count,
             "Can't have more saturated children than children"
         );
 
-        self.is_expanded.get() && saturated_children_count >= children_count
+        self.is_expanded() && saturated_children_count >= children_count
+    }
+
+    pub fn end_state_result(&self) -> Option<GameResult> {
+        *self.end_state_result.read().unwrap()
+    }
+
+    pub fn set_end_state_result(&self, result: GameResult) {
+        let mut writable = self.end_state_result.write().expect("Could not lock game result for writing.");
+        *writable = Some(result);
     }
 }
 
-impl<T: GameState + fmt::Display> fmt::Display for MctsData<T> {
+impl<T: GameState + fmt::Display> fmt::Display for AMctsData<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.state())
     }
@@ -161,7 +144,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_on_default_node() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
 
         assert!(
             !data.is_saturated(),
@@ -171,7 +154,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_for_expanded_childless_node() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         assert!(
@@ -182,7 +165,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_for_expanded_node_with_children() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
         data.set_children_count(7);
 
@@ -194,7 +177,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_true_after_incrementing_saturation_count_fully() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         // we mark the data as having 7 children
@@ -211,7 +194,7 @@ mod tests {
 
     #[test]
     fn is_saturated_expects_false_after_incrementing_saturation_count_partially() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);
@@ -227,7 +210,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn increment_saturated_children_count_explodes_if_over_saturated() {
-        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
         data.mark_expanded();
 
         data.set_children_count(7);

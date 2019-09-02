@@ -1,19 +1,21 @@
 pub mod tree_search;
+pub mod tree_search_par;
 
 use crate::util::get_rng;
 use crossbeam::thread;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    monte_carlo_data::MctsData, monte_carlo_data::MctsResult, rc_tree::RcNode, tree::Node,
+    amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node, arc_tree::ArcNode,
 };
 use std::marker::PhantomData;
 use std::sync::Mutex;
 use std::time::Instant;
+use std::marker::Sync;
 
-pub struct MctsAgent<TState, TNode = RcNode<MctsData<TState>>>
+pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
 where
     TState: GameState,
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
 {
     color: PlayerColor,
 
@@ -24,7 +26,7 @@ where
 impl<TState, TNode> MctsAgent<TState, TNode>
 where
     TState: GameState,
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
 {
     pub fn new(color: PlayerColor) -> Self {
         MctsAgent {
@@ -37,13 +39,13 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
-            PlayerColor::White => perform_mcts_multithreaded::<TNode, TState>(state, self.color, 4),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 1),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 1),
             // PlayerColor::White => perform_mcts_single_threaded::<TNode, TState>(state, self.color),
         };
 
@@ -81,97 +83,119 @@ fn pretty_ratio_bar_text(
     text_bar
 }
 
-fn perform_mcts_multithreaded<TNode, TState>(
+fn perform_mcts_par<TNode, TState>(
     state: &TState,
     player_color: PlayerColor,
     thread_count: usize,
 ) -> MctsResult<TState>
 where
-    TNode: Node<Data = MctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
-    let color = player_color;
+    let results = tree_search_par::mcts_result::<TNode, TState>(
+        state.clone(),
+        player_color,
+    );
 
-    let thread_results = Mutex::new(Vec::new());
-
-    let now = Instant::now();
-    thread::scope(|s| {
-        for _ in 0..thread_count {
-            s.spawn(|_| {
-                let result = tree_search::mcts_result::<TNode, TState, _>(
-                    state.clone(),
-                    color,
-                    &mut get_rng(),
-                );
-                thread_results
-                    .lock()
-                    .expect("Could not lock results")
-                    .push(result);
-            });
-        }
-    })
-    .unwrap();
-
-    let mut all_thread_results = thread_results.into_inner().unwrap();
-
-    // let mut all_thread_results = (0..thread_count)
-    //     .into_par_iter()
-    //     .map(|_| tree_search::mcts_result::<TNode, TState, _>(state.clone(), color, &mut get_rng()))
-    //     .collect::<Vec<_>>();
-    let elapsed = now.elapsed();
-
-    // Make a result that is the aggregation of the many results
-    let mut first_thread_result = all_thread_results.remove(0);
-
-    for mut each_action_result in first_thread_result.iter_mut() {
-        for other_threads_results in &all_thread_results {
-            let same_move_result = other_threads_results
-                .iter()
-                .find(|&r| r.action == each_action_result.action)
-                .expect("All results must contain the same moves.");
-
-            each_action_result.plays += same_move_result.plays;
-            each_action_result.wins += same_move_result.wins;
-        }
-    }
-
-    let total_plays = first_thread_result.iter().map(|r| r.plays).sum::<usize>();
-    dbg!(total_plays);
-
-    let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
-    println!("Plays per sec: {:.0}", plays_per_sec);
-
-    for action_result in &first_thread_result {
-        let sat_display = if action_result.is_saturated {
-            "(S)"
-        } else {
-            ""
-        };
-
-        println!(
-            "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
-            action_result.action,
-            action_result.plays,
-            action_result.wins,
-            action_result.wins as f32 / action_result.plays as f32,
-            sat_display,
-        );
-    }
-
-    if first_thread_result.iter().all(|r| r.is_saturated) {
-        first_thread_result
+    if results.iter().all(|r| r.is_saturated) {
+        results
             .iter()
             .max_by_key(|r| (r.wins * 10000) / r.plays)
             .expect("Must have been a max result")
             .clone()
     } else {
-        first_thread_result
+        results
             .iter()
             .max_by_key(|r| r.plays)
             .expect("Must have been a max result")
             .clone()
     }
 }
+
+// fn perform_mcts_multithreaded<TNode, TState>(
+//     state: &TState,
+//     player_color: PlayerColor,
+//     thread_count: usize,
+// ) -> MctsResult<TState>
+// where
+//     TNode: Node<Data = MctsData<TState>>,
+//     TState: GameState + Sync,
+// {
+//     let thread_results = Mutex::new(Vec::new());
+
+//     let now = Instant::now();
+//     thread::scope(|s| {
+//         for _ in 0..thread_count {
+//             s.spawn(|_| {
+//                 let result = tree_search::mcts_result::<TNode, TState, _>(
+//                     state.clone(),
+//                     player_color,
+//                     &mut get_rng(),
+//                 );
+//                 thread_results
+//                     .lock()
+//                     .expect("Could not lock results")
+//                     .push(result);
+//             });
+//         }
+//     })
+//     .unwrap();
+//     let elapsed = now.elapsed();
+
+//     let mut all_thread_results = thread_results.into_inner().unwrap();
+
+//     // Make a result that is the aggregation of the many results
+//     let mut first_thread_result = all_thread_results.remove(0);
+
+//     for mut each_action_result in first_thread_result.iter_mut() {
+//         for other_threads_results in &all_thread_results {
+//             let same_move_result = other_threads_results
+//                 .iter()
+//                 .find(|&r| r.action == each_action_result.action)
+//                 .expect("All results must contain the same moves.");
+
+//             each_action_result.plays += same_move_result.plays;
+//             each_action_result.wins += same_move_result.wins;
+//         }
+//     }
+
+//     let total_plays = first_thread_result.iter().map(|r| r.plays).sum::<usize>();
+//     dbg!(total_plays);
+
+//     let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
+//     println!("Plays per sec: {:.0}", plays_per_sec);
+
+//     for action_result in &first_thread_result {
+//         let sat_display = if action_result.is_saturated {
+//             "(S)"
+//         } else {
+//             ""
+//         };
+
+//         println!(
+//             "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
+//             action_result.action,
+//             action_result.plays,
+//             action_result.wins,
+//             action_result.wins as f32 / action_result.plays as f32,
+//             sat_display,
+//         );
+//     }
+
+//     if first_thread_result.iter().all(|r| r.is_saturated) {
+//         first_thread_result
+//             .iter()
+//             .max_by_key(|r| (r.wins * 10000) / r.plays)
+//             .expect("Must have been a max result")
+//             .clone()
+//     } else {
+//         first_thread_result
+//             .iter()
+//             .max_by_key(|r| r.plays)
+//             .expect("Must have been a max result")
+//             .clone()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -183,8 +207,8 @@ mod tests {
 
     #[test]
     fn tree_search_always_picks_winning_move() {
-        let black_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::Black);
-        let white_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::White);
+        let black_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::Black);
+        let white_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::White);
 
         let mut game = TicTacToe::new(white_agent, black_agent);
 
@@ -226,7 +250,7 @@ mod tests {
         assert_eq!(state.current_player_turn(), PlayerColor::Black);
         let legal_moves = state.legal_moves(PlayerColor::Black);
 
-        let test_black_agent: MctsAgent<_, RcNode<_>> = MctsAgent::new(PlayerColor::Black);
+        let test_black_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::Black);
         let mcts_chosen_move = test_black_agent.pick_move(state, &legal_moves);
 
         // The agent MUST pick the winning move:

@@ -323,14 +323,14 @@ pub mod tests {
 
     use std::str::FromStr;
 
-    use monte_carlo_tree::rc_tree::RcNode;
+    use monte_carlo_tree::arc_tree::ArcNode;
 
     fn make_test_state() -> impl GameState {
         TicTacToeState::initial_state()
     }
 
     fn make_node<G: GameState>(data: MctsData<G>) -> impl Node<Data = MctsData<G>> {
-        RcNode::new_root(data)
+        ArcNode::new_root(data)
     }
 
     fn make_test_data() -> MctsData<impl GameState> {
@@ -400,7 +400,7 @@ pub mod tests {
 
     #[test]
     fn expand_expects_creates_children() {
-        let tree_root = RcNode::new_root(make_test_data());
+        let tree_root = ArcNode::new_root(make_test_data());
 
         let expanded_children = expand(&tree_root)
             .expect("must have children")
@@ -414,7 +414,7 @@ pub mod tests {
 
     #[test]
     fn expand_expects_adds_children_to_parent() {
-        let tree_root = RcNode::new_root(make_test_data());
+        let tree_root = ArcNode::new_root(make_test_data());
 
         assert_eq!(0, tree_root.children().into_iter().count());
 
@@ -427,7 +427,7 @@ pub mod tests {
 
     #[test]
     fn expand_expects_marks_node_expanded() {
-        let tree_root = RcNode::new_root(make_test_data());
+        let tree_root = ArcNode::new_root(make_test_data());
 
         assert!(!tree_root.data().is_expanded());
 
@@ -438,7 +438,7 @@ pub mod tests {
 
     #[test]
     fn expand_expects_updates_children_count() {
-        let tree_root = RcNode::new_root(make_test_data());
+        let tree_root = ArcNode::new_root(make_test_data());
 
         assert_eq!(0, tree_root.data().children_count());
 
@@ -451,22 +451,22 @@ pub mod tests {
     fn select_child_max_score_expects_picks_less_explored_node() {
         let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
 
-        let tree_root = RcNode::new_root(data.clone());
+        let tree_root = ArcNode::new_root(data.clone());
 
         let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_1: &RcNode<_> = child_level_1.borrow();
+        let child_level_1: &ArcNode<_> = child_level_1.borrow();
 
         let child_level_2 = child_level_1.new_child(data.clone());
-        let child_level_2: &RcNode<_> = child_level_2.borrow();
+        let child_level_2: &ArcNode<_> = child_level_2.borrow();
 
         let child_level_3_handle = child_level_2.new_child(data.clone());
-        let child_level_3: &RcNode<_> = child_level_3_handle.borrow();
+        let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
 
         let child_level_4 = child_level_3.new_child(data.clone());
-        let child_level_4: &RcNode<_> = child_level_4.borrow();
+        let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
         let child_level_4b = child_level_3.new_child(data.clone());
-        let child_level_4b: &RcNode<_> = child_level_4b.borrow();
+        let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
 
         child_level_1.data().set_children_count(1);
         child_level_2.data().set_children_count(1);
@@ -483,13 +483,13 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score_inverted::<RcNode<_>, TicTacToeState>(
+        let selected = select_child_max_score_inverted::<ArcNode<_>, TicTacToeState>(
             &child_level_3_handle,
             PlayerColor::Black,
         )
         .expect("the child should have been selected.");
 
-        let selected: &RcNode<_> = selected.borrow();
+        let selected: &ArcNode<_> = selected.borrow();
 
         assert_eq!(1, selected.data().plays());
     }
@@ -672,8 +672,8 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
-        let root: &RcNode<_> = root_handle.borrow();
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
 
         assert!(
             !root.data().is_saturated(),
@@ -701,8 +701,8 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
-        let root: &RcNode<_> = root_handle.borrow();
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
 
@@ -713,7 +713,7 @@ pub mod tests {
 
         let mut traversal = vec![root.get_handle()];
         while let Some(n) = traversal.pop() {
-            let node: &RcNode<_> = n.borrow();
+            let node: &ArcNode<_> = n.borrow();
 
             let node_play_count = node.data().plays();
             let child_play_sum: usize = node.children().into_iter().map(|c| c.data().plays()).sum();
@@ -742,8 +742,8 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = RcNode::new_root(MctsData::new(state, 0, 0, None));
-        let root: &RcNode<_> = root_handle.borrow();
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::Black, &mut util::get_rng_deterministic());
 
@@ -754,7 +754,7 @@ pub mod tests {
 
         let mut traversal = vec![root.get_handle()];
         while let Some(n) = traversal.pop() {
-            let node: &RcNode<_> = n.borrow();
+            let node: &ArcNode<_> = n.borrow();
 
             if node.children().is_empty() {
                 assert_eq!(
