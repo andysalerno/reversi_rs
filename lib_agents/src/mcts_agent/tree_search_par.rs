@@ -1,18 +1,14 @@
 use crate::util;
 
+use crossbeam::thread;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::dot_visualize::TreeToDotFileFormat;
-use monte_carlo_tree::{
-    monte_carlo_data::MctsResult,
-    amonte_carlo_data::AMctsData,
-    tree::Node,
-};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
 use std::borrow::Borrow;
-use std::time::{Duration, Instant};
-use crossbeam::thread;
-use std::marker::{Sync, Send};
 use std::clone::Clone;
+use std::marker::{Send, Sync};
+use std::time::{Duration, Instant};
 
 // todo: mcts() should return the actual winning node,
 // and if the subtree from the root is saturated
@@ -243,7 +239,8 @@ where
                 mcts_loop(root, player_color);
             });
         }
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)

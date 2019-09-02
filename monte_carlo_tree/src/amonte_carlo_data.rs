@@ -1,8 +1,8 @@
+use crate::monte_carlo_data::MctsResult;
 use lib_boardgame::{GameResult, GameState};
 use std::fmt;
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::RwLock;
-use crate::monte_carlo_data::MctsResult;
 
 /// MCTS-related data that every Node will have.
 #[derive(Default)]
@@ -66,10 +66,12 @@ impl<T: GameState> AMctsData<T> {
     }
 
     pub fn increment_saturated_children_count(&self) {
-        self.children_saturated_count
-            .fetch_add(1, Ordering::SeqCst);
+        self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
 
-        debug_assert!(self.children_saturated_count.load(Ordering::SeqCst) <= self.children_count.load(Ordering::SeqCst));
+        debug_assert!(
+            self.children_saturated_count.load(Ordering::SeqCst)
+                <= self.children_count.load(Ordering::SeqCst)
+        );
     }
 
     pub fn state(&self) -> &T {
@@ -126,7 +128,10 @@ impl<T: GameState> AMctsData<T> {
     }
 
     pub fn set_end_state_result(&self, result: GameResult) {
-        let mut writable = self.end_state_result.write().expect("Could not lock game result for writing.");
+        let mut writable = self
+            .end_state_result
+            .write()
+            .expect("Could not lock game result for writing.");
         *writable = Some(result);
     }
 }

@@ -5,12 +5,12 @@ use crate::util::get_rng;
 use crossbeam::thread;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node, arc_tree::ArcNode,
+    amonte_carlo_data::AMctsData, arc_tree::ArcNode, monte_carlo_data::MctsResult, tree::Node,
 };
 use std::marker::PhantomData;
+use std::marker::Sync;
 use std::sync::Mutex;
 use std::time::Instant;
-use std::marker::Sync;
 
 pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
 where
@@ -92,10 +92,7 @@ where
     TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
-    let results = tree_search_par::mcts_result::<TNode, TState>(
-        state.clone(),
-        player_color,
-    );
+    let results = tree_search_par::mcts_result::<TNode, TState>(state.clone(), player_color);
 
     if results.iter().all(|r| r.is_saturated) {
         results
