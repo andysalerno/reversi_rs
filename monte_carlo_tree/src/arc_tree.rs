@@ -15,7 +15,6 @@ pub struct ArcNodeContent<T> {
 pub type ArcNode<T> = Arc<ArcNodeContent<T>>;
 
 impl<T> Node for ArcNode<T> {
-    type ChildrenIter = Vec<Self>;
     type Handle = Self;
     type Data = T;
 
@@ -31,13 +30,8 @@ impl<T> Node for ArcNode<T> {
         self.parent.upgrade().clone()
     }
 
-    fn children(&self) -> Self::ChildrenIter {
-        // TODO: perhaps this can return a borrowed slice instead,
-        // if the borrow checker will allow.
-        let readable_children = self.children.read().expect("Couldn't lock node children for reading.");
-        let c: Vec<Self> = readable_children.iter().cloned().collect();
-
-        c
+    fn children(&self) -> &Vec<Self> {
+        panic!("Use ANode::children_locked() instead.")
     }
 
     fn new_child(&self, data: T) -> ArcNode<T> {
@@ -63,8 +57,8 @@ impl<T> Node for ArcNode<T> {
 }
 
 impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {
-    fn children_write_lock(&self) -> std::sync::RwLockWriteGuard<Self::ChildrenIter> {
-        self.children.write().expect("Couldn't lock children for writing.")
+    fn children_locked(&self) -> &RwLock<Vec<Self>> {
+        &self.children
     }
 }
 

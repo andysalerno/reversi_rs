@@ -2,15 +2,14 @@ use std::borrow::Borrow;
 
 /// A tree node that can hold data, and refer to
 /// its parent and children.
-pub trait Node {
-    type ChildrenIter: IntoIterator<Item = Self::Handle>;
+pub trait Node: Sized {
     type Handle: Borrow<Self> + Clone;
     type Data;
 
     fn data(&self) -> &Self::Data;
     fn parent(&self) -> Option<Self::Handle>;
     fn get_handle(&self) -> Self::Handle;
-    fn children(&self) -> Self::ChildrenIter;
+    fn children(&self) -> &Vec<Self::Handle>;
 
     fn new_child(&self, state: Self::Data) -> Self::Handle;
     fn new_root(state: Self::Data) -> Self::Handle;
@@ -24,7 +23,6 @@ mod tests {
     struct TestNode;
 
     impl Node for TestNode {
-        type ChildrenIter = Vec<Self>;
         type Handle = Self;
         type Data = Option<()>;
 
@@ -37,8 +35,8 @@ mod tests {
         fn get_handle(&self) -> Self::Handle {
             unimplemented!()
         }
-        fn children(&self) -> Self::ChildrenIter {
-            Vec::new()
+        fn children(&self) -> &Vec<Self> {
+            &Vec::new()
         }
         fn new_child(&self, _state: Self::Data) -> Self {
             unimplemented!()

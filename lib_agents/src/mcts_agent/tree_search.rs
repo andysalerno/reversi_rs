@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 3_000;
 
-fn expand<TNode, TState>(node: &TNode) -> Option<TNode::ChildrenIter>
+fn expand<TNode, TState>(node: &TNode) -> Option<Vec<TNode::Handle>>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -48,7 +48,7 @@ where
         let _child_node = node.new_child(data);
     }
 
-    Some(node.children())
+    Some(node.children().into_iter().cloned().collect())
 }
 
 /// Increment this node's count of saturated children.
@@ -163,7 +163,7 @@ where
             let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
-        })
+        }).and_then(|n: TNode| Some(n.get_handle()))
 }
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
