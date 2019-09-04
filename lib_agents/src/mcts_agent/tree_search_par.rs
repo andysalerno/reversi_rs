@@ -45,7 +45,10 @@ where
         let _child_node = node.new_child(data);
     }
 
-    Some(node.children().clone())
+    let children = node.children_locked().read().unwrap();
+    let children_handles = children.iter().map(|c| c.get_handle()).collect();
+
+    Some(children_handles)
 }
 
 /// Increment this node's count of saturated children.
