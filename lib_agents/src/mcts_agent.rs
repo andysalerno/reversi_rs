@@ -1,4 +1,3 @@
-pub mod tree_search;
 pub mod tree_search_par;
 
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
@@ -36,7 +35,7 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
-    TNode: ANode<Data = AMctsData<TState>> + Sync,
+    TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState + Sync,
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {

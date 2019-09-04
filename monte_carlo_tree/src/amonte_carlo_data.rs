@@ -6,7 +6,10 @@ use std::sync::RwLock;
 
 /// MCTS-related data that every Node will have.
 #[derive(Default)]
-pub struct AMctsData<T: GameState> {
+pub struct AMctsData<T>
+where
+    T: GameState,
+{
     state: T,
     plays: AtomicUsize,
     wins: AtomicUsize,
@@ -17,6 +20,40 @@ pub struct AMctsData<T: GameState> {
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
+}
+
+impl<TState> Clone for AMctsData<TState>
+where
+    TState: GameState,
+{
+    fn clone(&self) -> Self {
+        let end_state_result = self
+            .end_state_result
+            .read()
+            .expect("Couldn't acquire read lock on end state result.");
+        let end_state_result = RwLock::new(*end_state_result);
+
+        let plays = clone_atomic_usize(&self.plays);
+        let wins = clone_atomic_usize(&self.wins);
+        let children_count = clone_atomic_usize(&self.children_count);
+        let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
+
+        Self {
+            state: self.state.clone(),
+            action: self.action,
+            end_state_result,
+            plays,
+            wins,
+            children_count,
+            children_saturated_count,
+            is_expanded: AtomicBool::new(self.is_expanded()),
+        }
+    }
+}
+
+fn clone_atomic_usize(atom: &AtomicUsize) -> AtomicUsize {
+    let raw = atom.load(Ordering::SeqCst);
+    AtomicUsize::new(raw)
 }
 
 impl<TState> From<&AMctsData<TState>> for MctsResult<TState>
@@ -34,7 +71,10 @@ where
     }
 }
 
-impl<T: GameState> AMctsData<T> {
+impl<T> AMctsData<T>
+where
+    T: GameState,
+{
     pub fn increment_plays(&self) {
         self.plays.fetch_add(1, Ordering::Relaxed);
     }
@@ -135,7 +175,10 @@ impl<T: GameState> AMctsData<T> {
     }
 }
 
-impl<T: GameState + fmt::Display> fmt::Display for AMctsData<T> {
+impl<T> fmt::Display for AMctsData<T>
+where
+    T: GameState + fmt::Display,
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.state())
     }

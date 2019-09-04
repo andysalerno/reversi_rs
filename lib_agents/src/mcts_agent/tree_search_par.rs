@@ -313,3 +313,461 @@ where
 
     dbg!(sim_count);
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use monte_carlo_tree::tree::Node;
+
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::{TicTacToeAction, TicTacToeState};
+
+    use std::str::FromStr;
+
+    use monte_carlo_tree::arc_tree::ArcNode;
+
+    fn make_test_state() -> impl GameState {
+        TicTacToeState::initial_state()
+    }
+
+    fn make_node<G>(data: AMctsData<G>) -> impl ANode<Data = AMctsData<G>>
+       where G: GameState + Sync,
+        G::Move: Sync
+     {
+        ArcNode::new_root(data)
+    }
+
+    fn make_test_data() -> AMctsData<TicTacToeState> {
+        AMctsData::new(TicTacToeState::initial_state(), 0, 0, None)
+    }
+
+    #[test]
+    fn new_child_expects_add_child_to_parent() {
+        let data = make_test_data();
+        let tree_root = make_node(data.clone());
+        let child = tree_root.new_child(data.clone());
+
+        assert_eq!(1, tree_root.children().into_iter().count());
+        assert!(child.borrow().parent().is_some());
+        assert!(tree_root.parent().is_none());
+    }
+
+    #[test]
+    fn backprop_sim_results_when_black_wins_expects_update_plays_wins() {
+        let data = make_test_data();
+        let tree_root = make_node(data.clone());
+        let is_win = true;
+
+        backprop_sim_result(&tree_root, is_win);
+
+        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(1, tree_root.data().wins());
+    }
+
+    #[test]
+    fn backprop_sim_results_when_black_wins_expects_update_white_plays_not_wins() {
+        let data = make_test_data();
+        let tree_root = make_node(data.clone());
+        let is_win = false;
+
+        backprop_sim_result(&tree_root, is_win);
+
+        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(0, tree_root.data().wins());
+    }
+
+    #[test]
+    fn backprop_sim_results_expects_updates_to_root() {
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
+
+        let is_win = true;
+        backprop_sim_result(child_level_3.borrow(), is_win);
+
+        assert_eq!(1, child_level_3.borrow().data().plays());
+        assert_eq!(1, child_level_2.borrow().data().plays());
+        assert_eq!(1, child_level_1.borrow().data().plays());
+        assert_eq!(1, tree_root.data().plays());
+
+        assert_eq!(1, child_level_3.borrow().data().wins());
+        assert_eq!(1, child_level_2.borrow().data().wins());
+        assert_eq!(1, child_level_1.borrow().data().wins());
+        assert_eq!(1, tree_root.data().wins());
+
+        assert_eq!(0, child_level_4.borrow().data().plays());
+    }
+
+    #[test]
+    fn expand_expects_creates_children() {
+        let tree_root = ArcNode::new_root(make_test_data());
+
+        let expanded_children = expand(&tree_root)
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        // The game used for testing is TicTacToe,
+        // which has nine intitial legal children positions.
+        assert_eq!(9, expanded_children.len());
+    }
+
+    #[test]
+    fn expand_expects_adds_children_to_parent() {
+        let tree_root = ArcNode::new_root(make_test_data());
+
+        assert_eq!(0, tree_root.children().into_iter().count());
+
+        expand(&tree_root);
+
+        // The game used for testing is TicTacToe,
+        // which has nine intitial legal children positions.
+        assert_eq!(9, tree_root.children().into_iter().count());
+    }
+
+    #[test]
+    fn expand_expects_marks_node_expanded() {
+        let tree_root = ArcNode::new_root(make_test_data());
+
+        assert!(!tree_root.data().is_expanded());
+
+        expand(&tree_root);
+
+        assert!(tree_root.data().is_expanded());
+    }
+
+    #[test]
+    fn expand_expects_updates_children_count() {
+        let tree_root = ArcNode::new_root(make_test_data());
+
+        assert_eq!(0, tree_root.data().children_count());
+
+        expand(&tree_root);
+
+        assert_eq!(9, tree_root.data().children_count());
+    }
+
+    #[test]
+    fn select_child_max_score_expects_picks_less_explored_node() {
+        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
+
+        let tree_root = ArcNode::new_root(data.clone());
+
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_1: &ArcNode<_> = child_level_1.borrow();
+
+        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_2: &ArcNode<_> = child_level_2.borrow();
+
+        let child_level_3_handle = child_level_2.new_child(data.clone());
+        let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
+
+        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_4: &ArcNode<_> = child_level_4.borrow();
+
+        let child_level_4b = child_level_3.new_child(data.clone());
+        let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
+
+        child_level_1.data().set_children_count(1);
+        child_level_2.data().set_children_count(1);
+        child_level_3.data().set_children_count(2);
+        child_level_4.data().set_children_count(1);
+        child_level_4b.data().set_children_count(1);
+
+        let is_win = true;
+        backprop_sim_result(child_level_3, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4, is_win);
+        backprop_sim_result(child_level_4b, is_win);
+
+        assert!(!child_level_3.data().is_saturated());
+
+        let selected = select_child_max_score_inverted::<ArcNode<_>, TicTacToeState>(
+            &child_level_3_handle,
+            PlayerColor::Black,
+        )
+        .expect("the child should have been selected.");
+
+        let selected: &ArcNode<_> = selected.borrow();
+
+        assert_eq!(1, selected.data().plays());
+    }
+
+    #[test]
+    fn select_to_leaf_expects_selects_less_explored_path() {
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
+        let child_level_4b = child_level_3.borrow().new_child(data.clone());
+
+        tree_root.data().set_children_count(1);
+        child_level_1.borrow().data().set_children_count(1);
+        child_level_2.borrow().data().set_children_count(1);
+        child_level_3.borrow().data().set_children_count(2);
+        child_level_4.borrow().data().set_children_count(2);
+        child_level_4b.borrow().data().set_children_count(2);
+
+        let is_win = true;
+        backprop_sim_result(child_level_3.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4.borrow(), is_win);
+        backprop_sim_result(child_level_4b.borrow(), is_win);
+        backprop_sim_result(child_level_4b.borrow(), is_win);
+
+        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
+
+        let leaf = leaf.borrow();
+
+        assert_eq!(2, leaf.data().plays());
+    }
+
+    #[test]
+    fn select_to_leaf_expects_when_already_leaf_returns_self() {
+        let data = AMctsData::new(TicTacToeState::initial_state(), 10, 10, None);
+
+        let tree_root = make_node(data.clone());
+
+        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
+        let leaf = leaf.borrow();
+
+        assert_eq!(10, leaf.data().plays());
+        assert_eq!(10, leaf.data().wins());
+    }
+
+    #[test]
+    fn backprop_saturation_expects_becomes_saturated_when_all_children_saturated() {
+        let data = {
+            let mut state = TicTacToeState::initial_state();
+
+            // ___
+            // ___
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,0").unwrap());
+
+            // ___
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
+
+            // __X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("2,2").unwrap());
+
+            // O_X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,2").unwrap());
+
+            // O_X
+            // _O_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("2,0").unwrap());
+
+            // O_X
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("0,1").unwrap());
+
+            // OXX
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("1,2").unwrap());
+
+            // OXX
+            // OO_
+            // XOX
+            state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
+
+            AMctsData::new(state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        let children = expand(tree_root.borrow())
+            .expect("must have children")
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        assert!(
+            !tree_root.data().is_saturated(),
+            "Every child is saturated, but not every child has had its saturation status backpropagated, so the root should not be considered saturated."
+        );
+
+        // backprop the one remaining child.
+        expand(children[0].borrow());
+        backprop_saturation(children[0].borrow());
+
+        assert!(
+            tree_root.data().is_saturated(),
+            "Now that every child has had its saturation backpropagated, the parent should be considered saturated as well."
+        );
+    }
+
+    #[test]
+    #[allow(clippy::unreadable_literal)]
+    #[allow(clippy::float_cmp)]
+    fn score_node_expects_always_prefers_univisted_node() {
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+
+        // all children of the same parent
+        let child_a = tree_root.new_child(data.clone());
+        let child_b = tree_root.new_child(data.clone());
+        let child_c = tree_root.new_child(data.clone());
+        let child_d = tree_root.new_child(data.clone());
+
+        // "visit" each child a different amount of times
+        // child a: three visits
+        let is_win = false;
+        backprop_sim_result(child_a.borrow(), is_win);
+        backprop_sim_result(child_a.borrow(), is_win);
+        backprop_sim_result(child_a.borrow(), is_win);
+
+        // child b: two visits
+        backprop_sim_result(child_b.borrow(), is_win);
+        backprop_sim_result(child_b.borrow(), is_win);
+
+        // child c: one visit
+        backprop_sim_result(child_c.borrow(), is_win);
+
+        assert_eq!(1.0929347, score_node_pessimistic(child_a.borrow(), true));
+        assert_eq!(1.3385662, score_node_pessimistic(child_b.borrow(), true));
+        assert_eq!(1.8930184, score_node_pessimistic(child_c.borrow(), true));
+        assert_eq!(
+            340282350000000000000000000000000000000f32,
+            score_node_pessimistic(child_d.borrow(), true)
+        );
+    }
+
+    #[test]
+    fn simulate_runs_to_completion_and_terminates() {
+        let mut initial_state = make_test_state();
+        initial_state.initialize_board();
+        let data = make_test_data();
+
+        let tree_root = make_node(data.clone());
+
+        let _sim_result = simulate(&tree_root, &mut crate::util::get_rng_deterministic());
+    }
+
+    #[test]
+    fn mcts_when_sufficient_resources_expects_saturates_root_node() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        assert!(
+            !root.data().is_saturated(),
+            "The node must not be saturated to begin with."
+        );
+
+        mcts(root, PlayerColor::Black, 1);
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated after sufficient MCTS traversal. (Is the test being run with an adequate amount of simulations?)"
+        );
+    }
+
+    #[test]
+    fn mcts_expects_parent_play_count_sum_children_play_counts() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        mcts(root, PlayerColor::Black, 1);
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated for this test to be valid. (Is the test being run with an adequate amount of simulations?)"
+        );
+
+        let mut traversal = vec![root.get_handle()];
+        while let Some(n) = traversal.pop() {
+            let node: &ArcNode<_> = n.borrow();
+
+            let node_play_count = node.data().plays();
+            let child_play_sum: usize = node.children().into_iter().map(|c| c.data().plays()).sum();
+
+            assert!(
+                // Note: this is a bit of a hack right now, they should be exactly equal
+                // but the root node is a special case that doesn't ever get played itself, only its children.
+                node_play_count - child_play_sum <= 1,
+                "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
+            );
+
+            traversal.extend(node.children().clone());
+        }
+    }
+
+    #[test]
+    fn mcts_when_root_saturated_expects_all_terminals_played_exactly_once() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        mcts(root, PlayerColor::Black, 1);
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated for this test to be valid. (Is the test being run with an adequate amount of simulations?)"
+        );
+
+        let mut traversal = vec![root.get_handle()];
+        while let Some(n) = traversal.pop() {
+            let node: &ArcNode<_> = n.borrow();
+
+            if node.children().is_empty() {
+                assert_eq!(
+                    node.data().plays(),
+                    1,
+                    "A terminal node with no children must have been played exactly one time."
+                );
+            }
+
+            traversal.extend(node.children().clone());
+        }
+    }
+}
