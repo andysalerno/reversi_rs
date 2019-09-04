@@ -154,13 +154,13 @@ where
 
     child_nodes
         .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .max_by(|a, b| {
+        .filter(|&n| !n.borrow().data().is_saturated())
+        .max_by(|&a, &b| {
             let a_score = score_node_pessimistic(a.borrow(), parent_is_player_color);
             let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
-        }).into()
+        }).and_then(|n| Some(n.clone()))
 }
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
@@ -202,7 +202,7 @@ where
 
     mcts(root, player_color, thread_count);
 
-    let mut state_children = root.children().into_iter().collect::<Vec<_>>();
+    let mut state_children = root.children().clone();
 
     if root.data().is_saturated() {
         state_children

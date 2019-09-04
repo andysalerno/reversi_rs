@@ -157,13 +157,13 @@ where
 
     child_nodes
         .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .max_by(|a, b| {
+        .filter(|&n| !n.borrow().data().is_saturated())
+        .max_by(|&a, &b| {
             let a_score = score_node_pessimistic(a.borrow(), parent_is_player_color);
             let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
-        }).and_then(|n: TNode| Some(n.get_handle()))
+        }).and_then(|n| Some(n.clone()))
 }
 
 fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
@@ -222,13 +222,13 @@ where
 
     if root.data().is_saturated() {
         state_children
-            .sort_by_key(|c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
+            .sort_by_key(|&c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
     } else {
-        state_children.sort_by_key(|c| c.borrow().data().plays());
+        state_children.sort_by_key(|&c| c.borrow().data().plays());
     };
 
     // Regardless of any other metric, actions that win the game are always preferred.
-    state_children.sort_by_key(|c| {
+    state_children.sort_by_key(|&c| {
         if let Some(result) = c.borrow().data().end_state_result() {
             result.is_win_for_player(player_color)
         } else {
@@ -725,7 +725,7 @@ pub mod tests {
                 "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
             );
 
-            traversal.extend(node.children());
+            traversal.extend(node.children().clone());
         }
     }
 
@@ -764,7 +764,7 @@ pub mod tests {
                 );
             }
 
-            traversal.extend(node.children());
+            traversal.extend(node.children().clone());
         }
     }
 }

@@ -124,8 +124,7 @@ mod tests {
                     while let Some(walker) = node_queue.pop() {
                         walker.data().increment_visits();
 
-                        let children = walker.children();
-                        let children = children.into_iter().collect::<Vec<_>>();
+                        let children = walker.children().clone();
 
                         node_queue.extend(children);
                     }

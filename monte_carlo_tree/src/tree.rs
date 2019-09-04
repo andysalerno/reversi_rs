@@ -20,7 +20,9 @@ mod tests {
     use super::*;
 
     #[derive(Clone)]
-    struct TestNode;
+    struct TestNode {
+        children: Vec<Self>
+    }
 
     impl Node for TestNode {
         type Handle = Self;
@@ -36,7 +38,7 @@ mod tests {
             unimplemented!()
         }
         fn children(&self) -> &Vec<Self> {
-            &Vec::new()
+            &self.children
         }
         fn new_child(&self, _state: Self::Data) -> Self {
             unimplemented!()
@@ -47,7 +49,9 @@ mod tests {
     }
 
     fn stub() -> impl Node {
-        TestNode
+        TestNode {
+            children: Vec::new()
+        }
     }
 
     #[test]
