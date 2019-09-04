@@ -56,7 +56,7 @@ fn depth_first_tree_walk<T, TState>(
     // Add the label for this node
     node_labels_buf.push_str(&label_str);
 
-    for child in node.children() {
+    for child in node.children_handles() {
         let child_label = node_label(child.borrow());
         let child_id = hash_str(&child_label).wrapping_add(id);
 

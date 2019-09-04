@@ -153,12 +153,12 @@ where
     // TODO: If the only play is "pass turn", then even if parent color is enemy, don't be pessimistic
     // since being forced to pass a turn is very bad for the enemy and good for the player
     let parent_is_player_color = root.borrow().data().state().current_player_turn() == player_color;
-    let child_nodes = root.children();
+    let child_nodes = root.children_handles();
 
     child_nodes
         .into_iter()
-        .filter(|&n| !n.borrow().data().is_saturated())
-        .max_by(|&a, &b| {
+        .filter(|n| !n.borrow().data().is_saturated())
+        .max_by(|a, b| {
             let a_score = score_node_pessimistic(a.borrow(), parent_is_player_color);
             let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
 
@@ -205,7 +205,7 @@ where
 
     mcts(root, player_color, thread_count);
 
-    let mut state_children = root.children().clone();
+    let mut state_children = root.children_handles();
 
     if root.data().is_saturated() {
         state_children
@@ -349,7 +349,7 @@ pub mod tests {
         let tree_root = make_node(data.clone());
         let child = tree_root.new_child(data.clone());
 
-        assert_eq!(1, tree_root.children().into_iter().count());
+        assert_eq!(1, tree_root.children_handles().len());
         assert!(child.borrow().parent().is_some());
         assert!(tree_root.parent().is_none());
     }
@@ -422,13 +422,13 @@ pub mod tests {
     fn expand_expects_adds_children_to_parent() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        assert_eq!(0, tree_root.children().into_iter().count());
+        assert_eq!(0, tree_root.children_handles().len());
 
         expand(&tree_root);
 
         // The game used for testing is TicTacToe,
         // which has nine intitial legal children positions.
-        assert_eq!(9, tree_root.children().into_iter().count());
+        assert_eq!(9, tree_root.children_handles().len());
     }
 
     #[test]
@@ -722,7 +722,7 @@ pub mod tests {
             let node: &ArcNode<_> = n.borrow();
 
             let node_play_count = node.data().plays();
-            let child_play_sum: usize = node.children().into_iter().map(|c| c.data().plays()).sum();
+            let child_play_sum: usize = node.children_handles().into_iter().map(|c| c.data().plays()).sum();
 
             assert!(
                 // Note: this is a bit of a hack right now, they should be exactly equal
@@ -731,7 +731,7 @@ pub mod tests {
                 "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
             );
 
-            traversal.extend(node.children().clone());
+            traversal.extend(node.children_handles());
         }
     }
 
@@ -762,7 +762,7 @@ pub mod tests {
         while let Some(n) = traversal.pop() {
             let node: &ArcNode<_> = n.borrow();
 
-            if node.children().is_empty() {
+            if node.children_handles().is_empty() {
                 assert_eq!(
                     node.data().plays(),
                     1,
@@ -770,7 +770,7 @@ pub mod tests {
                 );
             }
 
-            traversal.extend(node.children().clone());
+            traversal.extend(node.children_handles());
         }
     }
 }

@@ -1,7 +1,7 @@
 use crate::tree::Node;
 use crate::atree::ANode;
 
-use std::sync::RwLock;
+use std::sync::{RwLockReadGuard, RwLockWriteGuard, RwLock};
 use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
@@ -30,8 +30,18 @@ impl<T> Node for ArcNode<T> {
         self.parent.upgrade().clone()
     }
 
-    fn children(&self) -> &Vec<Self> {
-        panic!("Use ANode::children_locked() instead.")
+    fn children_lock_read(&self) -> RwLockReadGuard<Vec<Self::Handle>> {
+        self.children.read().expect("Couldn't acquire children read lock")
+    }
+
+    fn children_lock_write(&self) -> RwLockWriteGuard<Vec<Self::Handle>> {
+        self.children.write().expect("Couldn't acquire children read lock")
+    }
+
+    fn children_handles(&self) -> Vec<Self::Handle> {
+        let children_read = self.children_lock_read();
+
+        children_read.iter().map(|c| c.get_handle()).collect()
     }
 
     fn new_child(&self, data: T) -> ArcNode<T> {
@@ -97,11 +107,11 @@ mod tests {
         let root_child_b = root.new_child(DummyData::new());
         let root_child_b_child1 = root_child_b.new_child(DummyData::new());
 
-        assert_eq!(2, root.children().into_iter().count());
-        assert_eq!(1, root_child_a.children().into_iter().count());
-        assert_eq!(0, root_child_a_child1.children().into_iter().count());
-        assert_eq!(1, root_child_b.children().into_iter().count());
-        assert_eq!(0, root_child_b_child1.children().into_iter().count());
+        assert_eq!(2, root.children_handles().into_iter().count());
+        assert_eq!(1, root_child_a.children_handles().into_iter().count());
+        assert_eq!(0, root_child_a_child1.children_handles().into_iter().count());
+        assert_eq!(1, root_child_b.children_handles().into_iter().count());
+        assert_eq!(0, root_child_b_child1.children_handles().into_iter().count());
     }
 
     #[test]
@@ -124,7 +134,7 @@ mod tests {
                     while let Some(walker) = node_queue.pop() {
                         walker.data().increment_visits();
 
-                        let children = walker.children().clone();
+                        let children = walker.children_handles().clone();
 
                         node_queue.extend(children);
                     }
