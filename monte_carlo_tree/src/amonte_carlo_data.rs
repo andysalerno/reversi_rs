@@ -135,8 +135,8 @@ where
             action,
 
             // TODO: why can't I use the sugar `..Default::default()` for the remaining??
-            plays: AtomicUsize::default(),
-            wins: AtomicUsize::default(),
+            plays: AtomicUsize::new(plays),
+            wins: AtomicUsize::new(wins),
             is_expanded: Default::default(),
             children_count: Default::default(),
             children_saturated_count: Default::default(),
