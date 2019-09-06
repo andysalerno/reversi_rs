@@ -41,7 +41,7 @@ where
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
             PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 1),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 2),
         };
 
         let white_wins = if self.color == PlayerColor::White {

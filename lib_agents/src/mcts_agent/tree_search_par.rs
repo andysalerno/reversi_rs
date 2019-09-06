@@ -20,6 +20,15 @@ where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
+    // Acquire the write lock on the children
+    let mut children_write_lock = node.children_lock_write();
+
+    if node.data().is_expanded() {
+        // Another thread beat us to the punch, so no work to do
+        drop(children_write_lock);
+        return Some(node.children_handles());
+    }
+
     node.data().mark_expanded();
 
     let state = node.data().state();
@@ -42,13 +51,10 @@ where
     for &action in legal_actions {
         let resulting_state = state.next_state(action);
         let data = AMctsData::new(resulting_state, 0, 0, Some(action));
-        let _child_node = node.new_child(data);
+        let _child_node = node.new_child(data, &mut children_write_lock);
     }
 
-    let children = node.children_locked().read().unwrap();
-    let children_handles = children.iter().map(|c| c.get_handle()).collect();
-
-    Some(children_handles)
+    Some((*children_write_lock).clone())
 }
 
 /// Increment this node's count of saturated children.
@@ -347,7 +353,7 @@ pub mod tests {
     fn new_child_expects_add_child_to_parent() {
         let data = make_test_data();
         let tree_root = make_node(data.clone());
-        let child = tree_root.new_child(data.clone());
+        let child = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
 
         assert_eq!(1, tree_root.children_handles().len());
         assert!(child.borrow().parent().is_some());
@@ -383,10 +389,10 @@ pub mod tests {
         let data = make_test_data();
 
         let tree_root = make_node(data.clone());
-        let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_2 = child_level_1.borrow().new_child(data.clone());
-        let child_level_3 = child_level_2.borrow().new_child(data.clone());
-        let child_level_4 = child_level_3.borrow().new_child(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone(), &mut child_level_1.borrow().children_lock_write());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone(), &mut child_level_2.borrow().children_lock_write());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
 
         let is_win = true;
         backprop_sim_result(child_level_3.borrow(), is_win);
@@ -459,19 +465,19 @@ pub mod tests {
 
         let tree_root = ArcNode::new_root(data.clone());
 
-        let child_level_1 = tree_root.new_child(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
         let child_level_1: &ArcNode<_> = child_level_1.borrow();
 
-        let child_level_2 = child_level_1.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone(), &mut child_level_1.children_lock_write());
         let child_level_2: &ArcNode<_> = child_level_2.borrow();
 
-        let child_level_3_handle = child_level_2.new_child(data.clone());
+        let child_level_3_handle = child_level_2.new_child(data.clone(), &mut child_level_2.children_lock_write());
         let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
 
-        let child_level_4 = child_level_3.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
         let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
-        let child_level_4b = child_level_3.new_child(data.clone());
+        let child_level_4b = child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
         let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
 
         child_level_1.data().set_children_count(1);
@@ -505,11 +511,11 @@ pub mod tests {
         let data = make_test_data();
 
         let tree_root = make_node(data.clone());
-        let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_2 = child_level_1.borrow().new_child(data.clone());
-        let child_level_3 = child_level_2.borrow().new_child(data.clone());
-        let child_level_4 = child_level_3.borrow().new_child(data.clone());
-        let child_level_4b = child_level_3.borrow().new_child(data.clone());
+        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_level_2 = child_level_1.borrow().new_child(data.clone(), &mut child_level_1.borrow().children_lock_write());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone(), &mut child_level_2.borrow().children_lock_write());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
+        let child_level_4b = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
 
         tree_root.data().set_children_count(1);
         child_level_1.borrow().data().set_children_count(1);
@@ -626,10 +632,10 @@ pub mod tests {
         let tree_root = make_node(data.clone());
 
         // all children of the same parent
-        let child_a = tree_root.new_child(data.clone());
-        let child_b = tree_root.new_child(data.clone());
-        let child_c = tree_root.new_child(data.clone());
-        let child_d = tree_root.new_child(data.clone());
+        let child_a = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_b = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_c = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_d = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
 
         // "visit" each child a different amount of times
         // child a: three visits

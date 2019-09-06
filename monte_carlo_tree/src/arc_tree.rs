@@ -41,18 +41,17 @@ impl<T> Node for ArcNode<T> {
     fn children_handles(&self) -> Vec<Self::Handle> {
         let children_read = self.children_lock_read();
 
-        children_read.iter().map(|c| c.get_handle()).collect()
+        children_read.iter().cloned().collect()
     }
 
-    fn new_child(&self, data: T) -> ArcNode<T> {
+    fn new_child(&self, data: T, write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>) -> ArcNode<T> {
         let child = Arc::new(ArcNodeContent {
             parent: Arc::downgrade(self),
             children: RwLock::default(),
             data,
         });
 
-        let mut writable_children = self.children.write().expect("Couldn't lock node children for writing.");
-        writable_children.push(child.clone());
+        write_lock.push(child.clone());
 
         child
     }
@@ -101,11 +100,11 @@ mod tests {
     fn new_child_expects_can_add_children() {
         let root = ArcNode::new_root(DummyData::new());
 
-        let root_child_a = root.new_child(DummyData::new());
-        let root_child_a_child1 = root_child_a.new_child(DummyData::new());
+        let root_child_a = root.new_child(DummyData::new(), &mut root.children_lock_write());
+        let root_child_a_child1 = root_child_a.new_child(DummyData::new(), &mut root_child_a.children_lock_write());
 
-        let root_child_b = root.new_child(DummyData::new());
-        let root_child_b_child1 = root_child_b.new_child(DummyData::new());
+        let root_child_b = root.new_child(DummyData::new(), &mut root.children_lock_write());
+        let root_child_b_child1 = root_child_b.new_child(DummyData::new(), &mut root_child_b.children_lock_write());
 
         assert_eq!(2, root.children_handles().into_iter().count());
         assert_eq!(1, root_child_a.children_handles().into_iter().count());
@@ -119,12 +118,12 @@ mod tests {
         use crossbeam::thread;
 
         let r = ArcNode::new_root(DummyData::new());
-        let r_1 = r.new_child(DummyData::new());
-        let r_1_1 = r_1.new_child(DummyData::new());
-        let r_1_1_1 = r_1_1.new_child(DummyData::new());
-        let r_1_2 = r_1.new_child(DummyData::new());
-        let r_1_3 = r_1.new_child(DummyData::new());
-        let r_1_3_1 = r_1_3.new_child(DummyData::new());
+        let r_1 = r.new_child(DummyData::new(), &mut r.children_lock_write());
+        let r_1_1 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
+        let r_1_1_1 = r_1_1.new_child(DummyData::new(), &mut r_1_1.children_lock_write());
+        let r_1_2 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
+        let r_1_3 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
+        let r_1_3_1 = r_1_3.new_child(DummyData::new(), &mut r_1_3.children_lock_write());
 
         thread::scope(|s| {
             for _ in 0..4 {
