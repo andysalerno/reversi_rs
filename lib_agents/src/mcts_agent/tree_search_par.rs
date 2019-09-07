@@ -3,7 +3,7 @@ use crate::util;
 use crossbeam::thread;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, atree::ANode};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, atree::ANode, monte_carlo_data::MctsResult};
 use std::borrow::Borrow;
 use std::time::{Duration, Instant};
 
@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 3_000;
 
-fn expand<TNode, TState>(node: &TNode) -> Option<Vec<TNode::Handle>>
+fn expand<TNode, TState>(node: &TNode) -> Vec<TNode::Handle>
 where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
@@ -26,7 +26,7 @@ where
     if node.data().is_expanded() {
         // Another thread beat us to the punch, so no work to do
         drop(children_write_lock);
-        return Some(node.children_handles());
+        return node.children_handles();
     }
 
     node.data().mark_expanded();
@@ -35,7 +35,7 @@ where
     if state.is_game_over() {
         // if the game is over, we have nothing to expand
         node.data().set_children_count(0);
-        return None;
+        return vec![];
     }
 
     // TODO: There's no reason for legal_moves() to need this argument
@@ -54,7 +54,7 @@ where
         let _child_node = node.new_child(data, &mut children_write_lock);
     }
 
-    Some((*children_write_lock).clone())
+    (*children_write_lock).clone()
 }
 
 /// Increment this node's count of saturated children.
@@ -158,21 +158,30 @@ where
 {
     // TODO: If the only play is "pass turn", then even if parent color is enemy, don't be pessimistic
     // since being forced to pass a turn is very bad for the enemy and good for the player
-    let parent_is_player_color = root.borrow().data().state().current_player_turn() == player_color;
+    let parent_data = root.data();
+    let parent_is_player_color = parent_data.state().current_player_turn() == player_color;
+    let parent_plays = parent_data.plays();
+    let parent_plays = if parent_plays == 0 { 1 } else { parent_plays };
+
     let child_nodes = root.children_handles();
 
     child_nodes
         .into_iter()
         .filter(|n| !n.borrow().data().is_saturated())
         .max_by(|a, b| {
-            let a_score = score_node_pessimistic(a.borrow(), parent_is_player_color);
-            let b_score = score_node_pessimistic(b.borrow(), parent_is_player_color);
+            let a_score = score_node_pessimistic(a.borrow(), parent_plays, parent_is_player_color);
+            let b_score = score_node_pessimistic(b.borrow(), parent_plays, parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
-        }).and_then(|n| Some(n.clone()))
+        })
+        .and_then(|n| Some(n.clone()))
 }
 
-fn score_node_pessimistic<TNode, TState>(node: &TNode, parent_is_player_color: bool) -> f32
+fn score_node_pessimistic<TNode, TState>(
+    node: &TNode,
+    parent_plays: usize,
+    parent_is_player_color: bool,
+) -> f32
 where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
@@ -191,16 +200,25 @@ where
         (data.plays() - data.wins()) as f32
     };
 
-    let parent_plays = node.parent().map_or(0, |p| p.borrow().data().plays()) as f32;
+    let parent_plays = parent_plays as f32;
     let bias = f32::sqrt(2_f32);
 
-    (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays)
+    let score = (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays);
+
+    if score.is_nan() {
+        panic!(
+            "plays: {}\nwins: {}\nparent_plays: {}\nparent_is_player_color: {}",
+            plays, wins, parent_plays, parent_is_player_color
+        );
+    }
+
+    score
 }
 
 pub fn mcts_result<TNode, TState>(
     state: TState,
     player_color: PlayerColor,
-    thread_count: usize
+    thread_count: usize,
 ) -> Vec<MctsResult<TState>>
 where
     TNode: ANode<Data = AMctsData<TState>>,
@@ -289,9 +307,20 @@ where
         // Expand: generate fresh child nodes for the selected leaf node.
         let expanded_children = expand(leaf);
 
-        // If the leaf node had no possible children (i.e. it was also a terminating node)
-        // then we should do our saturation backpropagation.
-        if expanded_children.is_none() {
+        if !expanded_children.is_empty() {
+            let sim_node = util::random_pick(&expanded_children, &mut rng)
+                .expect("Must have had at least one expanded child.");
+            let sim_node = sim_node.borrow();
+
+            // simulate
+            let sim_result = simulate(sim_node, &mut rng);
+
+            // backprop
+            let is_win = sim_result.is_win_for_player(player_color);
+            backprop_sim_result(sim_node, is_win);
+        } else {
+            // We expanded the node, but it had no children,
+            // so this node must be a terminating node.
             let sim_result = simulate(leaf, &mut rng);
 
             if leaf.data().plays() == 0 {
@@ -306,18 +335,6 @@ where
 
             continue;
         }
-        let newly_expanded_children = expanded_children.unwrap().into_iter().collect::<Vec<_>>();
-
-        let sim_node = util::random_pick(&newly_expanded_children, &mut rng)
-            .expect("Must have had at least one expanded child.");
-        let sim_node = sim_node.borrow();
-
-        // simulate
-        let sim_result = simulate(sim_node, &mut rng);
-
-        // backprop
-        let is_win = sim_result.is_win_for_player(player_color);
-        backprop_sim_result(sim_node, is_win);
     }
 
     dbg!(sim_count);
@@ -339,9 +356,10 @@ pub mod tests {
     }
 
     fn make_node<G>(data: AMctsData<G>) -> impl ANode<Data = AMctsData<G>>
-       where G: GameState + Sync,
-        G::Move: Sync
-     {
+    where
+        G: GameState + Sync,
+        G::Move: Sync,
+    {
         ArcNode::new_root(data)
     }
 
@@ -390,9 +408,18 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
-        let child_level_2 = child_level_1.borrow().new_child(data.clone(), &mut child_level_1.borrow().children_lock_write());
-        let child_level_3 = child_level_2.borrow().new_child(data.clone(), &mut child_level_2.borrow().children_lock_write());
-        let child_level_4 = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
+        let child_level_2 = child_level_1.borrow().new_child(
+            data.clone(),
+            &mut child_level_1.borrow().children_lock_write(),
+        );
+        let child_level_3 = child_level_2.borrow().new_child(
+            data.clone(),
+            &mut child_level_2.borrow().children_lock_write(),
+        );
+        let child_level_4 = child_level_3.borrow().new_child(
+            data.clone(),
+            &mut child_level_3.borrow().children_lock_write(),
+        );
 
         let is_win = true;
         backprop_sim_result(child_level_3.borrow(), is_win);
@@ -414,10 +441,7 @@ pub mod tests {
     fn expand_expects_creates_children() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        let expanded_children = expand(&tree_root)
-            .expect("must have children")
-            .into_iter()
-            .collect::<Vec<_>>();
+        let expanded_children = expand(&tree_root).into_iter().collect::<Vec<_>>();
 
         // The game used for testing is TicTacToe,
         // which has nine intitial legal children positions.
@@ -468,16 +492,20 @@ pub mod tests {
         let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
         let child_level_1: &ArcNode<_> = child_level_1.borrow();
 
-        let child_level_2 = child_level_1.new_child(data.clone(), &mut child_level_1.children_lock_write());
+        let child_level_2 =
+            child_level_1.new_child(data.clone(), &mut child_level_1.children_lock_write());
         let child_level_2: &ArcNode<_> = child_level_2.borrow();
 
-        let child_level_3_handle = child_level_2.new_child(data.clone(), &mut child_level_2.children_lock_write());
+        let child_level_3_handle =
+            child_level_2.new_child(data.clone(), &mut child_level_2.children_lock_write());
         let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
 
-        let child_level_4 = child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
+        let child_level_4 =
+            child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
         let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
-        let child_level_4b = child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
+        let child_level_4b =
+            child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
         let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
 
         child_level_1.data().set_children_count(1);
@@ -512,10 +540,22 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
-        let child_level_2 = child_level_1.borrow().new_child(data.clone(), &mut child_level_1.borrow().children_lock_write());
-        let child_level_3 = child_level_2.borrow().new_child(data.clone(), &mut child_level_2.borrow().children_lock_write());
-        let child_level_4 = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
-        let child_level_4b = child_level_3.borrow().new_child(data.clone(), &mut child_level_3.borrow().children_lock_write());
+        let child_level_2 = child_level_1.borrow().new_child(
+            data.clone(),
+            &mut child_level_1.borrow().children_lock_write(),
+        );
+        let child_level_3 = child_level_2.borrow().new_child(
+            data.clone(),
+            &mut child_level_2.borrow().children_lock_write(),
+        );
+        let child_level_4 = child_level_3.borrow().new_child(
+            data.clone(),
+            &mut child_level_3.borrow().children_lock_write(),
+        );
+        let child_level_4b = child_level_3.borrow().new_child(
+            data.clone(),
+            &mut child_level_3.borrow().children_lock_write(),
+        );
 
         tree_root.data().set_children_count(1);
         child_level_1.borrow().data().set_children_count(1);
@@ -603,10 +643,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let children = expand(tree_root.borrow())
-            .expect("must have children")
-            .into_iter()
-            .collect::<Vec<_>>();
+        let children = expand(tree_root.borrow()).into_iter().collect::<Vec<_>>();
 
         assert!(
             !tree_root.data().is_saturated(),
@@ -651,12 +688,23 @@ pub mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), is_win);
 
-        assert_eq!(1.0929347, score_node_pessimistic(child_a.borrow(), true));
-        assert_eq!(1.3385662, score_node_pessimistic(child_b.borrow(), true));
-        assert_eq!(1.8930184, score_node_pessimistic(child_c.borrow(), true));
+        let parent_plays = tree_root.data().plays();
+
+        assert_eq!(
+            1.0929347,
+            score_node_pessimistic(child_a.borrow(), parent_plays, true)
+        );
+        assert_eq!(
+            1.3385662,
+            score_node_pessimistic(child_b.borrow(), parent_plays, true)
+        );
+        assert_eq!(
+            1.8930184,
+            score_node_pessimistic(child_c.borrow(), parent_plays, true)
+        );
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node_pessimistic(child_d.borrow(), true)
+            score_node_pessimistic(child_d.borrow(), parent_plays, true)
         );
     }
 
@@ -728,7 +776,11 @@ pub mod tests {
             let node: &ArcNode<_> = n.borrow();
 
             let node_play_count = node.data().plays();
-            let child_play_sum: usize = node.children_handles().into_iter().map(|c| c.data().plays()).sum();
+            let child_play_sum: usize = node
+                .children_handles()
+                .into_iter()
+                .map(|c| c.data().plays())
+                .sum();
 
             assert!(
                 // Note: this is a bit of a hack right now, they should be exactly equal

@@ -1,8 +1,8 @@
-use crate::tree::Node;
 use crate::atree::ANode;
+use crate::tree::Node;
 
-use std::sync::{RwLockReadGuard, RwLockWriteGuard, RwLock};
 use std::sync::{Arc, Weak};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug)]
 pub struct ArcNodeContent<T> {
@@ -31,11 +31,15 @@ impl<T> Node for ArcNode<T> {
     }
 
     fn children_lock_read(&self) -> RwLockReadGuard<Vec<Self::Handle>> {
-        self.children.read().expect("Couldn't acquire children read lock")
+        self.children
+            .read()
+            .expect("Couldn't acquire children read lock")
     }
 
     fn children_lock_write(&self) -> RwLockWriteGuard<Vec<Self::Handle>> {
-        self.children.write().expect("Couldn't acquire children read lock")
+        self.children
+            .write()
+            .expect("Couldn't acquire children read lock")
     }
 
     fn children_handles(&self) -> Vec<Self::Handle> {
@@ -44,7 +48,11 @@ impl<T> Node for ArcNode<T> {
         children_read.iter().cloned().collect()
     }
 
-    fn new_child(&self, data: T, write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>) -> ArcNode<T> {
+    fn new_child(
+        &self,
+        data: T,
+        write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>,
+    ) -> ArcNode<T> {
         let child = Arc::new(ArcNodeContent {
             parent: Arc::downgrade(self),
             children: RwLock::default(),
@@ -101,16 +109,24 @@ mod tests {
         let root = ArcNode::new_root(DummyData::new());
 
         let root_child_a = root.new_child(DummyData::new(), &mut root.children_lock_write());
-        let root_child_a_child1 = root_child_a.new_child(DummyData::new(), &mut root_child_a.children_lock_write());
+        let root_child_a_child1 =
+            root_child_a.new_child(DummyData::new(), &mut root_child_a.children_lock_write());
 
         let root_child_b = root.new_child(DummyData::new(), &mut root.children_lock_write());
-        let root_child_b_child1 = root_child_b.new_child(DummyData::new(), &mut root_child_b.children_lock_write());
+        let root_child_b_child1 =
+            root_child_b.new_child(DummyData::new(), &mut root_child_b.children_lock_write());
 
         assert_eq!(2, root.children_handles().into_iter().count());
         assert_eq!(1, root_child_a.children_handles().into_iter().count());
-        assert_eq!(0, root_child_a_child1.children_handles().into_iter().count());
+        assert_eq!(
+            0,
+            root_child_a_child1.children_handles().into_iter().count()
+        );
         assert_eq!(1, root_child_b.children_handles().into_iter().count());
-        assert_eq!(0, root_child_b_child1.children_handles().into_iter().count());
+        assert_eq!(
+            0,
+            root_child_b_child1.children_handles().into_iter().count()
+        );
     }
 
     #[test]

@@ -2,7 +2,8 @@ pub mod tree_search_par;
 
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, arc_tree::ArcNode, monte_carlo_data::MctsResult, tree::Node, atree::ANode,
+    amonte_carlo_data::AMctsData, arc_tree::ArcNode, atree::ANode, monte_carlo_data::MctsResult,
+    tree::Node,
 };
 use std::marker::PhantomData;
 use std::marker::Sync;

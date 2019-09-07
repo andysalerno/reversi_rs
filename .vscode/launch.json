@@ -4,15 +4,19 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    
-    
         {
-            "type": "lldb",
+            "name": "(Windows) Launch",
+            "type": "cppvsdbg",
             "request": "launch",
-            "name": "Debug",
-            "program": "${workspaceRoot}/target/debug/game_runner",
+            "program": "${workspaceFolder}/target/debug/game_runner.exe",
             "args": [],
-            "cwd": "${workspaceRoot}/target/debug/"
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
         }
+
+
+
     ]
 }

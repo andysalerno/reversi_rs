@@ -15,6 +15,10 @@ pub trait Node: Sized {
     fn children_lock_write(&self) -> RwLockWriteGuard<Vec<Self::Handle>>;
     fn children_handles(&self) -> Vec<Self::Handle>;
 
-    fn new_child(&self, state: Self::Data, write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>) -> Self::Handle;
+    fn new_child(
+        &self,
+        state: Self::Data,
+        write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>,
+    ) -> Self::Handle;
     fn new_root(state: Self::Data) -> Self::Handle;
 }
