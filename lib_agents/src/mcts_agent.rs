@@ -41,8 +41,8 @@ where
 {
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 2),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 4),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 1),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -98,8 +98,8 @@ where
         let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
         dbg!(total_plays);
 
-        let plays_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
-        println!("Plays per sec: {:.0}", plays_per_sec);
+        let sims_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
+        println!("Simulations per sec: {:.0}", sims_per_sec);
 
         for action_result in &results {
             let sat_display = if action_result.is_saturated {

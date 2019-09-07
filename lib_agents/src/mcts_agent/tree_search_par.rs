@@ -163,12 +163,12 @@ where
     let parent_plays = parent_data.plays();
     let parent_plays = if parent_plays == 0 { 1 } else { parent_plays };
 
-    let child_nodes = root.children_handles();
+    let child_nodes = root.children_lock_read();
 
-    child_nodes
-        .into_iter()
-        .filter(|n| !n.borrow().data().is_saturated())
-        .max_by(|a, b| {
+    (*child_nodes)
+        .iter()
+        .filter(|&n| !n.borrow().data().is_saturated())
+        .max_by(|&a, &b| {
             let a_score = score_node_pessimistic(a.borrow(), parent_plays, parent_is_player_color);
             let b_score = score_node_pessimistic(b.borrow(), parent_plays, parent_is_player_color);
 
