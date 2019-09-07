@@ -1,4 +1,4 @@
-use lib_agents::human_agent::HumanAgent;
+
 use lib_agents::mcts_agent::MctsAgent;
 use lib_boardgame::{Game, GameResult, PlayerColor};
 use lib_reversi::reversi::Reversi;

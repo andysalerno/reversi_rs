@@ -1,7 +1,7 @@
 use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
 use std::fmt;
-use std::sync::atomic::{AtomicBool, AtomicUsize};
+
 
 /// MCTS-related data that every Node will have.
 #[derive(Default, Clone)]
