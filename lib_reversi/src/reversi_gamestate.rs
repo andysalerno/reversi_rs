@@ -553,7 +553,8 @@ mod tests {
         let mut cloned = state.clone();
 
         let legal_moves = cloned.legal_moves(cloned.current_player_turn());
-        cloned.apply_move(legal_moves[0]);
+        let first_legal = legal_moves[0];
+        cloned.apply_move(first_legal);
 
         let orig_piece_count = state.white_pieces_count() + state.black_pieces_count();
         let modified_piece_count = cloned.white_pieces_count() + cloned.black_pieces_count();
