@@ -2,7 +2,6 @@ use lib_boardgame::{GameResult, GameState};
 use std::cell::Cell;
 use std::fmt;
 
-
 /// MCTS-related data that every Node will have.
 #[derive(Default, Clone)]
 pub struct MctsData<T: GameState> {

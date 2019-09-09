@@ -226,18 +226,24 @@ impl ReversiState {
             return true;
         }
 
-        let white_legal_moves = self.legal_moves(PlayerColor::White);
-        let black_legal_moves = self.legal_moves(PlayerColor::Black);
+        let cur_player_legal_moves = self.legal_moves(self.current_player_turn());
 
-        if white_legal_moves.len() == 1
-            && black_legal_moves.len() == 1
-            && white_legal_moves[0] == ReversiPlayerAction::PassTurn
-            && black_legal_moves[0] == ReversiPlayerAction::PassTurn
+        if cur_player_legal_moves.len() > 1
+            || cur_player_legal_moves[0] != ReversiPlayerAction::PassTurn
         {
-            return true;
+            return false;
         }
 
-        false
+        let opponent_color = opponent(self.current_player_turn());
+        let opponent_legal_moves = self.calc_legal_moves(opponent_color);
+
+        if opponent_legal_moves.len() > 1
+            || opponent_legal_moves[0] != ReversiPlayerAction::PassTurn
+        {
+            return false;
+        }
+
+        true
     }
 
     fn update_stored_state_values(&mut self) {
@@ -294,7 +300,9 @@ impl GameState for ReversiState {
         result
     }
 
+    // TODO: update trait if we're not using PlayerColor anymore
     fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
+        assert_eq!(_player, self.current_player_turn(), "Until the trait is updated, the requested legal moves must always be for the current player.");
         self.cur_state_legal_moves.as_slice()
     }
 
