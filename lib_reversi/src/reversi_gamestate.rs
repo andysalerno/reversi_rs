@@ -182,20 +182,17 @@ impl ReversiState {
             .map(|index| ((index / Self::BOARD_SIZE), (index % Self::BOARD_SIZE)))
             .map(|(col, row)| BoardPosition::new(col, row));
 
-        let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
+        let empty_positions = all_positions.filter(|&pos| self.get_piece(pos).is_none());
 
-        let mut moves: Vec<_> = empty_positions
+        let mut moves = empty_positions
             .filter(|pos| {
-                for col_dir in all_directions.iter() {
-                    for row_dir in all_directions.iter() {
-                        if *col_dir == SAME && *row_dir == SAME {
+                for &col_dir in all_directions.iter() {
+                    for &row_dir in all_directions.iter() {
+                        if col_dir == SAME && row_dir == SAME {
                             continue;
                         }
 
-                        let direction = Directions {
-                            col_dir: *col_dir,
-                            row_dir: *row_dir,
-                        };
+                        let direction = Directions { col_dir, row_dir };
 
                         if self
                             .find_sibling_piece_pos(*pos, piece_color, direction)
@@ -209,7 +206,7 @@ impl ReversiState {
                 false
             })
             .map(|position| ReversiPlayerAction::Move { position })
-            .collect();
+            .collect::<Vec<_>>();
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
@@ -350,23 +347,20 @@ impl GameState for ReversiState {
         //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
         //      For row, we can check all rows below us (direction -1), above us (direction 1), or the current row (direction 0).
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
-        for col_dir in all_directions.iter() {
-            for row_dir in all_directions.iter() {
-                if *col_dir == SAME && *row_dir == SAME {
+        for &col_dir in all_directions.iter() {
+            for &row_dir in all_directions.iter() {
+                if col_dir == SAME && row_dir == SAME {
                     // staying in the same row and col means not moving at all, so skip this scenario
                     continue;
                 }
 
-                let direction = Directions {
-                    col_dir: *col_dir,
-                    row_dir: *row_dir,
-                };
+                let direction = Directions { col_dir, row_dir };
                 let origin = position;
                 let sibling = self.find_sibling_piece_pos(origin, player_piece, direction);
 
                 if let Some(sibling) = sibling {
                     ReversiState::traverse_from(origin, direction)
-                        .take_while(|p| *p != sibling)
+                        .take_while(|&p| p != sibling)
                         .for_each(|p| {
                             self.flip_piece(p);
                         });
