@@ -1,3 +1,4 @@
+use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
     amonte_carlo_data::AMctsData, arc_tree::ArcNode, atree::ANode, monte_carlo_data::MctsResult,
@@ -7,7 +8,6 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::marker::Sync;
 use std::time::Instant;
-use super::tree_search_par;
 
 pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
 where
