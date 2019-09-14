@@ -93,8 +93,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -140,6 +140,13 @@ where
     TNode: ANode<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
+    let total_plays_before = root
+        .borrow()
+        .children_handles()
+        .into_iter()
+        .map(|c| c.borrow().data().plays())
+        .sum::<usize>();
+
     let now = Instant::now();
     let results = tree_search_par::mcts_result::<TNode, TState>(root, player_color, thread_count);
     let elapsed = now.elapsed();
@@ -147,6 +154,7 @@ where
     // Some friendly UI output
     {
         let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
+        let total_plays = total_plays - total_plays_before;
         dbg!(total_plays);
 
         let sims_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);

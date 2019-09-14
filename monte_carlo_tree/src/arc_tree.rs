@@ -39,7 +39,7 @@ impl<T> Node for ArcNode<T> {
     fn children_lock_write(&self) -> RwLockWriteGuard<Vec<Self::Handle>> {
         self.children
             .write()
-            .expect("Couldn't acquire children read lock")
+            .expect("Couldn't acquire children write lock")
     }
 
     fn children_handles(&self) -> Vec<Self::Handle> {
@@ -73,11 +73,7 @@ impl<T> Node for ArcNode<T> {
     }
 }
 
-impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {
-    fn children_locked(&self) -> &RwLock<Vec<Self>> {
-        &self.children
-    }
-}
+impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {}
 
 #[cfg(test)]
 mod tests {

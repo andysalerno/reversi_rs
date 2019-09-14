@@ -5,6 +5,8 @@ use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, atree::ANode, monte_carlo_data::MctsResult};
 use std::borrow::Borrow;
+use std::sync::RwLock;
+use std::sync::RwLockReadGuard;
 use std::time::{Duration, Instant};
 
 // todo: mcts() should return the actual winning node,
@@ -15,7 +17,7 @@ use std::time::{Duration, Instant};
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 0_000;
 
-fn expand<TNode, TState>(node: &TNode) -> Vec<TNode::Handle>
+fn expand<TNode, TState>(node: &TNode) -> RwLockReadGuard<Vec<TNode::Handle>>
 where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
@@ -26,7 +28,7 @@ where
     if node.data().is_expanded() {
         // Another thread beat us to the punch, so no work to do
         drop(children_write_lock);
-        return node.children_handles();
+        return node.children_lock_read();
     }
 
     node.data().mark_expanded();
@@ -35,7 +37,8 @@ where
     if state.is_game_over() {
         // if the game is over, we have nothing to expand
         node.data().set_children_count(0);
-        return vec![];
+        drop(children_write_lock);
+        return node.children_lock_read();
     }
 
     // TODO: There's no reason for legal_moves() to need this argument
@@ -54,7 +57,9 @@ where
         let _child_node = node.new_child(data, &mut children_write_lock);
     }
 
-    (*children_write_lock).clone()
+    drop(children_write_lock);
+
+    node.children_lock_read()
 }
 
 /// Increment this node's count of saturated children.
@@ -315,10 +320,12 @@ where
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
+        // let expanded_children = expand(leaf);
         let expanded_children = expand(leaf);
 
         if !expanded_children.is_empty() {
-            let sim_node = util::random_pick(&expanded_children, &mut rng)
+            // let sim_node = util::random_pick(&expanded_children, &mut rng)
+            let sim_node = util::random_pick(expanded_children.as_slice(), &mut rng)
                 .expect("Must have had at least one expanded child.");
             let sim_node = sim_node.borrow();
 
@@ -451,11 +458,12 @@ pub mod tests {
     fn expand_expects_creates_children() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        let expanded_children = expand(&tree_root).into_iter().collect::<Vec<_>>();
+        let children = expand(&tree_root);
+        let children = children.iter().cloned();
 
         // The game used for testing is TicTacToe,
         // which has nine intitial legal children positions.
-        assert_eq!(9, expanded_children.len());
+        assert_eq!(9, children.len());
     }
 
     #[test]
@@ -653,7 +661,8 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let children = expand(tree_root.borrow()).into_iter().collect::<Vec<_>>();
+        let children = expand(tree_root.borrow());
+        let children = children.iter().cloned().collect::<Vec<_>>();
 
         assert!(
             !tree_root.data().is_saturated(),
