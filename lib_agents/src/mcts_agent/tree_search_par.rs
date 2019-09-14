@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 // as the score.
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
-const EXTRA_TIME_MS: u64 = 3_000;
+const EXTRA_TIME_MS: u64 = 0_000;
 
 fn expand<TNode, TState>(node: &TNode) -> Vec<TNode::Handle>
 where
@@ -130,6 +130,7 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
+/// If the given node has no children, returns a handle back to the given node.
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: ANode<Data = AMctsData<TState>>,
@@ -137,17 +138,17 @@ where
 {
     let mut cur_node = root.get_handle();
 
-    loop {
-        let selected_child =
-            select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color);
-
-        match selected_child {
-            Some(c) => cur_node = c,
-            None => return cur_node,
-        }
+    while let Some(c) =
+        select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color)
+    {
+        cur_node = c;
     }
+
+    cur_node
 }
 
+/// Returns a handle to the child with the greatest selection score,
+/// or None if there are no children OR all children have been saturated.
 fn select_child_max_score_inverted<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
@@ -156,12 +157,10 @@ where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    // TODO: If the only play is "pass turn", then even if parent color is enemy, don't be pessimistic
-    // since being forced to pass a turn is very bad for the enemy and good for the player
     let parent_data = root.data();
     let parent_is_player_color = parent_data.state().current_player_turn() == player_color;
     let parent_plays = parent_data.plays();
-    let parent_plays = if parent_plays == 0 { 1 } else { parent_plays };
+    let parent_plays = usize::max(1, parent_plays);
 
     let child_nodes = root.children_lock_read();
 
@@ -201,9 +200,12 @@ where
     };
 
     let parent_plays = parent_plays as f32;
-    let bias = f32::sqrt(2_f32);
 
-    let score = (wins / plays) + bias * f32::sqrt(f32::ln(parent_plays) / plays);
+    let node_mean_val = wins / plays;
+    let explore_bias = 2_f32;
+
+    // todo: test swapping parent_plays and plays, and run trials for that
+    let score = node_mean_val + f32::sqrt((explore_bias * f32::ln(parent_plays)) / plays);
 
     if score.is_nan() {
         panic!(
@@ -258,14 +260,18 @@ where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    thread::scope(|s| {
-        for _ in 0..thread_count {
-            s.spawn(|_| {
-                mcts_loop(root, player_color);
-            });
-        }
-    })
-    .unwrap();
+    if thread_count == 1 {
+        mcts_loop(root, player_color);
+    } else {
+        thread::scope(|s| {
+            for _ in 0..thread_count {
+                s.spawn(|_| {
+                    mcts_loop(root, player_color);
+                });
+            }
+        })
+        .unwrap();
+    }
 }
 
 fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
@@ -699,7 +705,7 @@ pub mod tests {
             score_node_pessimistic(child_b.borrow(), parent_plays, true)
         );
         assert_eq!(
-            1.8930184,
+            1.8930185,
             score_node_pessimistic(child_c.borrow(), parent_plays, true)
         );
         assert_eq!(

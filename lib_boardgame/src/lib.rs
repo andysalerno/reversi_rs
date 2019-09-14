@@ -151,6 +151,11 @@ where
         let state = self.game_state_mut();
 
         state.apply_move(picked_action);
+
+        match player {
+            PlayerColor::Black => self.white_agent().observe_opponent_action(picked_action),
+            PlayerColor::White => self.black_agent().observe_opponent_action(picked_action),
+        }
     }
 
     /// Applies each player's turn one at a time until the game is over,
@@ -176,6 +181,7 @@ where
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
+    fn observe_opponent_action(&self, _action: TState::Move) {}
 }
 
 #[cfg(test)]

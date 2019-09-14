@@ -184,7 +184,9 @@ impl ReversiState {
 
         let empty_positions = all_positions.filter(|&pos| self.get_piece(pos).is_none());
 
-        let mut moves = empty_positions
+        let mut moves = Vec::with_capacity(8);
+
+        empty_positions
             .filter(|pos| {
                 for &col_dir in all_directions.iter() {
                     for &row_dir in all_directions.iter() {
@@ -206,7 +208,7 @@ impl ReversiState {
                 false
             })
             .map(|position| ReversiPlayerAction::Move { position })
-            .collect::<Vec<_>>();
+            .for_each(|a| moves.push(a));
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
