@@ -5,7 +5,7 @@ use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, atree::ANode, monte_carlo_data::MctsResult};
 use std::borrow::Borrow;
-use std::sync::RwLock;
+
 use std::sync::RwLockReadGuard;
 use std::time::{Duration, Instant};
 
