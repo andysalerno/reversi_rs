@@ -30,7 +30,7 @@ where
         }
     }
 
-    fn update_root_node(&self, action: TState::Move) {
+    fn walk_tree_to_child(&self, action: TState::Move) {
         // IDEA: half threads are "win seekers" and other half is "loss seeker"
         // (i.e. explores as though we're playing for the opponent)
         let root_handle = self
@@ -40,15 +40,18 @@ where
         let children = cur_state_node.children_handles();
 
         let resulting_child = children
-            .into_iter()
-            .find(|c| c.borrow().data().action().expect("action") == action)
-            .expect(
-                format!(
-                    "The provided move {:?} must have been a legal move from the current state.",
-                    action
+            .iter()
+            .find(|&c| c.borrow().data().action().expect("action") == action)
+            .unwrap_or_else(|| {
+                panic!(
+                    "The provided move {:?} was not in the set of available moves: {:?}",
+                    action,
+                    children
+                        .iter()
+                        .map(|c| c.borrow().data().action().unwrap())
+                        .collect::<Vec<_>>()
                 )
-                .as_ref(),
-            )
+            })
             .clone();
 
         *self.current_state_root.borrow_mut() = Some(resulting_child);
@@ -61,7 +64,7 @@ where
         Some(cur_state_node.clone())
     }
 
-    fn set_root_handle(&self, state: &TState) -> TNode::Handle {
+    fn reset_root_handle(&self, state: &TState) -> TNode::Handle {
         let fresh_data = AMctsData::new(state.clone(), 0, 0, None);
         let fresh_root = TNode::new_root(fresh_data);
 
@@ -79,22 +82,19 @@ where
     TState: GameState + Sync,
 {
     fn observe_action(&self, _player: PlayerColor, action: TState::Move, _result: &TState) {
-        self.update_root_node(action);
+        if self.current_root_handle().is_some() {
+            self.walk_tree_to_child(action);
+        }
     }
 
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
-        let root_handle = match self.current_root_handle() {
-            Some(r) => r,
-            _ => self.set_root_handle(state),
-        };
+        let root_handle = self
+            .current_root_handle()
+            .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => {
-                perform_mcts_par::<TNode, TState>(state, root_handle, self.color, 1)
-            }
-            PlayerColor::White => {
-                perform_mcts_par::<TNode, TState>(state, root_handle, self.color, 1)
-            }
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -132,7 +132,6 @@ fn pretty_ratio_bar_text(
 }
 
 fn perform_mcts_par<TNode, TState>(
-    state: &TState,
     root: TNode::Handle,
     player_color: PlayerColor,
     thread_count: usize,
@@ -142,8 +141,7 @@ where
     TState: GameState + Sync,
 {
     let now = Instant::now();
-    let results =
-        tree_search_par::mcts_result::<TNode, TState>(state.clone(), player_color, thread_count);
+    let results = tree_search_par::mcts_result::<TNode, TState>(root, player_color, thread_count);
     let elapsed = now.elapsed();
 
     // Some friendly UI output

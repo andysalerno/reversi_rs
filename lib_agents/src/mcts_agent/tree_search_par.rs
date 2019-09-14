@@ -218,7 +218,7 @@ where
 }
 
 pub fn mcts_result<TNode, TState>(
-    state: TState,
+    root_handle: TNode::Handle,
     player_color: PlayerColor,
     thread_count: usize,
 ) -> Vec<MctsResult<TState>>
@@ -226,8 +226,12 @@ where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    let root_handle = TNode::new_root(AMctsData::new(state, 0, 0, None));
     let root = root_handle.borrow();
+    println!(
+        "Beginning mcts on node with wins/plays: {}/{}",
+        root.data().wins(),
+        root.data().plays()
+    );
 
     mcts(root, player_color, thread_count);
 
