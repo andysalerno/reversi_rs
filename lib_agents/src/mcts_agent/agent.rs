@@ -33,18 +33,43 @@ where
     fn update_root_node(&self, action: TState::Move) {
         // IDEA: half threads are "win seekers" and other half is "loss seeker"
         // (i.e. explores as though we're playing for the opponent)
-        let cur_state_node = self.current_state_root.borrow();
-        let cur_state_node = cur_state_node.as_ref().unwrap();
-        let cur_state_node = cur_state_node.borrow();
+        let root_handle = self
+            .current_root_handle()
+            .expect("Must have a root node to seek through.");
+        let cur_state_node = root_handle.borrow();
         let children = cur_state_node.children_handles();
 
         let resulting_child = children
             .into_iter()
             .find(|c| c.borrow().data().action().expect("action") == action)
-            .expect("The provided move must have been a legal move from the current state.")
+            .expect(
+                format!(
+                    "The provided move {:?} must have been a legal move from the current state.",
+                    action
+                )
+                .as_ref(),
+            )
             .clone();
 
         *self.current_state_root.borrow_mut() = Some(resulting_child);
+    }
+
+    fn current_root_handle(&self) -> Option<TNode::Handle> {
+        let cur_state_node = self.current_state_root.borrow();
+        let cur_state_node = cur_state_node.as_ref()?;
+
+        Some(cur_state_node.clone())
+    }
+
+    fn set_root_handle(&self, state: &TState) -> TNode::Handle {
+        let fresh_data = AMctsData::new(state.clone(), 0, 0, None);
+        let fresh_root = TNode::new_root(fresh_data);
+
+        let mut opt = self.current_state_root.borrow_mut();
+
+        *opt = Some(fresh_root.clone());
+
+        fresh_root.clone()
     }
 }
 
@@ -58,9 +83,18 @@ where
     }
 
     fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+        let root_handle = match self.current_root_handle() {
+            Some(r) => r,
+            _ => self.set_root_handle(state),
+        };
+
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(state, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(state, self.color, 1),
+            PlayerColor::Black => {
+                perform_mcts_par::<TNode, TState>(state, root_handle, self.color, 1)
+            }
+            PlayerColor::White => {
+                perform_mcts_par::<TNode, TState>(state, root_handle, self.color, 1)
+            }
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -99,6 +133,7 @@ fn pretty_ratio_bar_text(
 
 fn perform_mcts_par<TNode, TState>(
     state: &TState,
+    root: TNode::Handle,
     player_color: PlayerColor,
     thread_count: usize,
 ) -> MctsResult<TState>
