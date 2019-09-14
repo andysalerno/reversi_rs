@@ -209,6 +209,8 @@ impl ReversiState {
             })
             .map(|position| ReversiPlayerAction::Move { position })
             .for_each(|a| moves.push(a));
+            // Note on above line: I have tried using "extend()" instead of "for_each()", but that incurred
+            // a performance hit for reasons I don't understand.
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 // as the score.
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
-const EXTRA_TIME_MS: u64 = 0_000;
+const EXTRA_TIME_MS: u64 = 3_000;
 
 fn expand<TNode, TState>(node: &TNode) -> RwLockReadGuard<Vec<TNode::Handle>>
 where
@@ -300,7 +300,7 @@ where
         if now.elapsed() >= exec_duration {
             let data = root.data();
 
-            if (data.wins() * 1000) / data.plays() > 500
+            if (data.wins() * 1000) / data.plays() > 800
                 || now.elapsed() >= exec_duration + extra_time
             {
                 break;
