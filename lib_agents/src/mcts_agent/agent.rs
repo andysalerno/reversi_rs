@@ -15,7 +15,6 @@ where
     TNode: Node<Data = AMctsData<TState>>,
 {
     color: PlayerColor,
-
     current_state_root: RefCell<Option<TNode::Handle>>,
 }
 
@@ -42,7 +41,7 @@ where
         let resulting_child = children
             .into_iter()
             .find(|c| c.borrow().data().action().expect("action") == action)
-            .expect("resulting child")
+            .expect("The provided move must have been a legal move from the current state.")
             .clone();
 
         *self.current_state_root.borrow_mut() = Some(resulting_child);
@@ -54,7 +53,7 @@ where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState + Sync,
 {
-    fn observe_opponent_action(&self, action: TState::Move) {
+    fn observe_action(&self, _player: PlayerColor, action: TState::Move, _result: &TState) {
         self.update_root_node(action);
     }
 

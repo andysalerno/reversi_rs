@@ -152,10 +152,12 @@ where
 
         state.apply_move(picked_action);
 
-        match player {
-            PlayerColor::Black => self.white_agent().observe_opponent_action(picked_action),
-            PlayerColor::White => self.black_agent().observe_opponent_action(picked_action),
-        }
+        // Now both players get a chance to observe the selected action and resulting state.
+        let state_copy = state.clone();
+        self.white_agent()
+            .observe_action(player, picked_action, &state_copy);
+        self.black_agent()
+            .observe_action(player, picked_action, &state_copy);
     }
 
     /// Applies each player's turn one at a time until the game is over,
@@ -181,7 +183,7 @@ where
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
-    fn observe_opponent_action(&self, _action: TState::Move) {}
+    fn observe_action(&self, _player: PlayerColor, _action: TState::Move, _result: &TState) {}
 }
 
 #[cfg(test)]
