@@ -425,15 +425,9 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_2 = child_level_1.borrow().new_child(
-            data.clone(),
-        );
-        let child_level_3 = child_level_2.borrow().new_child(
-            data.clone(),
-        );
-        let child_level_4 = child_level_3.borrow().new_child(
-            data.clone(),
-        );
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
 
         let is_win = true;
         backprop_sim_result(child_level_3.borrow(), is_win);
@@ -508,20 +502,16 @@ pub mod tests {
         let child_level_1 = tree_root.new_child(data.clone());
         let child_level_1: &ArcNode<_> = child_level_1.borrow();
 
-        let child_level_2 =
-            child_level_1.new_child(data.clone());
+        let child_level_2 = child_level_1.new_child(data.clone());
         let child_level_2: &ArcNode<_> = child_level_2.borrow();
 
-        let child_level_3_handle =
-            child_level_2.new_child(data.clone());
+        let child_level_3_handle = child_level_2.new_child(data.clone());
         let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
 
-        let child_level_4 =
-            child_level_3.new_child(data.clone());
+        let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
-        let child_level_4b =
-            child_level_3.new_child(data.clone());
+        let child_level_4b = child_level_3.new_child(data.clone());
         let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
 
         child_level_1.data().set_children_count(1);
@@ -556,18 +546,10 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
-        let child_level_2 = child_level_1.borrow().new_child(
-            data.clone(),
-        );
-        let child_level_3 = child_level_2.borrow().new_child(
-            data.clone(),
-        );
-        let child_level_4 = child_level_3.borrow().new_child(
-            data.clone(),
-        );
-        let child_level_4b = child_level_3.borrow().new_child(
-            data.clone(),
-        );
+        let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        let child_level_4 = child_level_3.borrow().new_child(data.clone());
+        let child_level_4b = child_level_3.borrow().new_child(data.clone());
 
         tree_root.data().set_children_count(1);
         child_level_1.borrow().data().set_children_count(1);

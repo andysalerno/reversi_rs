@@ -1,5 +1,5 @@
-use std::borrow::Borrow;
 use atomic_refcell::AtomicRef;
+use std::borrow::Borrow;
 use std::sync::MutexGuard;
 
 /// A tree node that can hold data, and refer to

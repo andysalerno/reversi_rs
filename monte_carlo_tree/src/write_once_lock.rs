@@ -1,6 +1,6 @@
-use std::sync::{Mutex, MutexGuard};
+use atomic_refcell::{AtomicRef, AtomicRefCell};
 use std::sync::atomic::{AtomicBool, Ordering};
-use atomic_refcell::{AtomicRefCell, AtomicRef};
+use std::sync::{Mutex, MutexGuard};
 
 /// A lock that assumes writing will only
 /// happen once, and all read attemps
@@ -13,7 +13,7 @@ use atomic_refcell::{AtomicRefCell, AtomicRef};
 pub(crate) struct WriteOnceLock<T> {
     data_write: Mutex<()>,
     data_read: AtomicRefCell<T>,
-    has_written: AtomicBool, 
+    has_written: AtomicBool,
 }
 
 impl<T: Sized> WriteOnceLock<T> {
@@ -21,7 +21,7 @@ impl<T: Sized> WriteOnceLock<T> {
         Self {
             data_write: Mutex::new(()),
             data_read: AtomicRefCell::new(data),
-            has_written: AtomicBool::new(false), 
+            has_written: AtomicBool::new(false),
         }
     }
 
@@ -49,7 +49,10 @@ impl<T: Sized> WriteOnceLock<T> {
     /// Panics if the data store was not previously written to.
     pub fn read(&self) -> AtomicRef<T> {
         let has_written = self.has_written.load(Ordering::SeqCst);
-        assert!(has_written, "Attempt to read from a WriteOnceLock before writing.");
+        assert!(
+            has_written,
+            "Attempt to read from a WriteOnceLock before writing."
+        );
 
         self.data_read.borrow()
     }
