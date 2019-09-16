@@ -8,7 +8,6 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::marker::Sync;
 use std::time::Instant;
-use std::ops::Deref;
 
 pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
 where
@@ -38,7 +37,7 @@ where
             .current_root_handle()
             .expect("Must have a root node to seek through.");
         let cur_state_node = root_handle.borrow();
-        let children = cur_state_node.children_read().deref();
+        let children = cur_state_node.children_read();
 
         let resulting_child = children
             .iter()
@@ -144,7 +143,7 @@ where
     let total_plays_before = root
         .borrow()
         .children_read()
-        .into_iter()
+        .iter()
         .map(|c| c.borrow().data().plays())
         .sum::<usize>();
 

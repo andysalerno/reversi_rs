@@ -6,7 +6,6 @@ use lib_boardgame::{GameState, PlayerColor};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, atree::ANode, monte_carlo_data::MctsResult};
 use std::borrow::Borrow;
 
-use std::sync::RwLockReadGuard;
 use std::time::{Duration, Instant};
 
 // todo: mcts() should return the actual winning node,
@@ -17,18 +16,22 @@ use std::time::{Duration, Instant};
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 0_000;
 
-fn expand<TNode, TState>(node: &TNode) -> RwLockReadGuard<Vec<TNode::Handle>>
+fn expand<TNode, TState>(node: &TNode)
 where
     TNode: ANode<Data = AMctsData<TState>>,
     TState: GameState,
 {
     // Acquire the write lock on the children
-    let mut children_write_lock = node.children_lock_write();
+    let children_write_lock = match node.children_write_lock() {
+        Some(lock) => lock,
+        None => panic!() // won't panic when done, will return children instead
+    };
 
+    // TODO: This is redundant after the match statement above, can probably remove
     if node.data().is_expanded() {
         // Another thread beat us to the punch, so no work to do
         drop(children_write_lock);
-        return node.children_lock_read();
+        panic!() // replace with return
     }
 
     node.data().mark_expanded();
@@ -38,7 +41,7 @@ where
         // if the game is over, we have nothing to expand
         node.data().set_children_count(0);
         drop(children_write_lock);
-        return node.children_lock_read();
+        panic!() // replce with return
     }
 
     // TODO: There's no reason for legal_moves() to need this argument
@@ -50,16 +53,12 @@ where
     // inform it how many children it has.
     node.data().set_children_count(legal_actions.len());
 
-    legal_actions
+    let new_children = legal_actions
         .iter()
-        .map(|&a| AMctsData::new(state.next_state(a), 0, 0, Some(a)))
-        .for_each(|d| {
-            node.new_child(d, &mut children_write_lock);
-        });
+        .map(|&a| TNode::new_root(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
+        .collect::<Vec<_>>();
 
-    drop(children_write_lock);
-
-    node.children_lock_read()
+    node.children_write(new_children);
 }
 
 /// Increment this node's count of saturated children.
@@ -167,7 +166,7 @@ where
     let parent_plays = parent_data.plays();
     let parent_plays = usize::max(1, parent_plays);
 
-    let child_nodes = root.children_lock_read();
+    let child_nodes = root.children_read();
 
     (*child_nodes)
         .iter()
@@ -240,7 +239,7 @@ where
 
     mcts(root, player_color, thread_count);
 
-    let mut state_children = root.children_handles();
+    let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
     if root.data().is_saturated() {
         state_children
@@ -321,7 +320,8 @@ where
 
         // Expand: generate fresh child nodes for the selected leaf node.
         // let expanded_children = expand(leaf);
-        let expanded_children = expand(leaf);
+        expand(leaf);
+        let expanded_children = leaf.children_read();
 
         if !expanded_children.is_empty() {
             // let sim_node = util::random_pick(&expanded_children, &mut rng)
@@ -388,9 +388,9 @@ pub mod tests {
     fn new_child_expects_add_child_to_parent() {
         let data = make_test_data();
         let tree_root = make_node(data.clone());
-        let child = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child = tree_root.new_child(data.clone());
 
-        assert_eq!(1, tree_root.children_handles().len());
+        assert_eq!(1, tree_root.children_read().len());
         assert!(child.borrow().parent().is_some());
         assert!(tree_root.parent().is_none());
     }
@@ -424,18 +424,15 @@ pub mod tests {
         let data = make_test_data();
 
         let tree_root = make_node(data.clone());
-        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_level_1 = tree_root.new_child(data.clone());
         let child_level_2 = child_level_1.borrow().new_child(
             data.clone(),
-            &mut child_level_1.borrow().children_lock_write(),
         );
         let child_level_3 = child_level_2.borrow().new_child(
             data.clone(),
-            &mut child_level_2.borrow().children_lock_write(),
         );
         let child_level_4 = child_level_3.borrow().new_child(
             data.clone(),
-            &mut child_level_3.borrow().children_lock_write(),
         );
 
         let is_win = true;
@@ -458,7 +455,8 @@ pub mod tests {
     fn expand_expects_creates_children() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        let children = expand(&tree_root);
+        expand(&tree_root);
+        let children = tree_root.children_read();
         let children = children.iter().cloned();
 
         // The game used for testing is TicTacToe,
@@ -470,13 +468,13 @@ pub mod tests {
     fn expand_expects_adds_children_to_parent() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        assert_eq!(0, tree_root.children_handles().len());
+        assert_eq!(0, tree_root.children_read().len());
 
         expand(&tree_root);
 
         // The game used for testing is TicTacToe,
         // which has nine intitial legal children positions.
-        assert_eq!(9, tree_root.children_handles().len());
+        assert_eq!(9, tree_root.children_read().len());
     }
 
     #[test]
@@ -507,23 +505,23 @@ pub mod tests {
 
         let tree_root = ArcNode::new_root(data.clone());
 
-        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_level_1 = tree_root.new_child(data.clone());
         let child_level_1: &ArcNode<_> = child_level_1.borrow();
 
         let child_level_2 =
-            child_level_1.new_child(data.clone(), &mut child_level_1.children_lock_write());
+            child_level_1.new_child(data.clone());
         let child_level_2: &ArcNode<_> = child_level_2.borrow();
 
         let child_level_3_handle =
-            child_level_2.new_child(data.clone(), &mut child_level_2.children_lock_write());
+            child_level_2.new_child(data.clone());
         let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
 
         let child_level_4 =
-            child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
+            child_level_3.new_child(data.clone());
         let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
         let child_level_4b =
-            child_level_3.new_child(data.clone(), &mut child_level_3.children_lock_write());
+            child_level_3.new_child(data.clone());
         let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
 
         child_level_1.data().set_children_count(1);
@@ -557,22 +555,18 @@ pub mod tests {
         let data = make_test_data();
 
         let tree_root = make_node(data.clone());
-        let child_level_1 = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_level_1 = tree_root.new_child(data.clone());
         let child_level_2 = child_level_1.borrow().new_child(
             data.clone(),
-            &mut child_level_1.borrow().children_lock_write(),
         );
         let child_level_3 = child_level_2.borrow().new_child(
             data.clone(),
-            &mut child_level_2.borrow().children_lock_write(),
         );
         let child_level_4 = child_level_3.borrow().new_child(
             data.clone(),
-            &mut child_level_3.borrow().children_lock_write(),
         );
         let child_level_4b = child_level_3.borrow().new_child(
             data.clone(),
-            &mut child_level_3.borrow().children_lock_write(),
         );
 
         tree_root.data().set_children_count(1);
@@ -661,7 +655,8 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let children = expand(tree_root.borrow());
+        expand(tree_root.borrow());
+        let children = tree_root.children_read();
         let children = children.iter().cloned().collect::<Vec<_>>();
 
         assert!(
@@ -688,10 +683,10 @@ pub mod tests {
         let tree_root = make_node(data.clone());
 
         // all children of the same parent
-        let child_a = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
-        let child_b = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
-        let child_c = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
-        let child_d = tree_root.new_child(data.clone(), &mut tree_root.children_lock_write());
+        let child_a = tree_root.new_child(data.clone());
+        let child_b = tree_root.new_child(data.clone());
+        let child_c = tree_root.new_child(data.clone());
+        let child_d = tree_root.new_child(data.clone());
 
         // "visit" each child a different amount of times
         // child a: three visits
@@ -796,7 +791,7 @@ pub mod tests {
 
             let node_play_count = node.data().plays();
             let child_play_sum: usize = node
-                .children_handles()
+                .children_read()
                 .into_iter()
                 .map(|c| c.data().plays())
                 .sum();
@@ -808,7 +803,7 @@ pub mod tests {
                 "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
             );
 
-            traversal.extend(node.children_handles());
+            traversal.extend(node.children_read().iter());
         }
     }
 
@@ -839,7 +834,7 @@ pub mod tests {
         while let Some(n) = traversal.pop() {
             let node: &ArcNode<_> = n.borrow();
 
-            if node.children_handles().is_empty() {
+            if node.children_read().is_empty() {
                 assert_eq!(
                     node.data().plays(),
                     1,
@@ -847,7 +842,7 @@ pub mod tests {
                 );
             }
 
-            traversal.extend(node.children_handles());
+            traversal.extend(node.children_read());
         }
     }
 }
