@@ -24,14 +24,14 @@ where
     // Acquire the write lock on the children
     let children_write_lock = match node.children_write_lock() {
         Some(lock) => lock,
-        None => panic!() // won't panic when done, will return children instead
+        None => return, // won't panic when done, will return children instead
     };
 
     // TODO: This is redundant after the match statement above, can probably remove
     if node.data().is_expanded() {
         // Another thread beat us to the punch, so no work to do
         drop(children_write_lock);
-        panic!() // replace with return
+        return; // replace with return
     }
 
     node.data().mark_expanded();
@@ -41,7 +41,7 @@ where
         // if the game is over, we have nothing to expand
         node.data().set_children_count(0);
         drop(children_write_lock);
-        panic!() // replce with return
+        return; // replce with return
     }
 
     // TODO: There's no reason for legal_moves() to need this argument
