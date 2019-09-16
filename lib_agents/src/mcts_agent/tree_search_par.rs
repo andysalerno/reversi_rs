@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 // as the score.
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
-const EXTRA_TIME_MS: u64 = 3_000;
+const EXTRA_TIME_MS: u64 = 0_000;
 
 fn expand<TNode, TState>(node: &TNode) -> RwLockReadGuard<Vec<TNode::Handle>>
 where
@@ -50,12 +50,12 @@ where
     // inform it how many children it has.
     node.data().set_children_count(legal_actions.len());
 
-    // create a new child node for every available action->state transition
-    for &action in legal_actions {
-        let resulting_state = state.next_state(action);
-        let data = AMctsData::new(resulting_state, 0, 0, Some(action));
-        let _child_node = node.new_child(data, &mut children_write_lock);
-    }
+    legal_actions
+        .iter()
+        .map(|&a| AMctsData::new(state.next_state(a), 0, 0, Some(a)))
+        .for_each(|d| {
+            node.new_child(d, &mut children_write_lock);
+        });
 
     drop(children_write_lock);
 

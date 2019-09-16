@@ -2,13 +2,24 @@ use crate::atree::ANode;
 use crate::tree::Node;
 
 use std::sync::{Arc, Weak};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::write_once_lock::WriteOnceLock;
+use atomic_refcell::AtomicRef;
 
 #[derive(Debug)]
 pub struct ArcNodeContent<T> {
     data: T,
-    parent: Weak<Self>,
-    children: RwLock<Vec<ArcNode<T>>>,
+    parent: Weak<Self>, // WTF? this is a ref to self, not ArcNode<T>??
+    children: WriteOnceLock<Vec<ArcNode<T>>>,
+}
+
+impl<T> ArcNodeContent<T> {
+    fn new_root_data(data: T) -> Self {
+        ArcNodeContent {
+            data,
+            parent: Weak::new(),
+            children: WriteOnceLock::new(Vec::new())
+        }
+    }
 }
 
 /// Wraps a NodeContent with a reference-counted owner.
@@ -30,46 +41,16 @@ impl<T> Node for ArcNode<T> {
         self.parent.upgrade().clone()
     }
 
-    fn children_lock_read(&self) -> RwLockReadGuard<Vec<Self::Handle>> {
-        self.children
-            .read()
-            .expect("Couldn't acquire children read lock")
-    }
-
-    fn children_lock_write(&self) -> RwLockWriteGuard<Vec<Self::Handle>> {
-        self.children
-            .write()
-            .expect("Couldn't acquire children write lock")
-    }
-
-    fn children_handles(&self) -> Vec<Self::Handle> {
-        let children_read = self.children_lock_read();
-
-        children_read.iter().cloned().collect()
-    }
-
-    fn new_child(
-        &self,
-        data: T,
-        write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>,
-    ) -> ArcNode<T> {
-        let child = Arc::new(ArcNodeContent {
-            parent: Arc::downgrade(self),
-            children: RwLock::default(),
-            data,
-        });
-
-        write_lock.push(child.clone());
-
-        child
-    }
-
     fn new_root(data: Self::Data) -> ArcNode<T> {
-        Arc::new(ArcNodeContent {
-            parent: Weak::new(),
-            children: RwLock::default(),
-            data,
-        })
+        Arc::new(ArcNodeContent::new_root_data(data))
+    }
+
+    fn children_write_once(&self, children: Vec<Self::Handle>) {
+        self.children.write(children);
+    }
+
+    fn children_read(&self) -> AtomicRef<Vec<Self::Handle>> {
+        self.children.read()
     }
 }
 

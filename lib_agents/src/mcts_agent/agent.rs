@@ -8,6 +8,7 @@ use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::marker::Sync;
 use std::time::Instant;
+use std::ops::Deref;
 
 pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
 where
@@ -37,7 +38,7 @@ where
             .current_root_handle()
             .expect("Must have a root node to seek through.");
         let cur_state_node = root_handle.borrow();
-        let children = cur_state_node.children_handles();
+        let children = cur_state_node.children_read().deref();
 
         let resulting_child = children
             .iter()
@@ -93,8 +94,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -142,7 +143,7 @@ where
 {
     let total_plays_before = root
         .borrow()
-        .children_handles()
+        .children_read()
         .into_iter()
         .map(|c| c.borrow().data().plays())
         .sum::<usize>();

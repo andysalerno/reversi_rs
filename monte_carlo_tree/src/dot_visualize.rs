@@ -4,6 +4,7 @@ use lib_boardgame::GameState;
 use std::borrow::Borrow;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 
 pub trait TreeToDotFileFormat {
     fn to_dot_file_str(&self, depth_limit: usize) -> String;
@@ -56,7 +57,7 @@ fn depth_first_tree_walk<T, TState>(
     // Add the label for this node
     node_labels_buf.push_str(&label_str);
 
-    for child in node.children_handles() {
+    for child in node.children_read().deref() {
         let child_label = node_label(child.borrow());
         let child_id = hash_str(&child_label).wrapping_add(id);
 

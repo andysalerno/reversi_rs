@@ -1,3 +1,5 @@
+mod write_once_lock;
+
 pub mod arc_tree;
 pub mod dot_visualize;
 pub mod monte_carlo_data;
