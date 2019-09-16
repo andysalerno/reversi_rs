@@ -52,10 +52,11 @@ where
 
     let new_children = legal_actions
         .iter()
-        .map(|&a| TNode::new_root(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
+        .map(|&a| node.new_child(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
         .collect::<Vec<_>>();
 
-    node.children_write(new_children);
+    children_write_lock.write(new_children);
+    drop(children_write_lock);
 }
 
 /// Increment this node's count of saturated children.
@@ -385,7 +386,11 @@ pub mod tests {
     fn new_child_expects_add_child_to_parent() {
         let data = make_test_data();
         let tree_root = make_node(data.clone());
+
+        let root_children_lock = tree_root.children_write_lock();
         let child = tree_root.new_child(data.clone());
+        let children = vec![child.borrow().get_handle()];
+        root_children_lock.write(children);
 
         assert_eq!(1, tree_root.children_read().len());
         assert!(child.borrow().parent().is_some());
@@ -634,7 +639,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        expand(tree_root.borrow());
+        expand(&tree_root);
         let children = tree_root.children_read();
         let children = children.iter().cloned().collect::<Vec<_>>();
 
@@ -769,11 +774,7 @@ pub mod tests {
             let node: &ArcNode<_> = n.borrow();
 
             let node_play_count = node.data().plays();
-            let child_play_sum: usize = node
-                .children_read()
-                .iter()
-                .map(|c| c.data().plays())
-                .sum();
+            let child_play_sum: usize = node.children_read().iter().map(|c| c.data().plays()).sum();
 
             assert!(
                 // Note: this is a bit of a hack right now, they should be exactly equal

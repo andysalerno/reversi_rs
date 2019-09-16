@@ -1,9 +1,9 @@
 use crate::atree::ANode;
 use crate::tree::Node;
 
-use crate::write_once_lock::WriteOnceLock;
+use crate::write_once_lock::{WriteOnceLock, WriteOnceWriteGuard};
 use atomic_refcell::AtomicRef;
-use std::sync::{Arc, MutexGuard, Weak};
+use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
 pub struct ArcNodeContent<T> {
@@ -17,7 +17,7 @@ impl<T> ArcNodeContent<T> {
         ArcNodeContent {
             data,
             parent: Weak::new(),
-            children: WriteOnceLock::new(Vec::new()),
+            children: WriteOnceLock::new(Vec::new(), Vec::new()),
         }
     }
 
@@ -25,7 +25,7 @@ impl<T> ArcNodeContent<T> {
         ArcNodeContent {
             data,
             parent: parent_ptr,
-            children: WriteOnceLock::new(Vec::new()),
+            children: WriteOnceLock::new(Vec::new(), Vec::new()),
         }
     }
 }
@@ -49,15 +49,11 @@ impl<T> Node for ArcNode<T> {
         self.parent.upgrade().clone()
     }
 
-    fn children_write(&self, children: Vec<Self::Handle>) {
-        self.children.write(children);
-    }
-
     fn children_read(&self) -> AtomicRef<Vec<Self::Handle>> {
         self.children.read()
     }
 
-    fn children_write_lock(&self) -> MutexGuard<()> {
+    fn children_write_lock(&self) -> WriteOnceWriteGuard<Vec<Self::Handle>> {
         self.children.write_lock()
     }
 
@@ -69,22 +65,6 @@ impl<T> Node for ArcNode<T> {
     fn new_root(data: Self::Data) -> ArcNode<T> {
         Arc::new(ArcNodeContent::new_root_data(data))
     }
-
-    //     fn new_child(
-    //     &self,
-    //     data: T,
-    //     write_lock: &mut RwLockWriteGuard<Vec<Self::Handle>>,
-    // ) -> ArcNode<T> {
-    //     let child = Arc::new(ArcNodeContent {
-    //         parent: Arc::downgrade(self),
-    //         children: RwLock::default(),
-    //         data,
-    //     });
-
-    //     write_lock.push(child.clone());
-
-    //     child
-    // }
 }
 
 impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {}

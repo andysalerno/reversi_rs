@@ -12,42 +12,60 @@ use std::sync::{Mutex, MutexGuard};
 #[derive(Debug)]
 pub(crate) struct WriteOnceLock<T> {
     data_write: Mutex<()>,
+    default_value: AtomicRefCell<T>,
     data_read: AtomicRefCell<T>,
     has_written: AtomicBool,
 }
 
+pub struct WriteOnceWriteGuard<'a, T> {
+    _mutex_guard: MutexGuard<'a, ()>,
+    guarded: &'a AtomicRefCell<T>,
+    has_written: &'a AtomicBool,
+}
+
+impl<'a, T: 'a> WriteOnceWriteGuard<'a, T> {
+    pub fn new(
+        mutex_guard: MutexGuard<'a, ()>,
+        guarded: &'a AtomicRefCell<T>,
+        has_written: &'a AtomicBool,
+    ) -> Self {
+        Self {
+            _mutex_guard: mutex_guard,
+            guarded,
+            has_written,
+        }
+    }
+
+    pub fn write(&self, data: T) {
+        *self.guarded.borrow_mut() = data;
+        self.has_written.store(true, Ordering::SeqCst);
+    }
+}
+
 impl<T: Sized> WriteOnceLock<T> {
-    pub fn new(data: T) -> Self {
+    pub fn new(data: T, default_data: T) -> Self {
         Self {
             data_write: Mutex::new(()),
             data_read: AtomicRefCell::new(data),
+            default_value: AtomicRefCell::new(default_data),
             has_written: AtomicBool::new(false),
         }
     }
 
-    /// If this is sequentially first invocation of this call on any thread,
-    /// acquires a lock, otherwise returns None.
-    /// The holder of this lock can safely call `write()`.
-    pub fn write_lock(&self) -> MutexGuard<()> {
-        self.data_write.lock().expect("Acquiring data write lock.")
-    }
-
-    /// Writes data to this wrapper's interior data store.
-    /// The expectation is: you only call this while you have a valid MutextGuard
-    /// from `write_lock()` in scope (NOT enforced by code!)
-    pub fn write(&self, data: T) {
-        *self.data_read.borrow_mut() = data;
+    pub fn write_lock(&self) -> WriteOnceWriteGuard<T> {
+        let write_lock = self.data_write.lock().expect("Acquiring data write lock.");
+        WriteOnceWriteGuard::new(write_lock, &self.data_read, &self.has_written)
     }
 
     /// Reads the data that was previously written into this wrapper's data store.
     /// Panics if the data store was not previously written to.
     pub fn read(&self) -> AtomicRef<T> {
         let has_written = self.has_written.load(Ordering::SeqCst);
-        assert!(
-            has_written,
-            "Attempt to read from a WriteOnceLock before writing."
-        );
 
-        self.data_read.borrow()
+        if has_written {
+            self.data_read.borrow()
+        } else {
+            self.default_value.borrow()
+        }
     }
 }
