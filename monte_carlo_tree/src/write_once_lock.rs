@@ -28,14 +28,8 @@ impl<T: Sized> WriteOnceLock<T> {
     /// If this is sequentially first invocation of this call on any thread,
     /// acquires a lock, otherwise returns None.
     /// The holder of this lock can safely call `write()`.
-    pub fn write_lock(&self) -> Option<MutexGuard<()>> {
-        let has_written = self.has_written.swap(true, Ordering::SeqCst);
-
-        if has_written {
-            return None;
-        }
-
-        Some(self.data_write.lock().expect("Acquiring data write lock."))
+    pub fn write_lock(&self) -> MutexGuard<()> {
+        self.data_write.lock().expect("Acquiring data write lock.")
     }
 
     /// Writes data to this wrapper's interior data store.

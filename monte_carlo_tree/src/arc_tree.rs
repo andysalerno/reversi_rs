@@ -57,7 +57,7 @@ impl<T> Node for ArcNode<T> {
         self.children.read()
     }
 
-    fn children_write_lock(&self) -> Option<MutexGuard<()>> {
+    fn children_write_lock(&self) -> MutexGuard<()> {
         self.children.write_lock()
     }
 

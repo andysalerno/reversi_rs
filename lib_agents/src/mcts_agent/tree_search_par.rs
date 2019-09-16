@@ -22,15 +22,12 @@ where
     TState: GameState,
 {
     // Acquire the write lock on the children
-    let children_write_lock = match node.children_write_lock() {
-        Some(lock) => lock,
-        None => return, // won't panic when done, will return children instead
-    };
+    let children_write_lock = node.children_write_lock();
 
     // TODO: This is redundant after the match statement above, can probably remove
     if node.data().is_expanded() {
         // Another thread beat us to the punch, so no work to do
-        drop(children_write_lock);
+        drop(children_write_lock); // TODO: this line isn't needed
         return; // replace with return
     }
 
@@ -40,7 +37,7 @@ where
     if state.is_game_over() {
         // if the game is over, we have nothing to expand
         node.data().set_children_count(0);
-        drop(children_write_lock);
+        drop(children_write_lock); // TODO: this line isn't needed
         return; // replce with return
     }
 
@@ -774,7 +771,7 @@ pub mod tests {
             let node_play_count = node.data().plays();
             let child_play_sum: usize = node
                 .children_read()
-                .into_iter()
+                .iter()
                 .map(|c| c.data().plays())
                 .sum();
 
@@ -785,7 +782,9 @@ pub mod tests {
                 "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
             );
 
-            traversal.extend(node.children_read().iter());
+            let children = node.children_read();
+            let children = children.iter().cloned();
+            traversal.extend(children);
         }
     }
 
@@ -824,7 +823,9 @@ pub mod tests {
                 );
             }
 
-            traversal.extend(node.children_read());
+            let children = node.children_read();
+            let children = children.iter().cloned();
+            traversal.extend(children);
         }
     }
 }
