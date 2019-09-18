@@ -154,43 +154,43 @@ impl<T: Send + Sync> Node for ArcNode<T> {
 //         assert_eq!(4, r_1_3_1.data().get_visits());
 //     }
 
-    // #[test]
-    // fn refcells_dont_explode() {
-    //     let root = RcNode::new_root(TestData(1));
-    //     let child_1 = root.new_child(TestData(2));
-    //     let child_2 = root.new_child(TestData(3));
-    //     let child_3 = root.new_child(TestData(4));
+// #[test]
+// fn refcells_dont_explode() {
+//     let root = RcNode::new_root(TestData(1));
+//     let child_1 = root.new_child(TestData(2));
+//     let child_2 = root.new_child(TestData(3));
+//     let child_3 = root.new_child(TestData(4));
 
-    //     let child_4 = child_1.new_child(TestData(5));
-    //     let child_5 = child_2.new_child(TestData(5));
-    //     let child_6 = child_5.new_child(TestData(5));
+//     let child_4 = child_1.new_child(TestData(5));
+//     let child_5 = child_2.new_child(TestData(5));
+//     let child_6 = child_5.new_child(TestData(5));
 
-    //     let child_1_children = child_1.children();
-    //     let child_2_children = child_2.children();
-    //     let child_3_children = child_3.children();
-    //     let child_4_children = child_4.children();
-    //     let child_5_children = child_5.children();
-    //     let child_6_children = child_6.children();
+//     let child_1_children = child_1.children();
+//     let child_2_children = child_2.children();
+//     let child_3_children = child_3.children();
+//     let child_4_children = child_4.children();
+//     let child_5_children = child_5.children();
+//     let child_6_children = child_6.children();
 
-    //     let mut _test: Vec<_> = child_6_children.iter().collect();
-    //     _test = child_5_children.iter().collect();
-    //     _test = child_6_children.iter().collect();
-    //     _test = child_1_children.iter().collect();
-    //     _test = child_2_children.iter().collect();
-    //     _test = child_4_children.iter().collect();
-    //     _test = child_3_children.iter().collect();
-    //     _test = child_5_children.iter().collect();
+//     let mut _test: Vec<_> = child_6_children.iter().collect();
+//     _test = child_5_children.iter().collect();
+//     _test = child_6_children.iter().collect();
+//     _test = child_1_children.iter().collect();
+//     _test = child_2_children.iter().collect();
+//     _test = child_4_children.iter().collect();
+//     _test = child_3_children.iter().collect();
+//     _test = child_5_children.iter().collect();
 
-    //     assert_eq!(
-    //         _test[0] // child_6
-    //             .parent() // child_5
-    //             .unwrap()
-    //             .parent() // child_2
-    //             .unwrap()
-    //             .parent() // root
-    //             .unwrap()
-    //             .data(),
-    //         &TestData(1),
-    //     );
-    // }
+//     assert_eq!(
+//         _test[0] // child_6
+//             .parent() // child_5
+//             .unwrap()
+//             .parent() // child_2
+//             .unwrap()
+//             .parent() // root
+//             .unwrap()
+//             .data(),
+//         &TestData(1),
+//     );
+// }
 // }

@@ -3,7 +3,7 @@ use crate::util;
 use crossbeam::thread;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, tree::Node, monte_carlo_data::MctsResult};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
 use std::borrow::Borrow;
 
 use std::time::{Duration, Instant};
@@ -373,7 +373,7 @@ pub mod tests {
     fn make_node<G>(data: AMctsData<G>) -> impl Node<Data = AMctsData<G>>
     where
         G: GameState + Sync + Send,
-        G::Move: Sync + Send
+        G::Move: Sync + Send,
     {
         ArcNode::new_root(data)
     }
