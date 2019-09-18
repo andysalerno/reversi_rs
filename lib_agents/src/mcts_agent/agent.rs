@@ -1,8 +1,7 @@
 use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, arc_tree::ArcNode, atree::ANode, monte_carlo_data::MctsResult,
-    tree::Node,
+    amonte_carlo_data::AMctsData, arc_tree::ArcNode, tree::Node, monte_carlo_data::MctsResult,
 };
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -78,7 +77,7 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState + Sync,
 {
     fn observe_action(&self, _player: PlayerColor, action: TState::Move, _result: &TState) {
@@ -93,8 +92,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 2),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 4),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -137,7 +136,7 @@ fn perform_mcts_par<TNode, TState>(
     thread_count: usize,
 ) -> MctsResult<TState>
 where
-    TNode: ANode<Data = AMctsData<TState>> + Sync,
+    TNode: Node<Data = AMctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
     let total_plays_before = root

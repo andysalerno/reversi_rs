@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 
 /// A tree node that can hold data, and refer to
 /// its parent and children.
-pub trait Node: Sized {
+pub trait Node: Sized + Sync {
     type Handle: Borrow<Self> + Clone;
     type Data;
 

@@ -1,4 +1,3 @@
-use crate::atree::ANode;
 use crate::tree::Node;
 
 use crate::write_once_lock::{WriteOnceLock, WriteOnceWriteGuard};
@@ -6,13 +5,13 @@ use atomic_refcell::AtomicRef;
 use std::sync::{Arc, Weak};
 
 #[derive(Debug)]
-pub struct ArcNodeContent<T> {
+pub struct ArcNodeContent<T: Send + Sync> {
     data: T,
     parent: Weak<Self>, // WTF? this is a ref to self, not ArcNode<T>??
     children: WriteOnceLock<Vec<ArcNode<T>>>,
 }
 
-impl<T> ArcNodeContent<T> {
+impl<T: Send + Sync> ArcNodeContent<T> {
     fn new_root_data(data: T) -> Self {
         ArcNodeContent {
             data,
@@ -33,7 +32,7 @@ impl<T> ArcNodeContent<T> {
 /// Wraps a NodeContent with a reference-counted owner.
 pub type ArcNode<T> = Arc<ArcNodeContent<T>>;
 
-impl<T> Node for ArcNode<T> {
+impl<T: Send + Sync> Node for ArcNode<T> {
     type Handle = Self;
     type Data = T;
 
@@ -66,8 +65,6 @@ impl<T> Node for ArcNode<T> {
         Arc::new(ArcNodeContent::new_root_data(data))
     }
 }
-
-impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {}
 
 // #[cfg(test)]
 // mod tests {
@@ -156,4 +153,44 @@ impl<T: std::marker::Send + std::marker::Sync> ANode for ArcNode<T> {}
 //         assert_eq!(4, r_1_3.data().get_visits());
 //         assert_eq!(4, r_1_3_1.data().get_visits());
 //     }
+
+    // #[test]
+    // fn refcells_dont_explode() {
+    //     let root = RcNode::new_root(TestData(1));
+    //     let child_1 = root.new_child(TestData(2));
+    //     let child_2 = root.new_child(TestData(3));
+    //     let child_3 = root.new_child(TestData(4));
+
+    //     let child_4 = child_1.new_child(TestData(5));
+    //     let child_5 = child_2.new_child(TestData(5));
+    //     let child_6 = child_5.new_child(TestData(5));
+
+    //     let child_1_children = child_1.children();
+    //     let child_2_children = child_2.children();
+    //     let child_3_children = child_3.children();
+    //     let child_4_children = child_4.children();
+    //     let child_5_children = child_5.children();
+    //     let child_6_children = child_6.children();
+
+    //     let mut _test: Vec<_> = child_6_children.iter().collect();
+    //     _test = child_5_children.iter().collect();
+    //     _test = child_6_children.iter().collect();
+    //     _test = child_1_children.iter().collect();
+    //     _test = child_2_children.iter().collect();
+    //     _test = child_4_children.iter().collect();
+    //     _test = child_3_children.iter().collect();
+    //     _test = child_5_children.iter().collect();
+
+    //     assert_eq!(
+    //         _test[0] // child_6
+    //             .parent() // child_5
+    //             .unwrap()
+    //             .parent() // child_2
+    //             .unwrap()
+    //             .parent() // root
+    //             .unwrap()
+    //             .data(),
+    //         &TestData(1),
+    //     );
+    // }
 // }

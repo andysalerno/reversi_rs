@@ -3,7 +3,7 @@ use crate::util;
 use crossbeam::thread;
 use lib_boardgame::GameResult;
 use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, atree::ANode, monte_carlo_data::MctsResult};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, tree::Node, monte_carlo_data::MctsResult};
 use std::borrow::Borrow;
 
 use std::time::{Duration, Instant};
@@ -18,7 +18,7 @@ const EXTRA_TIME_MS: u64 = 0_000;
 
 fn expand<TNode, TState>(node: &TNode)
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     // Acquire the write lock on the children
@@ -64,7 +64,7 @@ where
 /// follow the same operation for its parent.
 fn backprop_saturation<TNode, TState>(leaf: &TNode)
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     assert!(
@@ -90,7 +90,7 @@ where
 
 fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
     R: rand::Rng,
 {
@@ -113,7 +113,7 @@ where
 
 fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut parent_node = Some(node.get_handle());
@@ -135,7 +135,7 @@ where
 /// If the given node has no children, returns a handle back to the given node.
 fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
@@ -156,7 +156,7 @@ fn select_child_max_score_inverted<TNode, TState>(
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let parent_data = root.data();
@@ -184,7 +184,7 @@ fn score_node_pessimistic<TNode, TState>(
     parent_is_player_color: bool,
 ) -> f32
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let data = node.data();
@@ -225,7 +225,7 @@ pub fn mcts_result<TNode, TState>(
     thread_count: usize,
 ) -> Vec<MctsResult<TState>>
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let root = root_handle.borrow();
@@ -263,7 +263,7 @@ where
 
 fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_count: usize)
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     if thread_count == 1 {
@@ -282,7 +282,7 @@ where
 
 fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
-    TNode: ANode<Data = AMctsData<TState>>,
+    TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let now = Instant::now();
@@ -370,10 +370,10 @@ pub mod tests {
         TicTacToeState::initial_state()
     }
 
-    fn make_node<G>(data: AMctsData<G>) -> impl ANode<Data = AMctsData<G>>
+    fn make_node<G>(data: AMctsData<G>) -> impl Node<Data = AMctsData<G>>
     where
-        G: GameState + Sync,
-        G::Move: Sync,
+        G: GameState + Sync + Send,
+        G::Move: Sync + Send
     {
         ArcNode::new_root(data)
     }
@@ -532,7 +532,7 @@ pub mod tests {
         assert!(!child_level_3.data().is_saturated());
 
         let selected = select_child_max_score_inverted::<ArcNode<_>, TicTacToeState>(
-            &child_level_3_handle,
+            child_level_3_handle.borrow(),
             PlayerColor::Black,
         )
         .expect("the child should have been selected.");
