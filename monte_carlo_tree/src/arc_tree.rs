@@ -66,131 +66,123 @@ impl<T: Send + Sync> Node for ArcNode<T> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-//     struct DummyData {
-//         visits: AtomicUsize,
-//     }
+    struct DummyData {
+        visits: AtomicUsize,
+    }
 
-//     impl DummyData {
-//         fn new() -> Self {
-//             DummyData {
-//                 visits: AtomicUsize::new(0),
-//             }
-//         }
+    impl DummyData {
+        fn new() -> Self {
+            DummyData {
+                visits: AtomicUsize::new(0),
+            }
+        }
 
-//         fn increment_visits(&self) {
-//             self.visits.fetch_add(1, Ordering::Relaxed);
-//         }
+        fn increment_visits(&self) {
+            self.visits.fetch_add(1, Ordering::Relaxed);
+        }
 
-//         fn get_visits(&self) -> usize {
-//             self.visits.load(Ordering::SeqCst)
-//         }
-//     }
+        fn get_visits(&self) -> usize {
+            self.visits.load(Ordering::SeqCst)
+        }
+    }
 
-//     #[test]
-//     fn new_child_expects_can_add_children() {
-//         let root = ArcNode::new_root(DummyData::new());
+    #[test]
+    fn new_child_expects_can_add_children() {
+        let root = ArcNode::new_root(DummyData::new());
 
-//         let root_child_a = root.new_child(DummyData::new(), &mut root.children_lock_write());
-//         let root_child_a_child1 =
-//             root_child_a.new_child(DummyData::new(), &mut root_child_a.children_lock_write());
+        let root_child_a = root.new_child(DummyData::new());
+        let root_child_a_child1 = root_child_a.new_child(DummyData::new());
 
-//         let root_child_b = root.new_child(DummyData::new(), &mut root.children_lock_write());
-//         let root_child_b_child1 =
-//             root_child_b.new_child(DummyData::new(), &mut root_child_b.children_lock_write());
+        let root_child_b = root.new_child(DummyData::new());
+        let root_child_b_child1 = root_child_b.new_child(DummyData::new());
 
-//         assert_eq!(2, root.children_handles().into_iter().count());
-//         assert_eq!(1, root_child_a.children_handles().into_iter().count());
-//         assert_eq!(
-//             0,
-//             root_child_a_child1.children_handles().into_iter().count()
-//         );
-//         assert_eq!(1, root_child_b.children_handles().into_iter().count());
-//         assert_eq!(
-//             0,
-//             root_child_b_child1.children_handles().into_iter().count()
-//         );
-//     }
+        assert_eq!(2, root.children_read().iter().count());
+        assert_eq!(1, root_child_a.children_read().iter().count());
+        assert_eq!(0, root_child_a_child1.children_read().iter().count());
+        assert_eq!(1, root_child_b.children_read().iter().count());
+        assert_eq!(0, root_child_b_child1.children_read().iter().count());
+    }
 
-//     #[test]
-//     fn multiple_threads_can_walk_tree() {
-//         use crossbeam::thread;
+    #[test]
+    fn multiple_threads_can_walk_tree() {
+        use crossbeam::thread;
 
-//         let r = ArcNode::new_root(DummyData::new());
-//         let r_1 = r.new_child(DummyData::new(), &mut r.children_lock_write());
-//         let r_1_1 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
-//         let r_1_1_1 = r_1_1.new_child(DummyData::new(), &mut r_1_1.children_lock_write());
-//         let r_1_2 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
-//         let r_1_3 = r_1.new_child(DummyData::new(), &mut r_1.children_lock_write());
-//         let r_1_3_1 = r_1_3.new_child(DummyData::new(), &mut r_1_3.children_lock_write());
+        let r = ArcNode::new_root(DummyData::new());
+        let r_1 = r.new_child(DummyData::new());
+        let r_1_1 = r_1.new_child(DummyData::new());
+        let r_1_1_1 = r_1_1.new_child(DummyData::new());
+        let r_1_2 = r_1.new_child(DummyData::new());
+        let r_1_3 = r_1.new_child(DummyData::new());
+        let r_1_3_1 = r_1_3.new_child(DummyData::new());
 
-//         thread::scope(|s| {
-//             for _ in 0..4 {
-//                 s.spawn(|_| {
-//                     let mut node_queue = vec![r.clone()];
+        thread::scope(|s| {
+            for _ in 0..4 {
+                s.spawn(|_| {
+                    let mut node_queue = vec![r.clone()];
 
-//                     while let Some(walker) = node_queue.pop() {
-//                         walker.data().increment_visits();
+                    while let Some(walker) = node_queue.pop() {
+                        walker.data().increment_visits();
 
-//                         let children = walker.children_handles().clone();
+                        let children = walker.children_read().clone();
 
-//                         node_queue.extend(children);
-//                     }
-//                 });
-//             }
-//         })
-//         .expect("Scope didn't terminate properly.");
+                        node_queue.extend(children);
+                    }
+                });
+            }
+        })
+        .expect("Scope didn't terminate properly.");
 
-//         assert_eq!(4, r.data().get_visits());
-//         assert_eq!(4, r_1.data().get_visits());
-//         assert_eq!(4, r_1_1.data().get_visits());
-//         assert_eq!(4, r_1_1_1.data().get_visits());
-//         assert_eq!(4, r_1_2.data().get_visits());
-//         assert_eq!(4, r_1_3.data().get_visits());
-//         assert_eq!(4, r_1_3_1.data().get_visits());
-//     }
+        assert_eq!(4, r.data().get_visits());
+        assert_eq!(4, r_1.data().get_visits());
+        assert_eq!(4, r_1_1.data().get_visits());
+        assert_eq!(4, r_1_1_1.data().get_visits());
+        assert_eq!(4, r_1_2.data().get_visits());
+        assert_eq!(4, r_1_3.data().get_visits());
+        assert_eq!(4, r_1_3_1.data().get_visits());
+    }
 
-// #[test]
-// fn refcells_dont_explode() {
-//     let root = RcNode::new_root(TestData(1));
-//     let child_1 = root.new_child(TestData(2));
-//     let child_2 = root.new_child(TestData(3));
-//     let child_3 = root.new_child(TestData(4));
+    // #[test]
+    // fn refcells_dont_explode() {
+    //     let root = ArcNode::new_root(TestData(1));
+    //     let child_1 = root.new_child(TestData(2));
+    //     let child_2 = root.new_child(TestData(3));
+    //     let child_3 = root.new_child(TestData(4));
 
-//     let child_4 = child_1.new_child(TestData(5));
-//     let child_5 = child_2.new_child(TestData(5));
-//     let child_6 = child_5.new_child(TestData(5));
+    //     let child_4 = child_1.new_child(TestData(5));
+    //     let child_5 = child_2.new_child(TestData(5));
+    //     let child_6 = child_5.new_child(TestData(5));
 
-//     let child_1_children = child_1.children();
-//     let child_2_children = child_2.children();
-//     let child_3_children = child_3.children();
-//     let child_4_children = child_4.children();
-//     let child_5_children = child_5.children();
-//     let child_6_children = child_6.children();
+    //     let child_1_children = child_1.children();
+    //     let child_2_children = child_2.children();
+    //     let child_3_children = child_3.children();
+    //     let child_4_children = child_4.children();
+    //     let child_5_children = child_5.children();
+    //     let child_6_children = child_6.children();
 
-//     let mut _test: Vec<_> = child_6_children.iter().collect();
-//     _test = child_5_children.iter().collect();
-//     _test = child_6_children.iter().collect();
-//     _test = child_1_children.iter().collect();
-//     _test = child_2_children.iter().collect();
-//     _test = child_4_children.iter().collect();
-//     _test = child_3_children.iter().collect();
-//     _test = child_5_children.iter().collect();
+    //     let mut _test: Vec<_> = child_6_children.iter().collect();
+    //     _test = child_5_children.iter().collect();
+    //     _test = child_6_children.iter().collect();
+    //     _test = child_1_children.iter().collect();
+    //     _test = child_2_children.iter().collect();
+    //     _test = child_4_children.iter().collect();
+    //     _test = child_3_children.iter().collect();
+    //     _test = child_5_children.iter().collect();
 
-//     assert_eq!(
-//         _test[0] // child_6
-//             .parent() // child_5
-//             .unwrap()
-//             .parent() // child_2
-//             .unwrap()
-//             .parent() // root
-//             .unwrap()
-//             .data(),
-//         &TestData(1),
-//     );
-// }
-// }
+    //     assert_eq!(
+    //         _test[0] // child_6
+    //             .parent() // child_5
+    //             .unwrap()
+    //             .parent() // child_2
+    //             .unwrap()
+    //             .parent() // root
+    //             .unwrap()
+    //             .data(),
+    //         &TestData(1),
+    //     );
+    // }
+}

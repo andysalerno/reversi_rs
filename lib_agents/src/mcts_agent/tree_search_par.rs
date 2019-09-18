@@ -378,6 +378,15 @@ pub mod tests {
         ArcNode::new_root(data)
     }
 
+    fn add_children_to_parent<TNode, TState>(parent: &TNode, children: Vec<TNode::Handle>)
+    where
+        TNode: Node<Data = AMctsData<TState>>,
+        TState: GameState,
+    {
+        let parent_write_lock = parent.children_write_lock();
+        parent_write_lock.write(children);
+    }
+
     fn make_test_data() -> AMctsData<TicTacToeState> {
         AMctsData::new(TicTacToeState::initial_state(), 0, 0, None)
     }
@@ -503,19 +512,27 @@ pub mod tests {
 
         let child_level_1 = tree_root.new_child(data.clone());
         let child_level_1: &ArcNode<_> = child_level_1.borrow();
+        add_children_to_parent(&tree_root, vec![child_level_1.get_handle()]);
 
         let child_level_2 = child_level_1.new_child(data.clone());
         let child_level_2: &ArcNode<_> = child_level_2.borrow();
+        add_children_to_parent(child_level_1, vec![child_level_2.get_handle()]);
 
         let child_level_3_handle = child_level_2.new_child(data.clone());
         let child_level_3: &ArcNode<_> = child_level_3_handle.borrow();
+        add_children_to_parent(child_level_2, vec![child_level_3.get_handle()]);
 
         let child_level_4 = child_level_3.new_child(data.clone());
         let child_level_4: &ArcNode<_> = child_level_4.borrow();
 
         let child_level_4b = child_level_3.new_child(data.clone());
         let child_level_4b: &ArcNode<_> = child_level_4b.borrow();
+        add_children_to_parent(
+            child_level_3,
+            vec![child_level_4.get_handle(), child_level_4b.get_handle()],
+        );
 
+        // TODO: remove when we set this in the write() on the lock
         child_level_1.data().set_children_count(1);
         child_level_2.data().set_children_count(1);
         child_level_3.data().set_children_count(2);
