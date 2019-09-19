@@ -91,15 +91,28 @@ mod tests {
         }
     }
 
+    fn add_children_to_parent(parent: &ArcNode<DummyData>, children: Vec<ArcNode<DummyData>>) {
+        let parent_write_lock = parent.children_write_lock();
+        parent_write_lock.write(children);
+    }
+
     #[test]
     fn new_child_expects_can_add_children() {
         let root = ArcNode::new_root(DummyData::new());
 
         let root_child_a = root.new_child(DummyData::new());
+
         let root_child_a_child1 = root_child_a.new_child(DummyData::new());
+        add_children_to_parent(&root_child_a, vec![root_child_a_child1.get_handle()]);
 
         let root_child_b = root.new_child(DummyData::new());
+        add_children_to_parent(
+            &root,
+            vec![root_child_a.get_handle(), root_child_b.get_handle()],
+        );
+
         let root_child_b_child1 = root_child_b.new_child(DummyData::new());
+        add_children_to_parent(&root_child_b, vec![root_child_b_child1.get_handle()]);
 
         assert_eq!(2, root.children_read().iter().count());
         assert_eq!(1, root_child_a.children_read().iter().count());
@@ -113,12 +126,23 @@ mod tests {
         use crossbeam::thread;
 
         let r = ArcNode::new_root(DummyData::new());
+
         let r_1 = r.new_child(DummyData::new());
+        add_children_to_parent(&r, vec![r_1.get_handle()]);
+
         let r_1_1 = r_1.new_child(DummyData::new());
-        let r_1_1_1 = r_1_1.new_child(DummyData::new());
         let r_1_2 = r_1.new_child(DummyData::new());
         let r_1_3 = r_1.new_child(DummyData::new());
+        add_children_to_parent(
+            &r_1,
+            vec![r_1_1.get_handle(), r_1_2.get_handle(), r_1_3.get_handle()],
+        );
+
+        let r_1_1_1 = r_1_1.new_child(DummyData::new());
+        add_children_to_parent(&r_1_1, vec![r_1_1_1.get_handle()]);
+
         let r_1_3_1 = r_1_3.new_child(DummyData::new());
+        add_children_to_parent(&r_1_3, vec![r_1_3_1.get_handle()]);
 
         thread::scope(|s| {
             for _ in 0..4 {

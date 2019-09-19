@@ -1,17 +1,11 @@
-use crate::util;
-
-use crossbeam::thread;
-use lib_boardgame::GameResult;
-use lib_boardgame::{GameState, PlayerColor};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
 use std::borrow::Borrow;
-
 use std::time::{Duration, Instant};
 
-// todo: mcts() should return the actual winning node,
-// and if the subtree from the root is saturated
-// it should use ratio of wins/plays inatead of sum(plays)
-// as the score.
+use crossbeam::thread;
+
+use crate::util;
+use lib_boardgame::{GameResult, GameState, PlayerColor};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 0_000;
@@ -24,38 +18,39 @@ where
     // Acquire the write lock on the children
     let children_write_lock = node.children_write_lock();
 
-    // TODO: This is redundant after the match statement above, can probably remove
-    if node.data().is_expanded() {
-        // Another thread beat us to the punch, so no work to do
-        drop(children_write_lock); // TODO: this line isn't needed
-        return; // replace with return
+    // Critical lock scope of this function:
+    {
+        if node.data().is_expanded() {
+            // Another thread beat us to the punch, so no work to do
+            return;
+        }
+
+        node.data().mark_expanded();
+
+        let state = node.data().state();
+        if state.is_game_over() {
+            // if the game is over, we have nothing to expand
+            node.data().set_children_count(0);
+            return;
+        }
+
+        // TODO: There's no reason for legal_moves() to need this argument
+        // since the state already knows the player's turn.
+        let player_turn = state.current_player_turn();
+        let legal_actions = state.legal_moves(player_turn);
+
+        // Now that we've expanded this node, update it to
+        // inform it how many children it has.
+        node.data().set_children_count(legal_actions.len());
+
+        let new_children = legal_actions
+            .iter()
+            .map(|&a| node.new_child(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
+            .collect::<Vec<_>>();
+
+        children_write_lock.write(new_children);
     }
 
-    node.data().mark_expanded();
-
-    let state = node.data().state();
-    if state.is_game_over() {
-        // if the game is over, we have nothing to expand
-        node.data().set_children_count(0);
-        drop(children_write_lock); // TODO: this line isn't needed
-        return; // replce with return
-    }
-
-    // TODO: There's no reason for legal_moves() to need this argument
-    // since the state already knows the player's turn.
-    let player_turn = state.current_player_turn();
-    let legal_actions = state.legal_moves(player_turn);
-
-    // Now that we've expanded this node, update it to
-    // inform it how many children it has.
-    node.data().set_children_count(legal_actions.len());
-
-    let new_children = legal_actions
-        .iter()
-        .map(|&a| node.new_child(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
-        .collect::<Vec<_>>();
-
-    children_write_lock.write(new_children);
     drop(children_write_lock);
 }
 
@@ -71,11 +66,13 @@ where
         leaf.data().is_saturated(),
         "Only a leaf considered saturated can have its saturated status backpropagated."
     );
+
     let mut handle = leaf.parent();
 
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
+
         data.increment_saturated_children_count();
 
         if !data.is_saturated() {
@@ -140,7 +137,8 @@ where
 {
     let mut cur_node = root.get_handle();
 
-    while let Some(c) = select_child_max_score::<TNode, TState>(cur_node.borrow(), player_color) {
+    while let Some(c) = select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
+    {
         cur_node = c;
     }
 
@@ -149,7 +147,7 @@ where
 
 /// Returns a handle to the child with the greatest selection score,
 /// or None if there are no children OR all children have been saturated.
-fn select_child_max_score<TNode, TState>(
+fn select_child_for_traversal<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
@@ -168,15 +166,21 @@ where
         .iter()
         .filter(|&n| !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
-            let a_score = score_node(a.borrow(), parent_plays, parent_is_player_color);
-            let b_score = score_node(b.borrow(), parent_plays, parent_is_player_color);
+            let a_score =
+                score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
+            let b_score =
+                score_node_for_traversal(b.borrow(), parent_plays, parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
         })
         .and_then(|n| Some(n.clone()))
 }
 
-fn score_node<TNode, TState>(node: &TNode, parent_plays: usize, parent_is_player_color: bool) -> f32
+fn score_node_for_traversal<TNode, TState>(
+    node: &TNode,
+    parent_plays: usize,
+    parent_is_player_color: bool,
+) -> f32
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -200,7 +204,6 @@ where
     let node_mean_val = wins / plays;
     let explore_bias = 2_f32;
 
-    // todo: test swapping parent_plays and plays, and run trials for that
     let score = node_mean_val + f32::sqrt((explore_bias * f32::ln(parent_plays)) / plays);
 
     if score.is_nan() {
@@ -542,7 +545,7 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score::<ArcNode<_>, TicTacToeState>(
+        let selected = select_child_for_traversal::<ArcNode<_>, TicTacToeState>(
             child_level_3_handle.borrow(),
             PlayerColor::Black,
         )
@@ -710,12 +713,21 @@ pub mod tests {
 
         let parent_plays = tree_root.data().plays();
 
-        assert_eq!(1.0929347, score_node(child_a.borrow(), parent_plays, true));
-        assert_eq!(1.3385662, score_node(child_b.borrow(), parent_plays, true));
-        assert_eq!(1.8930185, score_node(child_c.borrow(), parent_plays, true));
+        assert_eq!(
+            1.0929347,
+            score_node_for_traversal(child_a.borrow(), parent_plays, true)
+        );
+        assert_eq!(
+            1.3385662,
+            score_node_for_traversal(child_b.borrow(), parent_plays, true)
+        );
+        assert_eq!(
+            1.8930185,
+            score_node_for_traversal(child_c.borrow(), parent_plays, true)
+        );
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node(child_d.borrow(), parent_plays, true)
+            score_node_for_traversal(child_d.borrow(), parent_plays, true)
         );
     }
 
