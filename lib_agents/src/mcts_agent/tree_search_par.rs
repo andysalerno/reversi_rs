@@ -133,16 +133,14 @@ where
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
 /// If the given node has no children, returns a handle back to the given node.
-fn select_to_leaf_inverted<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
+fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
 
-    while let Some(c) =
-        select_child_max_score_inverted::<TNode, TState>(cur_node.borrow(), player_color)
-    {
+    while let Some(c) = select_child_max_score::<TNode, TState>(cur_node.borrow(), player_color) {
         cur_node = c;
     }
 
@@ -151,7 +149,7 @@ where
 
 /// Returns a handle to the child with the greatest selection score,
 /// or None if there are no children OR all children have been saturated.
-fn select_child_max_score_inverted<TNode, TState>(
+fn select_child_max_score<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
@@ -170,19 +168,15 @@ where
         .iter()
         .filter(|&n| !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
-            let a_score = score_node_pessimistic(a.borrow(), parent_plays, parent_is_player_color);
-            let b_score = score_node_pessimistic(b.borrow(), parent_plays, parent_is_player_color);
+            let a_score = score_node(a.borrow(), parent_plays, parent_is_player_color);
+            let b_score = score_node(b.borrow(), parent_plays, parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
         })
         .and_then(|n| Some(n.clone()))
 }
 
-fn score_node_pessimistic<TNode, TState>(
-    node: &TNode,
-    parent_plays: usize,
-    parent_is_player_color: bool,
-) -> f32
+fn score_node<TNode, TState>(node: &TNode, parent_plays: usize, parent_is_player_color: bool) -> f32
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -312,7 +306,7 @@ where
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf_inverted(root, player_color);
+        let leaf = select_to_leaf(root, player_color);
 
         let leaf = leaf.borrow();
 
@@ -548,7 +542,7 @@ pub mod tests {
 
         assert!(!child_level_3.data().is_saturated());
 
-        let selected = select_child_max_score_inverted::<ArcNode<_>, TicTacToeState>(
+        let selected = select_child_max_score::<ArcNode<_>, TicTacToeState>(
             child_level_3_handle.borrow(),
             PlayerColor::Black,
         )
@@ -565,10 +559,21 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
         let child_level_1 = tree_root.new_child(data.clone());
+        add_children_to_parent(&tree_root, vec![child_level_1.clone()]);
+
         let child_level_2 = child_level_1.borrow().new_child(data.clone());
+        add_children_to_parent(child_level_1.borrow(), vec![child_level_2.clone()]);
+
         let child_level_3 = child_level_2.borrow().new_child(data.clone());
+        add_children_to_parent(child_level_2.borrow(), vec![child_level_3.clone()]);
+
         let child_level_4 = child_level_3.borrow().new_child(data.clone());
+
         let child_level_4b = child_level_3.borrow().new_child(data.clone());
+        add_children_to_parent(
+            child_level_3.borrow(),
+            vec![child_level_4.clone(), child_level_4b.clone()],
+        );
 
         tree_root.data().set_children_count(1);
         child_level_1.borrow().data().set_children_count(1);
@@ -586,7 +591,7 @@ pub mod tests {
         backprop_sim_result(child_level_4b.borrow(), is_win);
         backprop_sim_result(child_level_4b.borrow(), is_win);
 
-        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
 
         let leaf = leaf.borrow();
 
@@ -599,7 +604,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let leaf = select_to_leaf_inverted(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
         let leaf = leaf.borrow();
 
         assert_eq!(10, leaf.data().plays());
@@ -705,21 +710,12 @@ pub mod tests {
 
         let parent_plays = tree_root.data().plays();
 
-        assert_eq!(
-            1.0929347,
-            score_node_pessimistic(child_a.borrow(), parent_plays, true)
-        );
-        assert_eq!(
-            1.3385662,
-            score_node_pessimistic(child_b.borrow(), parent_plays, true)
-        );
-        assert_eq!(
-            1.8930185,
-            score_node_pessimistic(child_c.borrow(), parent_plays, true)
-        );
+        assert_eq!(1.0929347, score_node(child_a.borrow(), parent_plays, true));
+        assert_eq!(1.3385662, score_node(child_b.borrow(), parent_plays, true));
+        assert_eq!(1.8930185, score_node(child_c.borrow(), parent_plays, true));
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node_pessimistic(child_d.borrow(), parent_plays, true)
+            score_node(child_d.borrow(), parent_plays, true)
         );
     }
 

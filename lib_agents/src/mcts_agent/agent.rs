@@ -92,8 +92,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 4),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 4),
         };
 
         let white_wins = if self.color == PlayerColor::White {
