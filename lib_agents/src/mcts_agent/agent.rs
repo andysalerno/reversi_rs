@@ -1,7 +1,7 @@
 use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, arc_tree::ArcNode, monte_carlo_data::MctsResult, tree::Node,
+    amonte_carlo_data::AMctsData, arc_tree::ArcNode, amonte_carlo_data::MctsResult, tree::Node,
 };
 use std::borrow::Borrow;
 use std::cell::RefCell;
@@ -92,8 +92,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 4),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 4),
         };
 
         let white_wins = if self.color == PlayerColor::White {

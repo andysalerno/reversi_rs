@@ -1,8 +1,16 @@
-use crate::monte_carlo_data::MctsResult;
 use lib_boardgame::{GameResult, GameState};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::RwLock;
+
+#[derive(Default, Clone)]
+pub struct MctsResult<TState: GameState> {
+    pub result: Option<GameResult>,
+    pub action: TState::Move,
+    pub wins: usize,
+    pub plays: usize,
+    pub is_saturated: bool,
+}
 
 /// MCTS-related data that every Node will have.
 #[derive(Default)]

@@ -1,3 +1,12 @@
+/// When we used "saturation", we ran many times more
+/// unique simulations, and explored without duplicating any work.
+/// But it gave larger subtrees preference over smaller ones which
+/// might have been better.
+/// Without "saturation", we keep re-playing paths we've already been done.
+/// What we need is for every parent to hold not only "saturated_children / all_children",
+/// but those same numbers for all descendents of its entire subtree.
+/// Then we can know, way up at the root, how well explored the choice really is.
+
 use std::borrow::Borrow;
 use std::time::{Duration, Instant};
 
@@ -5,7 +14,7 @@ use crossbeam::thread;
 
 use crate::util;
 use lib_boardgame::{GameResult, GameState, PlayerColor};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, monte_carlo_data::MctsResult, tree::Node};
+use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
 const EXTRA_TIME_MS: u64 = 0_000;
@@ -52,37 +61,6 @@ where
     }
 
     drop(children_write_lock);
-}
-
-/// Increment this node's count of saturated children.
-/// If doing so results in this node itself becoming saturated,
-/// follow the same operation for its parent.
-fn backprop_saturation<TNode, TState>(leaf: &TNode)
-where
-    TNode: Node<Data = AMctsData<TState>>,
-    TState: GameState,
-{
-    assert!(
-        leaf.data().is_saturated(),
-        "Only a leaf considered saturated can have its saturated status backpropagated."
-    );
-
-    let mut handle = leaf.parent();
-
-    while let Some(p) = handle {
-        let node = p.borrow();
-        let data = node.data();
-
-        data.increment_saturated_children_count();
-
-        if !data.is_saturated() {
-            // Don't back-prop any further
-            // if we've reached a non-saturated node.
-            return;
-        }
-
-        handle = node.parent();
-    }
 }
 
 fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
@@ -164,7 +142,7 @@ where
 
     (*child_nodes)
         .iter()
-        .filter(|&n| !n.borrow().data().is_saturated())
+        // .filter(|&n| !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
             let a_score =
                 score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
@@ -236,7 +214,7 @@ where
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
-    if root.data().is_saturated() {
+    if false && root.data().is_saturated() {
         state_children
             .sort_by_key(|c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
     } else {
@@ -302,11 +280,6 @@ where
         }
 
         sim_count += 1;
-        // If we have completely explored this entire tree,
-        // there's nothing left to do.
-        if root.data().is_saturated() {
-            break;
-        }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = select_to_leaf(root, player_color);
@@ -314,12 +287,10 @@ where
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
-        // let expanded_children = expand(leaf);
         expand(leaf);
         let expanded_children = leaf.children_read();
 
         if !expanded_children.is_empty() {
-            // let sim_node = util::random_pick(&expanded_children, &mut rng)
             let sim_node = util::random_pick(expanded_children.as_slice(), &mut rng)
                 .expect("Must have had at least one expanded child.");
             let sim_node = sim_node.borrow();
@@ -342,8 +313,6 @@ where
 
             // Update the terminating node so it knows its own end game result.
             leaf.data().set_end_state_result(sim_result);
-
-            backprop_saturation(leaf);
 
             continue;
         }
