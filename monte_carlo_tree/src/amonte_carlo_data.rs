@@ -27,6 +27,8 @@ where
 
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
+    all_descendants_count: AtomicUsize,
+    saturated_descendants_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
 }
 
@@ -45,6 +47,8 @@ where
         let wins = clone_atomic_usize(&self.wins);
         let children_count = clone_atomic_usize(&self.children_count);
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
+        let all_descendants_count = clone_atomic_usize(&self.all_descendants_count);
+        let saturated_descendants_count = clone_atomic_usize(&self.saturated_descendants_count);
 
         Self {
             state: self.state.clone(),
@@ -54,6 +58,8 @@ where
             wins,
             children_count,
             children_saturated_count,
+            all_descendants_count,
+            saturated_descendants_count,
             is_expanded: AtomicBool::new(self.is_expanded()),
         }
     }
@@ -108,6 +114,14 @@ where
         self.children_count.store(count, Ordering::SeqCst);
     }
 
+    pub fn increment_all_descendants_count(&self, increment: usize) {
+        self.all_descendants_count.fetch_add(increment, Ordering::Relaxed);
+    }
+
+    pub fn increment_saturated_descendants_count(&self, increment: usize) {
+        self.saturated_descendants_count.fetch_add(increment, Ordering::Relaxed);
+    }
+
     pub fn children_count(&self) -> usize {
         self.children_count.load(Ordering::SeqCst)
     }
@@ -150,6 +164,8 @@ where
             children_count: Default::default(),
             children_saturated_count: Default::default(),
             end_state_result: Default::default(),
+            all_descendants_count: Default::default(),
+            saturated_descendants_count: Default::default(),
         }
     }
 

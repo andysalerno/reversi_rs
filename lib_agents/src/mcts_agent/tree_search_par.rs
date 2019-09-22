@@ -6,7 +6,6 @@
 /// What we need is for every parent to hold not only "saturated_children / all_children",
 /// but those same numbers for all descendents of its entire subtree.
 /// Then we can know, way up at the root, how well explored the choice really is.
-
 use std::borrow::Borrow;
 use std::time::{Duration, Instant};
 
@@ -48,6 +47,10 @@ where
         let player_turn = state.current_player_turn();
         let legal_actions = state.legal_moves(player_turn);
 
+        // TODO: maybe put this after dropping the lock somehow
+        // backprop child count to update 'all_descendants_count' up the tree
+        backprop_descendants_count(node, legal_actions.len());
+
         // Now that we've expanded this node, update it to
         // inform it how many children it has.
         node.data().set_children_count(legal_actions.len());
@@ -61,6 +64,89 @@ where
     }
 
     drop(children_write_lock);
+}
+
+fn backprop_descendants_count<TNode, TState>(node: &TNode, val: usize)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    let mut parent_node = Some(node.get_handle());
+
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        let data = parent.data();
+        data.increment_all_descendants_count(val);
+
+        parent_node = parent.parent();
+    }
+}
+
+fn backprop_saturated_descendants_count<TNode, TState>(node: &TNode, val: usize)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    let mut parent_node = Some(node.get_handle());
+
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        let data = parent.data();
+        data.increment_saturated_descendants_count(val);
+
+        parent_node = parent.parent();
+    }
+}
+
+/// Increment this node's count of saturated children.
+/// If doing so results in this node itself becoming saturated,
+/// follow the same operation for its parent.
+fn backprop_saturation<TNode, TState>(leaf: &TNode)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    assert!(
+        leaf.data().is_saturated(),
+        "Only a leaf considered saturated can have its saturated status backpropagated."
+    );
+
+    let mut handle = leaf.parent();
+
+    while let Some(p) = handle {
+        let node = p.borrow();
+        let data = node.data();
+
+        data.increment_saturated_children_count();
+
+        if !data.is_saturated() {
+            // Don't back-prop any further
+            // if we've reached a non-saturated node.
+            return;
+        }
+
+        handle = node.parent();
+    }
+}
+
+fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    let mut parent_node = Some(node.get_handle());
+
+    while let Some(p) = parent_node {
+        let parent = p.borrow();
+        let data = parent.data();
+        data.increment_plays();
+
+        if is_win {
+            data.increment_wins();
+        }
+
+        parent_node = parent.parent();
+    }
 }
 
 fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
@@ -86,36 +172,21 @@ where
     }
 }
 
-fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
-where
-    TNode: Node<Data = AMctsData<TState>>,
-    TState: GameState,
-{
-    let mut parent_node = Some(node.get_handle());
-
-    while let Some(p) = parent_node {
-        let parent = p.borrow();
-        let data = parent.data();
-        data.increment_plays();
-
-        if is_win {
-            data.increment_wins();
-        }
-
-        parent_node = parent.parent();
-    }
-}
-
 /// Selects using max UCB, but on opponent's turn inverts the score.
 /// If the given node has no children, returns a handle back to the given node.
-fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
+fn select_to_leaf<TNode, TState>(
+    root: &TNode,
+    player_color: PlayerColor,
+    explore_bias: f32,
+) -> TNode::Handle
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
 
-    while let Some(c) = select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
+    while let Some(c) =
+        select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color, explore_bias)
     {
         cur_node = c;
     }
@@ -128,6 +199,7 @@ where
 fn select_child_for_traversal<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
+    explore_bias: f32,
 ) -> Option<TNode::Handle>
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -142,12 +214,20 @@ where
 
     (*child_nodes)
         .iter()
-        // .filter(|&n| !n.borrow().data().is_saturated())
+        .filter(|&n| player_color == PlayerColor::Black || !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
-            let a_score =
-                score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
-            let b_score =
-                score_node_for_traversal(b.borrow(), parent_plays, parent_is_player_color);
+            let a_score = score_node_for_traversal(
+                a.borrow(),
+                parent_plays,
+                parent_is_player_color,
+                explore_bias,
+            );
+            let b_score = score_node_for_traversal(
+                b.borrow(),
+                parent_plays,
+                parent_is_player_color,
+                explore_bias,
+            );
 
             a_score.partial_cmp(&b_score).unwrap()
         })
@@ -158,6 +238,7 @@ fn score_node_for_traversal<TNode, TState>(
     node: &TNode,
     parent_plays: usize,
     parent_is_player_color: bool,
+    explore_bias: f32,
 ) -> f32
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -180,7 +261,6 @@ where
     let parent_plays = parent_plays as f32;
 
     let node_mean_val = wins / plays;
-    let explore_bias = 2_f32;
 
     let score = node_mean_val + f32::sqrt((explore_bias * f32::ln(parent_plays)) / plays);
 
@@ -214,7 +294,7 @@ where
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
-    if false && root.data().is_saturated() {
+    if root.data().is_saturated() {
         state_children
             .sort_by_key(|c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
     } else {
@@ -242,12 +322,12 @@ where
     TState: GameState,
 {
     if thread_count == 1 {
-        mcts_loop(root, player_color);
+        mcts_loop(root, player_color, 0);
     } else {
         thread::scope(|s| {
-            for _ in 0..thread_count {
-                s.spawn(|_| {
-                    mcts_loop(root, player_color);
+            for i in 0..thread_count {
+                s.spawn(move |_| {
+                    mcts_loop(root, player_color, i);
                 });
             }
         })
@@ -255,7 +335,7 @@ where
     }
 }
 
-fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
+fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_num: usize)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -267,6 +347,10 @@ where
     let mut rng = util::get_rng();
 
     let mut sim_count: usize = 0;
+
+    let direction_neg = if thread_num % 2 == 0 { 1_f32 } else { -1_f32 };
+    let explore_bias = 2_f32 + (direction_neg * (((thread_num as f32) / 2_f32) as f32));
+    dbg!(explore_bias);
 
     loop {
         if now.elapsed() >= exec_duration {
@@ -281,8 +365,12 @@ where
 
         sim_count += 1;
 
+        if root.data().is_saturated() {
+            break;
+        }
+
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf(root, player_color);
+        let leaf = select_to_leaf(root, player_color, explore_bias);
 
         let leaf = leaf.borrow();
 
@@ -314,7 +402,8 @@ where
             // Update the terminating node so it knows its own end game result.
             leaf.data().set_end_state_result(sim_result);
 
-            continue;
+            backprop_saturation(leaf);
+            backprop_saturated_descendants_count(leaf, 1);
         }
     }
 

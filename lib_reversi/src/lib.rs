@@ -1,5 +1,6 @@
 pub mod reversi;
 pub mod reversi_gamestate;
+pub mod nboard_engine;
 mod util;
 
 use lib_boardgame::{GameMove, PlayerColor};
