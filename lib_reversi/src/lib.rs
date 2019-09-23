@@ -1,6 +1,6 @@
+pub mod nboard_engine;
 pub mod reversi;
 pub mod reversi_gamestate;
-pub mod nboard_engine;
 mod util;
 
 use lib_boardgame::{GameMove, PlayerColor};
@@ -8,7 +8,6 @@ use std::fmt;
 
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
-/// TODO: put this in lib.rs
 const BOARD_SIZE: usize = 8;
 
 type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];

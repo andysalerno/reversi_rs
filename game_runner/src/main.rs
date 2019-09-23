@@ -1,18 +1,28 @@
 use lib_agents::{HumanAgent, MctsAgent};
 use lib_boardgame::{Game, GameResult, PlayerColor};
+use lib_reversi::nboard_engine;
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
 use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
-fn main() {
-    let game_count: usize = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "1".into())
-        .parse()
-        .expect("Couldn't parse arg as a usize.");
+#[derive(Debug)]
+struct Args {
+    game_count: usize,
+    start_nboard: bool,
+}
 
-    let results = (0..game_count).map(|_| play_reversi()).collect::<Vec<_>>();
+fn main() {
+    let args = get_args();
+
+    if args.start_nboard {
+        dbg!("Starting nboard...");
+        nboard_engine::run();
+    }
+
+    let results = (0..args.game_count)
+        .map(|_| play_reversi())
+        .collect::<Vec<_>>();
 
     let white_wins = results
         .iter()
@@ -37,6 +47,24 @@ fn main() {
         white_wins as f32 / total as f32
     );
     println!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
+}
+
+fn get_args() -> Args {
+    // let args = std::env::args().collect::<Vec<_>>();
+    let mut args = std::env::args();
+
+    let game_count = args
+        .nth(1)
+        .unwrap_or_else(|| "1".into())
+        .parse::<usize>()
+        .expect("Couldn't parse arg as a usize.");
+
+    let start_nboard = args.any(|a| a.to_lowercase() == "nboard");
+
+    Args {
+        game_count,
+        start_nboard,
+    }
 }
 
 #[allow(unused)]
