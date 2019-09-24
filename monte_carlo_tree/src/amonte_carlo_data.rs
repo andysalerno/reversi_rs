@@ -115,11 +115,13 @@ where
     }
 
     pub fn increment_all_descendants_count(&self, increment: usize) {
-        self.all_descendants_count.fetch_add(increment, Ordering::Relaxed);
+        self.all_descendants_count
+            .fetch_add(increment, Ordering::Relaxed);
     }
 
     pub fn increment_saturated_descendants_count(&self, increment: usize) {
-        self.saturated_descendants_count.fetch_add(increment, Ordering::Relaxed);
+        self.saturated_descendants_count
+            .fetch_add(increment, Ordering::Relaxed);
     }
 
     pub fn children_count(&self) -> usize {

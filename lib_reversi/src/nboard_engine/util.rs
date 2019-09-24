@@ -1,5 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
+use std::fs::{File, OpenOptions};
+use std::io::Write;
 
 pub(super) enum Log {
     Info(String),
@@ -35,9 +37,21 @@ impl Display for NboardError {
 impl Error for NboardError {}
 
 pub(super) fn log(log: Log) {
-    match log {
-        Log::Info(l) => println!("[Info] {}", l),
-        Log::Warning(l) => println!("[Warn] {}", l),
-        Log::Error(l) => eprintln!("[Error] {}", l),
-    }
+    let log_file_loc = r"c:\users\andy\documents\log.txt";
+
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .append(true)
+        .open(log_file_loc)
+        .expect("Couldn't open log file.");
+
+    let bytes_msg = match log {
+        Log::Info(l) => format!("[Info] {}\n", l),
+        Log::Warning(l) => format!("[Warn] {}\n", l),
+        Log::Error(l) => format!("[Error] {}\n", l),
+    };
+
+    write!(f, "{}", bytes_msg);
+    write!(std::io::stdout(), "{}", bytes_msg);
 }

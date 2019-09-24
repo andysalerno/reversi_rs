@@ -16,12 +16,24 @@ enum MsgFromGui {
     Analyze,
 }
 
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() {
+    let result = run_loop();
+
+    if result.is_err() {
+        log(Log::Error(format!(
+            "Execution failed with result: {:?}",
+            result
+        )));
+    }
+}
+
+pub fn run_loop() -> Result<(), Box<dyn Error>> {
     loop {
         let msg = read_from_stdin()?;
-        let parsed = parse_msg(&msg);
+        log(Log::Info(format!("Received raw msg: {}", msg.trim())));
 
-        println!("Received message from gui: {:?}", parsed);
+        let parsed = parse_msg(&msg)?;
+        log(Log::Info(format!("Parsed message as: {:?}", parsed)));
     }
 }
 
@@ -34,14 +46,16 @@ fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
         .collect::<Vec<_>>()
         .as_slice()
     {
-        ["nboard", "version:"] => MsgFromGui::Go,
-        ["set", "depth"] => MsgFromGui::SetDepth(0),
-        ["set", "game"] => MsgFromGui::SetGame("123".into()),
+        ["nboard", version] => MsgFromGui::NBoard(version.parse::<usize>().unwrap()),
+        ["set", "depth", depth_str] => MsgFromGui::SetDepth(depth_str.parse::<usize>().unwrap()),
+        ["set", "game", g1, g2, g3, g4, g5] => {
+            MsgFromGui::SetGame(format!("{} {} {} {} {}", g1, g2, g3, g4, g5))
+        }
         ["set", "contempt"] => MsgFromGui::SetContempt(0),
         ["move"] => MsgFromGui::Move("123".into()),
         ["hint"] => MsgFromGui::Hint(0),
         ["go"] => MsgFromGui::Go,
-        ["ping"] => MsgFromGui::Ping(0),
+        ["ping", ping_str] => MsgFromGui::Ping(ping_str.parse::<usize>().unwrap()),
         ["learn"] => MsgFromGui::Learn,
         ["analyze"] => MsgFromGui::Analyze,
         _ => {
@@ -54,7 +68,7 @@ fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
 
 fn read_from_stdin() -> Result<String, Box<dyn Error>> {
     let mut buffer = String::new();
-    std::io::stdin().read_to_string(&mut buffer)?;
+    std::io::stdin().read_line(&mut buffer)?;
 
     Ok(buffer)
 }

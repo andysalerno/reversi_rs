@@ -1,7 +1,7 @@
 use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, arc_tree::ArcNode, amonte_carlo_data::MctsResult, tree::Node,
+    amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, arc_tree::ArcNode, tree::Node,
 };
 use std::borrow::Borrow;
 use std::cell::RefCell;
