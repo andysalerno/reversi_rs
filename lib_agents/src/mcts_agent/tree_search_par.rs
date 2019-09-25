@@ -421,6 +421,8 @@ pub mod tests {
 
     use monte_carlo_tree::arc_tree::ArcNode;
 
+    const explore_bias: f32 = 2.00;
+
     fn make_test_state() -> impl GameState {
         TicTacToeState::initial_state()
     }
@@ -606,6 +608,7 @@ pub mod tests {
         let selected = select_child_for_traversal::<ArcNode<_>, TicTacToeState>(
             child_level_3_handle.borrow(),
             PlayerColor::Black,
+            2.00,
         )
         .expect("the child should have been selected.");
 
@@ -652,7 +655,7 @@ pub mod tests {
         backprop_sim_result(child_level_4b.borrow(), is_win);
         backprop_sim_result(child_level_4b.borrow(), is_win);
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, explore_bias);
 
         let leaf = leaf.borrow();
 
@@ -665,7 +668,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, explore_bias);
         let leaf = leaf.borrow();
 
         assert_eq!(10, leaf.data().plays());
@@ -773,19 +776,19 @@ pub mod tests {
 
         assert_eq!(
             1.0929347,
-            score_node_for_traversal(child_a.borrow(), parent_plays, true)
+            score_node_for_traversal(child_a.borrow(), parent_plays, true, explore_bias)
         );
         assert_eq!(
             1.3385662,
-            score_node_for_traversal(child_b.borrow(), parent_plays, true)
+            score_node_for_traversal(child_b.borrow(), parent_plays, true, explore_bias)
         );
         assert_eq!(
             1.8930185,
-            score_node_for_traversal(child_c.borrow(), parent_plays, true)
+            score_node_for_traversal(child_c.borrow(), parent_plays, true, explore_bias)
         );
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node_for_traversal(child_d.borrow(), parent_plays, true)
+            score_node_for_traversal(child_d.borrow(), parent_plays, true, explore_bias)
         );
     }
 

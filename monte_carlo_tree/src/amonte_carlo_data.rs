@@ -131,6 +131,14 @@ where
     pub fn increment_saturated_children_count(&self) {
         self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
 
+        if self.children_saturated_count.load(Ordering::SeqCst)
+            > self.children_count.load(Ordering::SeqCst)
+        {
+            let x = String::from("12345");
+            panic!("WTF????");
+            println!("{}", x);
+        }
+
         // TODO: make a debug_assert when confident it's true
         debug_assert!(
             self.children_saturated_count.load(Ordering::SeqCst)
