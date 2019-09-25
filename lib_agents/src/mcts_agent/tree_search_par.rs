@@ -177,7 +177,6 @@ where
 fn select_to_leaf<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
-    explore_bias: f32,
 ) -> TNode::Handle
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -186,7 +185,7 @@ where
     let mut cur_node = root.get_handle();
 
     while let Some(c) =
-        select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color, explore_bias)
+        select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
     {
         cur_node = c;
     }
@@ -199,7 +198,6 @@ where
 fn select_child_for_traversal<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
-    explore_bias: f32,
 ) -> Option<TNode::Handle>
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -220,13 +218,11 @@ where
                 a.borrow(),
                 parent_plays,
                 parent_is_player_color,
-                explore_bias,
             );
             let b_score = score_node_for_traversal(
                 b.borrow(),
                 parent_plays,
                 parent_is_player_color,
-                explore_bias,
             );
 
             a_score.partial_cmp(&b_score).unwrap()
@@ -238,7 +234,6 @@ fn score_node_for_traversal<TNode, TState>(
     node: &TNode,
     parent_plays: usize,
     parent_is_player_color: bool,
-    explore_bias: f32,
 ) -> f32
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -262,6 +257,7 @@ where
 
     let node_mean_val = wins / plays;
 
+    let explore_bias = 2.00;
     let score = node_mean_val + f32::sqrt((explore_bias * f32::ln(parent_plays)) / plays);
 
     if score.is_nan() {
@@ -348,10 +344,6 @@ where
 
     let mut sim_count: usize = 0;
 
-    let direction_neg = if thread_num % 2 == 0 { 1_f32 } else { -1_f32 };
-    let explore_bias = 2_f32 + (direction_neg * (((thread_num as f32) / 2_f32) as f32));
-    dbg!(explore_bias);
-
     loop {
         if now.elapsed() >= exec_duration {
             let data = root.data();
@@ -370,7 +362,7 @@ where
         }
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
-        let leaf = select_to_leaf(root, player_color, explore_bias);
+        let leaf = select_to_leaf(root, player_color);
 
         let leaf = leaf.borrow();
 
@@ -420,8 +412,6 @@ pub mod tests {
     use std::str::FromStr;
 
     use monte_carlo_tree::arc_tree::ArcNode;
-
-    const explore_bias: f32 = 2.00;
 
     fn make_test_state() -> impl GameState {
         TicTacToeState::initial_state()
@@ -608,7 +598,6 @@ pub mod tests {
         let selected = select_child_for_traversal::<ArcNode<_>, TicTacToeState>(
             child_level_3_handle.borrow(),
             PlayerColor::Black,
-            2.00,
         )
         .expect("the child should have been selected.");
 
@@ -655,7 +644,7 @@ pub mod tests {
         backprop_sim_result(child_level_4b.borrow(), is_win);
         backprop_sim_result(child_level_4b.borrow(), is_win);
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, explore_bias);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
 
         let leaf = leaf.borrow();
 
@@ -668,7 +657,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, explore_bias);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
         let leaf = leaf.borrow();
 
         assert_eq!(10, leaf.data().plays());
@@ -776,19 +765,19 @@ pub mod tests {
 
         assert_eq!(
             1.0929347,
-            score_node_for_traversal(child_a.borrow(), parent_plays, true, explore_bias)
+            score_node_for_traversal(child_a.borrow(), parent_plays, true)
         );
         assert_eq!(
             1.3385662,
-            score_node_for_traversal(child_b.borrow(), parent_plays, true, explore_bias)
+            score_node_for_traversal(child_b.borrow(), parent_plays, true)
         );
         assert_eq!(
             1.8930185,
-            score_node_for_traversal(child_c.borrow(), parent_plays, true, explore_bias)
+            score_node_for_traversal(child_c.borrow(), parent_plays, true)
         );
         assert_eq!(
             340282350000000000000000000000000000000f32,
-            score_node_for_traversal(child_d.borrow(), parent_plays, true, explore_bias)
+            score_node_for_traversal(child_d.borrow(), parent_plays, true)
         );
     }
 
