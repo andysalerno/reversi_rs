@@ -47,10 +47,6 @@ where
         let player_turn = state.current_player_turn();
         let legal_actions = state.legal_moves(player_turn);
 
-        // TODO: maybe put this after dropping the lock somehow
-        // backprop child count to update 'all_descendants_count' up the tree
-        backprop_descendants_count(node, legal_actions.len());
-
         // Now that we've expanded this node, update it to
         // inform it how many children it has.
         node.data().set_children_count(legal_actions.len());
@@ -64,38 +60,6 @@ where
     }
 
     drop(children_write_lock);
-}
-
-fn backprop_descendants_count<TNode, TState>(node: &TNode, val: usize)
-where
-    TNode: Node<Data = AMctsData<TState>>,
-    TState: GameState,
-{
-    let mut parent_node = Some(node.get_handle());
-
-    while let Some(p) = parent_node {
-        let parent = p.borrow();
-        let data = parent.data();
-        data.increment_all_descendants_count(val);
-
-        parent_node = parent.parent();
-    }
-}
-
-fn backprop_saturated_descendants_count<TNode, TState>(node: &TNode, val: usize)
-where
-    TNode: Node<Data = AMctsData<TState>>,
-    TState: GameState,
-{
-    let mut parent_node = Some(node.get_handle());
-
-    while let Some(p) = parent_node {
-        let parent = p.borrow();
-        let data = parent.data();
-        data.increment_saturated_descendants_count(val);
-
-        parent_node = parent.parent();
-    }
 }
 
 /// Increment this node's count of saturated children.
@@ -395,7 +359,6 @@ where
             leaf.data().set_end_state_result(sim_result);
 
             backprop_saturation(leaf);
-            backprop_saturated_descendants_count(leaf, 1);
         }
     }
 
