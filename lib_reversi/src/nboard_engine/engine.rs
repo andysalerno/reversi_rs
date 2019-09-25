@@ -38,8 +38,6 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
 }
 
 fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
-    let msg = msg.to_lowercase();
-
     let parsed = match msg
         .split_whitespace()
         .into_iter()
