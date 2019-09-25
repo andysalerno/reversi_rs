@@ -138,18 +138,14 @@ where
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
 /// If the given node has no children, returns a handle back to the given node.
-fn select_to_leaf<TNode, TState>(
-    root: &TNode,
-    player_color: PlayerColor,
-) -> TNode::Handle
+fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
 
-    while let Some(c) =
-        select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
+    while let Some(c) = select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
     {
         cur_node = c;
     }
@@ -178,16 +174,10 @@ where
         .iter()
         .filter(|&n| player_color == PlayerColor::Black || !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
-            let a_score = score_node_for_traversal(
-                a.borrow(),
-                parent_plays,
-                parent_is_player_color,
-            );
-            let b_score = score_node_for_traversal(
-                b.borrow(),
-                parent_plays,
-                parent_is_player_color,
-            );
+            let a_score =
+                score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
+            let b_score =
+                score_node_for_traversal(b.borrow(), parent_plays, parent_is_player_color);
 
             a_score.partial_cmp(&b_score).unwrap()
         })
