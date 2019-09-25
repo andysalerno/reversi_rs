@@ -172,7 +172,7 @@ where
 
     (*child_nodes)
         .iter()
-        .filter(|&n| player_color == PlayerColor::Black || !n.borrow().data().is_saturated())
+        .filter(|&n| !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
             let a_score =
                 score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
