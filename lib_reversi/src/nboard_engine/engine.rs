@@ -64,9 +64,45 @@ fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
     Ok(parsed)
 }
 
+fn get_move_from_GGF(ggf: &str) -> String {
+    // (;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)
+    //                                                                                                                                                           ^^ That's the last move.
+
+    let split_on_move = ggf.split("]B[").collect::<Vec<_>>();
+
+    if split_on_move.len() <= 1 {
+        // pattern not found
+        panic!("Couldn't find pattern ']B[' in GGF text: {}", ggf);
+    }
+
+    let second_chunk = split_on_move[1];
+    let second_chunk_split = second_chunk.split("//").collect::<Vec<_>>();
+
+    if second_chunk_split.len() <= 1 {
+        // pattern not found
+        panic!("Couldn't find pattern '//' in GGF text: {}", ggf);
+    }
+
+    second_chunk_split[0].to_string()
+}
+
 fn read_from_stdin() -> Result<String, Box<dyn Error>> {
     let mut buffer = String::new();
     std::io::stdin().read_line(&mut buffer)?;
 
     Ok(buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_move_from_GGF_finds_move() {
+        let ggf_string = r"(;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)";
+
+        let parsed_move = get_move_from_GGF(ggf_string);
+
+        assert_eq!("D3", parsed_move, "Expected to parse out the move value from the GGF string.");
+    }
 }
