@@ -1,6 +1,5 @@
 use lib_agents::{HumanAgent, MctsAgent};
 use lib_boardgame::{Game, GameResult, PlayerColor};
-use lib_reversi::nboard_engine;
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
@@ -14,11 +13,6 @@ struct Args {
 
 fn main() {
     let args = get_args();
-
-    if args.start_nboard {
-        dbg!("Starting nboard...");
-        nboard_engine::run();
-    }
 
     let results = (0..args.game_count)
         .map(|_| play_reversi())

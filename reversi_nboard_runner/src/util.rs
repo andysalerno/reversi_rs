@@ -37,7 +37,7 @@ impl Display for NboardError {
 impl Error for NboardError {}
 
 pub(super) fn log(log: Log) {
-    let log_file_loc = r"c:\users\andy\documents\log.txt";
+    let log_file_loc = r"/Users/andy/reversi_rs/nboard_log.txt";
 
     let mut f = OpenOptions::new()
         .write(true)

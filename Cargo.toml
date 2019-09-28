@@ -6,4 +6,5 @@ members = [
    "monte_carlo_tree",
    "lib_agents",
    "lib_tic_tac_toe",
+   "reversi_nboard_runner",
 ]

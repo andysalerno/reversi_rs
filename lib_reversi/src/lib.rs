@@ -1,4 +1,3 @@
-pub mod nboard_engine;
 pub mod reversi;
 pub mod reversi_gamestate;
 mod util;
@@ -45,7 +44,7 @@ pub struct BoardPosition {
 }
 
 impl BoardPosition {
-    fn new(col: usize, row: usize) -> Self {
+    pub fn new(col: usize, row: usize) -> Self {
         Self { col, row }
     }
 }
