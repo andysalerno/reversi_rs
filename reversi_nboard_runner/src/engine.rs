@@ -1,11 +1,11 @@
 use crate::util::{log, Log, NboardError};
 use lib_agents::MctsAgent;
-use lib_boardgame::{GameState, PlayerColor};
+use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_reversi::{BoardPosition, ReversiPlayerAction};
 use std::error::Error;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 
 #[derive(Debug)]
 enum MsgFromGui {
@@ -33,14 +33,14 @@ impl From<ReversiPlayerAction> for NBoardAction {
         };
 
         let letter_col = match x_pos {
-            0 => 'A',
-            1 => 'B',
-            2 => 'C',
-            3 => 'D',
-            4 => 'E',
-            5 => 'F',
-            6 => 'G',
-            7 => 'H',
+            0 => 'a',
+            1 => 'b',
+            2 => 'c',
+            3 => 'd',
+            4 => 'e',
+            5 => 'f',
+            6 => 'g',
+            7 => 'h',
             _ => panic!("x_pos {} not supported right now", x_pos),
         };
 
@@ -85,6 +85,28 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
                     "Next state:\n{}",
                     state.human_friendly()
                 )));
+            }
+            MsgFromGui::Go => {
+                log(Log::Info("Running agent to select move...".to_owned()));
+
+                let cur_player = state.current_player_turn();
+                let selected_move = match cur_player {
+                    PlayerColor::Black => {
+                        black.pick_move(&state, state.legal_moves(PlayerColor::Black))
+                    }
+                    PlayerColor::White => {
+                        white.pick_move(&state, state.legal_moves(PlayerColor::White))
+                    }
+                };
+
+                let nboard_action: NBoardAction = selected_move.into();
+
+                log(Log::Info(format!(
+                    "Agent picked {} (in NBoard lingo: {})",
+                    selected_move, nboard_action.0
+                )));
+
+                writeln_to_stdout(format!("=== {}", nboard_action.0))?;
             }
             _ => {}
         }
@@ -173,6 +195,15 @@ fn read_from_stdin() -> Result<String, Box<dyn Error>> {
     Ok(buffer)
 }
 
+fn writeln_to_stdout<T: AsRef<str>>(s: T) -> Result<(), Box<dyn Error>> {
+    log(Log::Info(format!("Sending message: {}", s.as_ref())));
+    let with_newline = format!("{}\n", s.as_ref());
+    io::stdout().write_all(b"=== f6\n")?;
+    io::stdout().flush()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,7 +230,6 @@ mod tests {
 
         let nboard_bot_left: NBoardAction = bottom_left_position.into();
         assert_eq!(nboard_bot_left.0, "A8".to_owned());
-
 
         let top_right_position = ReversiPlayerAction::Move {
             position: BoardPosition::new(7, 7),
