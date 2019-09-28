@@ -21,6 +21,37 @@ enum MsgFromGui {
     Analyze,
 }
 
+/// Represents an NBoard action, which is structured like so:
+/// "A8" is the bottom-left position, "H1" is the top-right.
+struct NBoardAction(String);
+
+impl From<ReversiPlayerAction> for NBoardAction {
+    fn from(action: ReversiPlayerAction) -> Self {
+        let (x_pos, y_pos) = match action {
+            ReversiPlayerAction::PassTurn => panic!("Not sure how to represent pass yet"),
+            ReversiPlayerAction::Move { position } => (position.col(), position.row()),
+        };
+
+        let letter_col = match x_pos {
+            0 => 'A',
+            1 => 'B',
+            2 => 'C',
+            3 => 'D',
+            4 => 'E',
+            5 => 'F',
+            6 => 'G',
+            7 => 'H',
+            _ => panic!("x_pos {} not supported right now", x_pos),
+        };
+
+        let num_row = 8 - y_pos;
+
+        let nboard_formatted = format!("{}{}", letter_col, num_row);
+
+        NBoardAction(nboard_formatted)
+    }
+}
+
 pub fn run() {
     let result = run_loop();
 
@@ -50,7 +81,10 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
                 let reversi_action = get_move_from_ggf(&ggf);
                 log(Log::Info(format!("Saw move: {}", &reversi_action)));
                 state.apply_move(reversi_action);
-                log(Log::Info(format!("Next state:\n{}", state.human_friendly())));
+                log(Log::Info(format!(
+                    "Next state:\n{}",
+                    state.human_friendly()
+                )));
             }
             _ => {}
         }
@@ -151,9 +185,34 @@ mod tests {
 
         match parsed_move {
             ReversiPlayerAction::Move { position } => {
-                assert_eq!(position, BoardPosition::new(3, 3))
+                assert_eq!(position, BoardPosition::new(3, 5))
             }
             _ => panic!("Expected to find a board position."),
         }
+    }
+
+    #[test]
+    fn nboard_action_from_reversi_action() {
+        let bottom_left_position = ReversiPlayerAction::Move {
+            position: BoardPosition::new(0, 0),
+        };
+
+        let nboard_bot_left: NBoardAction = bottom_left_position.into();
+        assert_eq!(nboard_bot_left.0, "A8".to_owned());
+
+
+        let top_right_position = ReversiPlayerAction::Move {
+            position: BoardPosition::new(7, 7),
+        };
+
+        let nboard_top_right: NBoardAction = top_right_position.into();
+        assert_eq!(nboard_top_right.0, "H1".to_owned());
+
+        let one_one = ReversiPlayerAction::Move {
+            position: BoardPosition::new(1, 1),
+        };
+
+        let nboard_one_one: NBoardAction = one_one.into();
+        assert_eq!(nboard_one_one.0, "B7".to_owned());
     }
 }

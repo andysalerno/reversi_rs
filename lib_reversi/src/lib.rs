@@ -47,6 +47,14 @@ impl BoardPosition {
     pub fn new(col: usize, row: usize) -> Self {
         Self { col, row }
     }
+
+    pub fn col(&self) -> usize {
+        self.col
+    }
+
+    pub fn row(&self) -> usize {
+        self.row
+    }
 }
 
 #[derive(Copy, Clone, PartialEq)]
