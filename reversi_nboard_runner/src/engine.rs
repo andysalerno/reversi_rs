@@ -28,7 +28,7 @@ struct NBoardAction(String);
 impl From<ReversiPlayerAction> for NBoardAction {
     fn from(action: ReversiPlayerAction) -> Self {
         let (x_pos, y_pos) = match action {
-            ReversiPlayerAction::PassTurn => panic!("Not sure how to represent pass yet"),
+            ReversiPlayerAction::PassTurn => return NBoardAction(String::new()),
             ReversiPlayerAction::Move { position } => (position.col(), position.row()),
         };
 
@@ -61,15 +61,19 @@ pub fn run() {
             result
         )));
     }
+
+    log(Log::Info(format!("Exiting.")));
 }
 
 pub fn run_loop() -> Result<(), Box<dyn Error>> {
-    // let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
-    // let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
-    let black = RandomAgent;
-    let white = RandomAgent;
+    let mut black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
+    let mut white = MctsAgent::<ReversiState>::new(PlayerColor::White);
+    // let mut black = RandomAgent;
+    // let white = RandomAgent;
 
     let mut state = ReversiState::initial_state();
+
+    let mut move_count = 0;
 
     loop {
         let msg = read_from_stdin()?;
@@ -79,16 +83,27 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
         log(Log::Info(format!("Parsed message as: {:?}", parsed)));
 
         match parsed {
-            MsgFromGui::SetGame(ggf) => {
-                let latest_move = parse_game_history(&ggf).iter().last().expect("Must have a latest move").clone();
-                log(Log::Info(format!("Saw move: {}", latest_move)));
-                state.apply_move(latest_move);
-                log(Log::Info(format!(
-                    "Next state:\n{}",
-                    state.human_friendly()
-                )));
-            }
             MsgFromGui::Ping(n) => writeln_to_stdout(format!("pong {}", n))?,
+            MsgFromGui::Move(m) => {
+                let reversi_move = nboard_action_to_reversi_action(NBoardAction(m));
+                apply_action_and_observe(&mut state, reversi_move, &mut black, &mut white);
+                move_count += 1;
+            }
+            MsgFromGui::SetGame(ggf) => {
+                let mut history = parse_game_history(&ggf);
+                history.drain(..move_count);
+
+                for m in &history {
+                    log(Log::Info(format!("Saw move: {}", m)));
+                    apply_action_and_observe(&mut state, *m, &mut black, &mut white);
+                    log(Log::Info(format!(
+                        "Next state:\n{}",
+                        state.human_friendly()
+                    )));
+                }
+
+                move_count += history.len();
+            }
             MsgFromGui::Go => {
                 log(Log::Info("Running agent to select move...".to_owned()));
 
@@ -104,9 +119,14 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
 
                 let nboard_action: NBoardAction = selected_move.into();
 
+                let agent_name = match cur_player {
+                    PlayerColor::Black => "Black",
+                    PlayerColor::White => "White",
+                };
+
                 log(Log::Info(format!(
-                    "Agent picked {} (in NBoard lingo: {})",
-                    selected_move, nboard_action.0
+                    "Agent {} picked {} (in NBoard lingo: {})",
+                    agent_name, selected_move, nboard_action.0
                 )));
 
                 writeln_to_stdout(format!("=== {}", nboard_action.0))?;
@@ -114,6 +134,18 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
             _ => {}
         }
     }
+}
+
+fn apply_action_and_observe(
+    state: &mut ReversiState,
+    action: ReversiPlayerAction,
+    black: &mut impl GameAgent<ReversiState>,
+    white: &mut impl GameAgent<ReversiState>,
+) {
+    let player_turn = state.current_player_turn();
+    state.apply_move(action);
+    black.observe_action(player_turn, action, &state);
+    white.observe_action(player_turn, action, &state);
 }
 
 fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
@@ -129,7 +161,7 @@ fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
             MsgFromGui::SetGame(format!("{} {} {} {} {}", g1, g2, g3, g4, g5))
         }
         ["set", "contempt"] => MsgFromGui::SetContempt(0),
-        ["move"] => MsgFromGui::Move("123".into()),
+        ["move", m] => MsgFromGui::Move(m.to_string()),
         ["hint"] => MsgFromGui::Hint(0),
         ["go"] => MsgFromGui::Go,
         ["ping", ping_str] => MsgFromGui::Ping(ping_str.parse::<usize>().unwrap()),
@@ -239,7 +271,11 @@ mod tests {
     fn parse_game_history_finds_one_move() {
         let ggf_string = r"(;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)";
 
-        let parsed_move = parse_game_history(ggf_string).iter().last().unwrap().clone();
+        let parsed_move = parse_game_history(ggf_string)
+            .iter()
+            .last()
+            .unwrap()
+            .clone();
 
         match parsed_move {
             ReversiPlayerAction::Move { position } => {

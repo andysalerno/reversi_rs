@@ -4,11 +4,17 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+    {
+        "type": "lldb",
+        "request": "attach",
+        "name": "Attach",
+        "pid": "${command:pickMyProcess}" // use ${command:pickProcess} to pick other users' processes
+    },
         {
             "name": "(Windows) Launch",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/target/debug/game_runner.exe",
+            "program": "${workspaceFolder}/target/debug/reversi_nboard_runner.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
