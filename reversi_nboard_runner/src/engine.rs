@@ -183,6 +183,15 @@ fn parse_game_history(ggf: &str) -> Vec<ReversiPlayerAction> {
             Some(idx) => {
                 s.drain(..idx);
 
+                // ']B[' or ']W['
+                let color_str: String = s.drain(..3).collect();
+                let _player_color = match color_str.chars().nth(1).expect("must match ]B[ pattern")
+                {
+                    'B' => PlayerColor::Black,
+                    'W' => PlayerColor::White,
+                    c => panic!("Expected 'B' or 'W', saw: {}", c),
+                };
+
                 // C4, F5, etc
                 let ggf_move: String = s.drain(..2).collect();
                 let ggf_move = NBoardAction(ggf_move);

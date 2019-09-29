@@ -16,8 +16,16 @@ use lib_boardgame::{GameResult, GameState, PlayerColor};
 use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
-pub(super) const SIM_TIME_MS: u64 = 3_000;
-const EXTRA_TIME_MS: u64 = 0_000;
+mod configs {
+    pub(super) const SIM_TIME_MS: u64 = 3_000;
+    pub(super) const EXTRA_TIME_MS: u64 = 0_000;
+
+    pub(super) const BLACK_FILTER_SAT: bool = true;
+    pub(super) const WHITE_FILTER_SAT: bool = true;
+
+    pub(super) const BLACK_THREAD_COUNT: usize = 1;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
+}
 
 fn expand<TNode, TState>(node: &TNode)
 where
@@ -171,9 +179,14 @@ where
 
     let child_nodes = root.children_read();
 
+    let filter_sat = match player_color {
+        PlayerColor::Black => configs::BLACK_FILTER_SAT,
+        PlayerColor::White => configs::WHITE_FILTER_SAT,
+    };
+
     (*child_nodes)
         .iter()
-        .filter(|&n| !n.borrow().data().is_saturated())
+        .filter(|&n| !filter_sat || !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
             let a_score =
                 score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
@@ -228,7 +241,6 @@ where
 pub fn mcts_result<TNode, TState>(
     root_handle: TNode::Handle,
     player_color: PlayerColor,
-    thread_count: usize,
 ) -> Vec<MctsResult<TState>>
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -241,7 +253,7 @@ where
         root.data().plays()
     );
 
-    mcts(root, player_color, thread_count);
+    mcts(root, player_color);
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
@@ -267,11 +279,16 @@ where
         .collect()
 }
 
-fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_count: usize)
+fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
+    let thread_count = match player_color {
+        PlayerColor::Black => 1,
+        PlayerColor::White => 1,
+    };
+
     if thread_count == 1 {
         mcts_loop(root, player_color, 0);
     } else {
@@ -292,8 +309,8 @@ where
     TState: GameState,
 {
     let now = Instant::now();
-    let exec_duration = Duration::from_millis(SIM_TIME_MS);
-    let extra_time = Duration::from_millis(EXTRA_TIME_MS);
+    let exec_duration = Duration::from_millis(configs::SIM_TIME_MS);
+    let extra_time = Duration::from_millis(configs::EXTRA_TIME_MS);
 
     let mut rng = util::get_rng();
 
@@ -767,7 +784,7 @@ pub mod tests {
             "The node must not be saturated to begin with."
         );
 
-        mcts(root, PlayerColor::Black, 1);
+        mcts(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),
@@ -791,7 +808,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::Black, 1);
+        mcts(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),
@@ -834,7 +851,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::Black, 1);
+        mcts(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),

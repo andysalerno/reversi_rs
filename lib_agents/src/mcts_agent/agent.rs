@@ -93,8 +93,8 @@ where
             .unwrap_or_else(|| self.reset_root_handle(state));
 
         let result = match self.color {
-            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
-            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color, 1),
+            PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color),
+            PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color),
         };
 
         let white_wins = if self.color == PlayerColor::White {
@@ -134,7 +134,6 @@ fn pretty_ratio_bar_text(
 fn perform_mcts_par<TNode, TState>(
     root: TNode::Handle,
     player_color: PlayerColor,
-    thread_count: usize,
 ) -> MctsResult<TState>
 where
     TNode: Node<Data = AMctsData<TState>> + Sync,
@@ -148,7 +147,7 @@ where
         .sum::<usize>();
 
     let now = Instant::now();
-    let results = tree_search_par::mcts_result::<TNode, TState>(root, player_color, thread_count);
+    let results = tree_search_par::mcts_result::<TNode, TState>(root, player_color);
     let elapsed = now.elapsed();
 
     // Some friendly UI output
