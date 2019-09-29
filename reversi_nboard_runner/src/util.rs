@@ -37,8 +37,8 @@ impl Display for NboardError {
 impl Error for NboardError {}
 
 pub(super) fn log(log: Log) {
-    // let log_file_loc = r"/Users/andy/reversi_rs/nboard_log.txt";
-    let log_file_loc = r"C:\Users\Andy\git_repos\reversi_rs\nboard_log.txt";
+    let log_file_loc = r"/Users/andy/reversi_rs/nboard_log.txt";
+    // let log_file_loc = r"C:\Users\Andy\git_repos\reversi_rs\nboard_log.txt";
 
     let mut f = OpenOptions::new()
         .write(true)
@@ -54,5 +54,5 @@ pub(super) fn log(log: Log) {
     };
 
     write!(f, "{}", bytes_msg);
-    write!(std::io::stdout(), "{}", bytes_msg);
+    // write!(std::io::stdout(), "{}", bytes_msg);
 }

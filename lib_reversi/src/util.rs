@@ -55,3 +55,15 @@ impl Iterator for BoardDirectionIter {
         Some(next_pos)
     }
 }
+
+macro_rules! out {
+    ($($arg:tt)*) => (out_impl(format!($($arg)*)))
+}
+
+fn out_impl(s: String) {
+    print!("{}", s);
+}
+
+fn test_out() {
+    out!("{}{}", "hello", "world");
+}
