@@ -1,11 +1,17 @@
-use lib_agents::MctsAgent;
-use lib_boardgame::{Game, PlayerColor};
-use lib_reversi::reversi::Reversi;
-use lib_reversi::reversi_gamestate::ReversiState;
-
 mod engine;
 mod util;
 
+use util::{log, Log};
+
 fn main() {
-    engine::run_loop();
+    let result = engine::run_loop();
+
+    if result.is_err() {
+        log(Log::Error(format!(
+            "Execution failed with result: {:?}",
+            result
+        )));
+    }
+
+    log(Log::Info(format!("Exiting.")));
 }

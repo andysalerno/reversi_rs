@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::Write;
 
 pub(super) enum Log {
@@ -15,12 +15,6 @@ pub(super) struct NboardError {
 }
 
 impl NboardError {
-    pub fn err2(msg: impl AsRef<str>) -> Self {
-        Self {
-            msg: String::from(msg.as_ref()),
-        }
-    }
-
     pub fn err<T>(msg: impl AsRef<str>) -> Result<T, Self> {
         Result::Err(Self {
             msg: String::from(msg.as_ref()),
@@ -52,6 +46,6 @@ pub(super) fn log(log: Log) {
         Log::Error(l) => format!("[Error] {}\n", l),
     };
 
-    write!(f, "{}", bytes_msg);
+    write!(f, "{}", bytes_msg).expect("Failure writing to log");
     // write!(std::io::stdout(), "{}", bytes_msg);
 }

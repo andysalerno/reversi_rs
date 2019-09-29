@@ -286,7 +286,7 @@ where
     }
 }
 
-fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, thread_num: usize)
+fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, _thread_num: usize)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,

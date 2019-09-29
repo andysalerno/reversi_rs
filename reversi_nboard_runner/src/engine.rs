@@ -1,11 +1,10 @@
 use crate::util::{log, Log, NboardError};
-use lib_agents::{MctsAgent, RandomAgent};
+use lib_agents::MctsAgent;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
-use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
-use lib_reversi::{BoardPosition, ReversiPlayerAction};
+use lib_reversi::ReversiPlayerAction;
 use std::error::Error;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 
 #[derive(Debug)]
 enum MsgFromGui {
@@ -50,19 +49,6 @@ impl From<ReversiPlayerAction> for NBoardAction {
 
         NBoardAction(nboard_formatted)
     }
-}
-
-pub fn run() {
-    let result = run_loop();
-
-    if result.is_err() {
-        log(Log::Error(format!(
-            "Execution failed with result: {:?}",
-            result
-        )));
-    }
-
-    log(Log::Info(format!("Exiting.")));
 }
 
 pub fn run_loop() -> Result<(), Box<dyn Error>> {
@@ -197,14 +183,6 @@ fn parse_game_history(ggf: &str) -> Vec<ReversiPlayerAction> {
             Some(idx) => {
                 s.drain(..idx);
 
-                // ']B[' or ']W['
-                let color_str: String = s.drain(..3).collect();
-                let player_color = match color_str.chars().nth(1).expect("must match ]B[ pattern") {
-                    'B' => PlayerColor::Black,
-                    'W' => PlayerColor::White,
-                    c => panic!("Expected 'B' or 'W', saw: {}", c),
-                };
-
                 // C4, F5, etc
                 let ggf_move: String = s.drain(..2).collect();
                 let ggf_move = NBoardAction(ggf_move);
@@ -214,8 +192,6 @@ fn parse_game_history(ggf: &str) -> Vec<ReversiPlayerAction> {
             None => return result,
         }
     }
-
-    result
 }
 
 fn nboard_action_to_reversi_action(n: NBoardAction) -> ReversiPlayerAction {
@@ -266,6 +242,7 @@ fn writeln_to_stdout<T: AsRef<str>>(s: T) -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lib_reversi::BoardPosition;
 
     #[test]
     fn parse_game_history_finds_one_move() {

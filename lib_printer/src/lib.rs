@@ -4,7 +4,7 @@ macro_rules! out {
 }
 
 pub fn out_impl(s: String) {
-    // println!("{}", s);
+    println!("{}", s);
 }
 
 #[allow(unused)]
