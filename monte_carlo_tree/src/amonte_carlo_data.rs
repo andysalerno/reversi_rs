@@ -1,4 +1,5 @@
 use lib_boardgame::{GameResult, GameState};
+use lib_printer::{out, out_impl};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::RwLock;
@@ -120,7 +121,7 @@ where
         {
             let x = String::from("12345");
             panic!("WTF????");
-            println!("{}", x);
+            out!("{}", x);
         }
 
         // TODO: make a debug_assert when confident it's true

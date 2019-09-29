@@ -1,5 +1,6 @@
 use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
+use lib_printer::{out, out_impl};
 use monte_carlo_tree::{
     amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, arc_tree::ArcNode, tree::Node,
 };
@@ -102,7 +103,7 @@ where
             result.plays - result.wins
         };
 
-        println!("{}", pretty_ratio_bar_text(20, white_wins, result.plays));
+        out!("{}", pretty_ratio_bar_text(20, white_wins, result.plays));
 
         result.action
     }
@@ -157,7 +158,7 @@ where
         dbg!(total_plays);
 
         let sims_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
-        println!("Simulations per sec: {:.0}", sims_per_sec);
+        out!("Simulations per sec: {:.0}", sims_per_sec);
 
         for action_result in &results {
             let sat_display = if action_result.is_saturated {
@@ -166,7 +167,7 @@ where
                 ""
             };
 
-            println!(
+            out!(
                 "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
                 action_result.action,
                 action_result.plays,

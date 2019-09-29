@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 lib_boardgame = {path = "../lib_boardgame" }
+lib_printer = {path = "../lib_printer" }
 lib_tic_tac_toe = {path = "../lib_tic_tac_toe" }
 crossbeam = "0.7.2"
 atomic_refcell = "0.1.3"

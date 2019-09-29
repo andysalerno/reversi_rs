@@ -13,6 +13,7 @@ use crossbeam::thread;
 
 use crate::util;
 use lib_boardgame::{GameResult, GameState, PlayerColor};
+use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 pub(super) const SIM_TIME_MS: u64 = 3_000;
@@ -234,7 +235,7 @@ where
     TState: GameState,
 {
     let root = root_handle.borrow();
-    println!(
+    out!(
         "Beginning mcts on node with wins/plays: {}/{}",
         root.data().wins(),
         root.data().plays()

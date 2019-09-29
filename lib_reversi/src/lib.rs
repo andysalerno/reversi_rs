@@ -5,6 +5,8 @@ mod util;
 use lib_boardgame::{GameMove, PlayerColor};
 use std::fmt;
 
+use lib_printer::{out, out_impl};
+
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
 const BOARD_SIZE: usize = 8;
@@ -102,7 +104,7 @@ impl std::str::FromStr for ReversiPlayerAction {
         let nums: Vec<_> = s.split(',').map(|x| x.trim()).collect();
 
         if nums.len() != 2 {
-            println!("Invalid input: {} -- expected format: col,row", s);
+            out!("Invalid input: {} -- expected format: col,row", s);
             return Err(9);
         }
 
@@ -114,7 +116,7 @@ impl std::str::FromStr for ReversiPlayerAction {
             if col > crate::reversi_gamestate::ReversiState::BOARD_SIZE
                 || row >= crate::reversi_gamestate::ReversiState::BOARD_SIZE
             {
-                println!(
+                out!(
                     "Position out of bounds of board. Input: {:?}, actual board size: {}",
                     position,
                     crate::reversi_gamestate::ReversiState::BOARD_SIZE
@@ -126,7 +128,7 @@ impl std::str::FromStr for ReversiPlayerAction {
                 Ok(action)
             }
         } else {
-            println!("Didn't recognize input as a board position: {}", s);
+            out!("Didn't recognize input as a board position: {}", s);
             Err(9)
         }
     }

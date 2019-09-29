@@ -1,5 +1,6 @@
 use lib_agents::{HumanAgent, MctsAgent};
 use lib_boardgame::{Game, GameResult, PlayerColor};
+use lib_printer::{out, out_impl};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
@@ -30,17 +31,17 @@ fn main() {
 
     let total = results.len();
 
-    println!(
+    out!(
         "Black wins: {} ({:.2})",
         black_wins,
         black_wins as f32 / total as f32
     );
-    println!(
+    out!(
         "White wins: {} ({:.2})",
         white_wins,
         white_wins as f32 / total as f32
     );
-    println!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
+    out!("Ties      : {} ({:.2})", ties, ties as f32 / total as f32);
 }
 
 fn get_args() -> Args {

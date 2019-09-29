@@ -6,5 +6,6 @@ edition = "2018"
 
 [dependencies]
 lib_boardgame = { path = "../lib_boardgame" }
+lib_printer = { path = "../lib_printer" }
 rand = "0.6"
 log = "0.4.8"

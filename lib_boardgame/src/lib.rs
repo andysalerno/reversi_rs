@@ -1,3 +1,4 @@
+use lib_printer::{out, out_impl};
 use std::fmt;
 use std::fmt::Display;
 
@@ -146,7 +147,7 @@ where
             panic!("Agent provided a move that is illegal.");
         }
 
-        println!("Player {:?} picked move {:?}", player, picked_action);
+        out!("Player {:?} picked move {:?}", player, picked_action);
 
         let state = self.game_state_mut();
 
@@ -164,15 +165,15 @@ where
     /// and returns the game result.
     fn play_to_end(&mut self) -> GameResult {
         self.game_state_mut().initialize_board();
-        println!("Board initialized.");
+        out!("Board initialized.");
 
         while !self.is_game_over() {
-            println!("{}", self.game_state().human_friendly());
+            out!("{}", self.game_state().human_friendly());
             let cur_player_color = self.game_state().current_player_turn();
             self.player_take_turn(cur_player_color);
         }
 
-        println!("{}", self.game_state().human_friendly());
+        out!("{}", self.game_state().human_friendly());
 
         self.game_result()
             .expect("The game is over, so there must be a game result.")
@@ -204,5 +205,4 @@ pub mod tests {
         assert!(white_wins.is_win_for_player(PlayerColor::White));
         assert!(!white_wins.is_win_for_player(PlayerColor::Black));
     }
-
 }

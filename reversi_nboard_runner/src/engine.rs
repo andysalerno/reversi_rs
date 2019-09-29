@@ -1,5 +1,5 @@
 use crate::util::{log, Log, NboardError};
-use lib_agents::MctsAgent;
+use lib_agents::{MctsAgent, RandomAgent};
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
@@ -64,8 +64,10 @@ pub fn run() {
 }
 
 pub fn run_loop() -> Result<(), Box<dyn Error>> {
-    let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
-    let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
+    // let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
+    // let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
+    let black = RandomAgent;
+    let white = RandomAgent;
 
     let mut state = ReversiState::initial_state();
 
@@ -78,14 +80,15 @@ pub fn run_loop() -> Result<(), Box<dyn Error>> {
 
         match parsed {
             MsgFromGui::SetGame(ggf) => {
-                let reversi_action = get_move_from_ggf(&ggf);
-                log(Log::Info(format!("Saw move: {}", &reversi_action)));
-                state.apply_move(reversi_action);
+                let latest_move = parse_game_history(&ggf).iter().last().expect("Must have a latest move").clone();
+                log(Log::Info(format!("Saw move: {}", latest_move)));
+                state.apply_move(latest_move);
                 log(Log::Info(format!(
                     "Next state:\n{}",
                     state.human_friendly()
                 )));
             }
+            MsgFromGui::Ping(n) => writeln_to_stdout(format!("pong {}", n))?,
             MsgFromGui::Go => {
                 log(Log::Info("Running agent to select move...".to_owned()));
 
@@ -140,28 +143,51 @@ fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
     Ok(parsed)
 }
 
-fn get_move_from_ggf(ggf: &str) -> ReversiPlayerAction {
-    // Example of GGF:
-    // (;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)
-    //                                                                                                                                                           ^^ That's the last move.
+fn parse_game_history(ggf: &str) -> Vec<ReversiPlayerAction> {
+    // (;GM[Othello]PC[NBoard]DT[2019-09-29 03:22:14 GMT]PB[Andy]PW[rustrs]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[C4//5.558]W[C3]B[F5//26.906];)
 
-    let split_on_move = ggf.split("]B[").collect::<Vec<_>>();
+    let mut result = Vec::new();
+    let mut s = String::from(ggf);
 
-    if split_on_move.len() <= 1 {
-        // pattern not found
-        panic!("Couldn't find pattern ']B[' in GGF text: {}", ggf);
+    loop {
+        let next_move_idx = {
+            let next_b_move = s.find("]B[");
+            let next_w_move = s.find("]W[");
+
+            if next_b_move.is_some() && next_w_move.is_some() {
+                Some(usize::min(next_b_move.unwrap(), next_w_move.unwrap()))
+            } else {
+                next_b_move.or(next_w_move)
+            }
+        };
+
+        match next_move_idx {
+            Some(idx) => {
+                s.drain(..idx);
+
+                // ']B[' or ']W['
+                let color_str: String = s.drain(..3).collect();
+                let player_color = match color_str.chars().nth(1).expect("must match ]B[ pattern") {
+                    'B' => PlayerColor::Black,
+                    'W' => PlayerColor::White,
+                    c => panic!("Expected 'B' or 'W', saw: {}", c),
+                };
+
+                // C4, F5, etc
+                let ggf_move: String = s.drain(..2).collect();
+                let ggf_move = NBoardAction(ggf_move);
+                let reversi_action = nboard_action_to_reversi_action(ggf_move);
+                result.push(reversi_action);
+            }
+            None => return result,
+        }
     }
 
-    let second_chunk = split_on_move[1];
-    let second_chunk_split = second_chunk.split("//").collect::<Vec<_>>();
+    result
+}
 
-    if second_chunk_split.len() <= 1 {
-        // pattern not found
-        panic!("Couldn't find pattern '//' in GGF text: {}", ggf);
-    }
-
-    let move_str = second_chunk_split[0].to_string();
-    let letter = move_str.chars().nth(0).expect("move_str first letter");
+fn nboard_action_to_reversi_action(n: NBoardAction) -> ReversiPlayerAction {
+    let letter = n.0.chars().nth(0).expect("move_str first letter");
     let x_pos_val = match letter {
         'A' => 0,
         'B' => 1,
@@ -173,13 +199,14 @@ fn get_move_from_ggf(ggf: &str) -> ReversiPlayerAction {
         'H' => 7,
         _ => panic!("Didn't recognize board letter: {}", letter),
     };
-    let y_pos_val = move_str
-        .chars()
-        .nth(1)
-        .expect("move_str second char")
-        .to_string()
-        .parse::<usize>()
-        .expect("move str from nboard had no y val");
+
+    let y_pos_val =
+        n.0.chars()
+            .nth(1)
+            .expect("move_str second char")
+            .to_string()
+            .parse::<usize>()
+            .expect("move str from nboard had no y val");
     let y_pos_val = 7 - (y_pos_val - 1);
 
     let position = lib_reversi::BoardPosition::new(x_pos_val, y_pos_val);
@@ -198,7 +225,7 @@ fn read_from_stdin() -> Result<String, Box<dyn Error>> {
 fn writeln_to_stdout<T: AsRef<str>>(s: T) -> Result<(), Box<dyn Error>> {
     log(Log::Info(format!("Sending message: {}", s.as_ref())));
     let with_newline = format!("{}\n", s.as_ref());
-    io::stdout().write_all(b"=== f6\n")?;
+    io::stdout().write_all(with_newline.as_bytes())?;
     io::stdout().flush()?;
 
     Ok(())
@@ -209,10 +236,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_move_from_ggf_finds_move() {
+    fn parse_game_history_finds_one_move() {
         let ggf_string = r"(;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)";
 
-        let parsed_move = get_move_from_ggf(ggf_string);
+        let parsed_move = parse_game_history(ggf_string).iter().last().unwrap().clone();
 
         match parsed_move {
             ReversiPlayerAction::Move { position } => {
@@ -223,26 +250,56 @@ mod tests {
     }
 
     #[test]
+    fn parse_game_history_finds_all_moves() {
+        let ggf_string = r"(;GM[Othello]PC[NBoard]DT[2019-09-29 03:22:14 GMT]PB[Andy]PW[rustrs]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[C4//5.558]W[C3]B[F5//26.906];)";
+
+        let history = parse_game_history(ggf_string);
+
+        match history[0] {
+            ReversiPlayerAction::Move { position } => {
+                assert_eq!(position, BoardPosition::new(2, 4))
+            }
+            _ => panic!("Expected to find a board position."),
+        }
+
+        match history[1] {
+            ReversiPlayerAction::Move { position } => {
+                assert_eq!(position, BoardPosition::new(2, 5))
+            }
+            _ => panic!("Expected to find a board position."),
+        }
+
+        match history[2] {
+            ReversiPlayerAction::Move { position } => {
+                assert_eq!(position, BoardPosition::new(5, 3))
+            }
+            _ => panic!("Expected to find a board position."),
+        }
+
+        assert_eq!(3, history.len());
+    }
+
+    #[test]
     fn nboard_action_from_reversi_action() {
         let bottom_left_position = ReversiPlayerAction::Move {
             position: BoardPosition::new(0, 0),
         };
 
         let nboard_bot_left: NBoardAction = bottom_left_position.into();
-        assert_eq!(nboard_bot_left.0, "A8".to_owned());
+        assert_eq!(nboard_bot_left.0, "a8".to_owned());
 
         let top_right_position = ReversiPlayerAction::Move {
             position: BoardPosition::new(7, 7),
         };
 
         let nboard_top_right: NBoardAction = top_right_position.into();
-        assert_eq!(nboard_top_right.0, "H1".to_owned());
+        assert_eq!(nboard_top_right.0, "h1".to_owned());
 
         let one_one = ReversiPlayerAction::Move {
             position: BoardPosition::new(1, 1),
         };
 
         let nboard_one_one: NBoardAction = one_one.into();
-        assert_eq!(nboard_one_one.0, "B7".to_owned());
+        assert_eq!(nboard_one_one.0, "b7".to_owned());
     }
 }
