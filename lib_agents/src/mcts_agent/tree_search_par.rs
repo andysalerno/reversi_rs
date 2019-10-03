@@ -37,8 +37,14 @@ where
 
     // Critical lock scope of this function:
     {
-        if node.data().is_expanded() {
+        // TODO: undo this
+        let data = node.data();
+        let is_expanded = data.is_expanded();
+        if is_expanded {
             // Another thread beat us to the punch, so no work to do
+            // remove this:
+            // std::process::exit(0);
+            panic!("how?");
             return;
         }
 
@@ -107,9 +113,9 @@ where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    let mut parent_node = Some(node.get_handle());
+    let mut handle = Some(node.get_handle());
 
-    while let Some(p) = parent_node {
+    while let Some(p) = handle {
         let parent = p.borrow();
         let data = parent.data();
         data.increment_plays();
@@ -118,7 +124,7 @@ where
             data.increment_wins();
         }
 
-        parent_node = parent.parent();
+        handle = parent.parent();
     }
 }
 
@@ -146,7 +152,8 @@ where
 }
 
 /// Selects using max UCB, but on opponent's turn inverts the score.
-/// If the given node has no children, returns a handle back to the given node.
+/// If the given node has no unsaturated children,
+/// returns a handle back to the given node.
 fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -285,17 +292,17 @@ where
     TState: GameState,
 {
     let thread_count = match player_color {
-        PlayerColor::Black => 1,
-        PlayerColor::White => 1,
+        PlayerColor::Black => configs::BLACK_THREAD_COUNT,
+        PlayerColor::White => configs::WHTIE_THREAD_COUNT,
     };
 
     if thread_count == 1 {
-        mcts_loop(root, player_color, 0);
+        mcts_loop(root, player_color);
     } else {
         thread::scope(|s| {
-            for i in 0..thread_count {
+            for _ in 0..thread_count {
                 s.spawn(move |_| {
-                    mcts_loop(root, player_color, i);
+                    mcts_loop(root, player_color);
                 });
             }
         })
@@ -303,7 +310,7 @@ where
     }
 }
 
-fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, _thread_num: usize)
+fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -335,10 +342,12 @@ where
 
         // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = select_to_leaf(root, player_color);
-
         let leaf = leaf.borrow();
 
         // Expand: generate fresh child nodes for the selected leaf node.
+        // scenario: the path has already expanded to a terminal, which is marked saturated.
+        // when we are at the PARENT of that terminal, the 'select' stage returns
+        // itself, so we have selected an already-expanded node, and try to expand again.
         expand(leaf);
         let expanded_children = leaf.children_read();
 
@@ -358,15 +367,23 @@ where
             // so this node must be a terminating node.
             let sim_result = simulate(leaf, &mut rng);
 
-            if leaf.data().plays() == 0 {
+            // plays could be 0 or 1
+            // 0 if the parent node was expanded, and sim'd on a different child
+            // 1 if the parent node was expanded, and sim'd on this child
+            // if this is our first time selecting this node...
+            let plays = leaf.data().plays();
+            if plays == 0 {
                 let is_win = sim_result.is_win_for_player(player_color);
                 backprop_sim_result(leaf, is_win);
             }
 
-            // Update the terminating node so it knows its own end game result.
-            leaf.data().set_end_state_result(sim_result);
+            if leaf.data().end_state_result().is_none() {
+                // bit of a hack, this is just to know we've never done this before
+                // Update the terminating node so it knows its own end game result.
+                leaf.data().set_end_state_result(sim_result);
 
-            backprop_saturation(leaf);
+                backprop_saturation(leaf);
+            }
         }
     }
 
@@ -705,6 +722,78 @@ pub mod tests {
     }
 
     #[test]
+    fn terminal_node_is_considered_saturated() {
+        let data = {
+            let mut state = TicTacToeState::initial_state();
+
+            // ___
+            // ___
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,0").unwrap());
+
+            // ___
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
+
+            // __X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("2,2").unwrap());
+
+            // O_X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,2").unwrap());
+
+            // O_X
+            // _O_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("2,0").unwrap());
+
+            // O_X
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("0,1").unwrap());
+
+            // OXX
+            // OO_
+            // X_X
+            state.apply_move(TicTacToeAction::from_str("1,2").unwrap());
+
+            // OXX
+            // OO_
+            // XOX
+            state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
+
+            AMctsData::new(state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        expand(&tree_root);
+        let children = tree_root.children_read();
+        let children = children.iter().cloned().collect::<Vec<_>>();
+
+        assert_eq!(
+            1,
+            children.len(),
+            "Only one move left, so expect only 1 child."
+        );
+        assert!(
+            !children[0].borrow().data().is_saturated(),
+            "Not considered saturated, since we have not expanded yet (so we don't know for sure)"
+        );
+
+        expand(children[0].borrow());
+
+        assert!(
+            children[0].borrow().data().is_saturated(),
+            "Now that we've expanded, we know it is saturated."
+        );
+    }
+
+    #[test]
     #[allow(clippy::unreadable_literal)]
     #[allow(clippy::float_cmp)]
     fn score_node_expects_always_prefers_univisted_node() {
@@ -793,6 +882,40 @@ pub mod tests {
     }
 
     #[test]
+    fn mcts_saturates_root_node() {
+        let mut state = TicTacToeState::new();
+
+        // XOX
+        // OOX
+        // X_O
+        let moves = vec!["0,0", "1,1", "2,2", "1,2", "0,2", "0,1", "2,1", "2,0"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        assert!(
+            !root.data().is_saturated(),
+            "The node must not be saturated to begin with."
+        );
+
+        assert_eq!(
+            PlayerColor::Black,
+            root.data().state().current_player_turn()
+        );
+
+        mcts(root, PlayerColor::Black);
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated after sufficient MCTS traversal. (Is the test being run with an adequate amount of simulations?)"
+        );
+    }
+
+    #[test]
     fn mcts_expects_parent_play_count_sum_children_play_counts() {
         let mut state = TicTacToeState::new();
 
@@ -851,7 +974,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::Black);
+        mcts(root, PlayerColor::White);
 
         assert!(
             root.data().is_saturated(),
