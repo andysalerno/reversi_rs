@@ -64,9 +64,9 @@ fn get_args() -> Args {
 
 #[allow(unused)]
 fn play_reversi() -> lib_boardgame::GameResult {
-    let black = MctsAgent::<ReversiState>::new(PlayerColor::Black);
-    let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
-    // let white = HumanAgent::new(PlayerColor::White);
+    let black = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::Black));
+    // let white = MctsAgent::<ReversiState>::new(PlayerColor::White);
+    let white = Box::new(HumanAgent::new(PlayerColor::White));
 
     let mut game = Reversi::new(white, black);
 
@@ -75,8 +75,8 @@ fn play_reversi() -> lib_boardgame::GameResult {
 
 #[allow(unused)]
 fn play_tic_tac_toe() -> lib_boardgame::GameResult {
-    let black = MctsAgent::<TicTacToeState>::new(PlayerColor::Black);
-    let white = MctsAgent::<TicTacToeState>::new(PlayerColor::White);
+    let black = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::Black));
+    let white = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::White));
 
     let mut game = TicTacToe::new(white, black);
 

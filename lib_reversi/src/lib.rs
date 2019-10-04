@@ -65,7 +65,15 @@ pub enum ReversiPlayerAction {
     Move { position: BoardPosition },
 }
 
-impl GameMove for ReversiPlayerAction {}
+impl GameMove for ReversiPlayerAction {
+    fn is_forced_pass(self) -> bool {
+        match self {
+            ReversiPlayerAction::PassTurn => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Debug for ReversiPlayerAction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let msg = match self {

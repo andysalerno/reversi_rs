@@ -1,22 +1,18 @@
 use crate::reversi_gamestate::ReversiState;
 use lib_boardgame::{Game, GameAgent, GameResult, GameState};
+use std::borrow::Borrow;
 
-pub struct Reversi<WhiteAgent, BlackAgent>
-where
-    WhiteAgent: GameAgent<ReversiState>,
-    BlackAgent: GameAgent<ReversiState>,
-{
-    white_agent: WhiteAgent,
-    black_agent: BlackAgent,
+pub struct Reversi {
+    white_agent: Box<dyn GameAgent<ReversiState>>,
+    black_agent: Box<dyn GameAgent<ReversiState>>,
     game_state: ReversiState,
 }
 
-impl<WhiteAgent, BlackAgent> Reversi<WhiteAgent, BlackAgent>
-where
-    WhiteAgent: GameAgent<ReversiState>,
-    BlackAgent: GameAgent<ReversiState>,
-{
-    pub fn new(white_agent: WhiteAgent, black_agent: BlackAgent) -> Self {
+impl Reversi {
+    pub fn new(
+        white_agent: Box<dyn GameAgent<ReversiState>>,
+        black_agent: Box<dyn GameAgent<ReversiState>>,
+    ) -> Self {
         Reversi {
             white_agent,
             black_agent,
@@ -25,18 +21,14 @@ where
     }
 }
 
-impl<W, B> Game<W, B> for Reversi<W, B>
-where
-    W: GameAgent<ReversiState>,
-    B: GameAgent<ReversiState>,
-{
+impl Game for Reversi {
     type State = ReversiState;
 
-    fn white_agent(&self) -> &W {
-        &self.white_agent
+    fn white_agent(&self) -> &dyn GameAgent<ReversiState> {
+        self.white_agent.borrow()
     }
-    fn black_agent(&self) -> &B {
-        &self.black_agent
+    fn black_agent(&self) -> &dyn GameAgent<ReversiState> {
+        self.black_agent.borrow()
     }
 
     /// The game's current state.

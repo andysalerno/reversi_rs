@@ -202,8 +202,10 @@ mod tests {
 
     #[test]
     fn tree_search_always_picks_winning_move() {
-        let black_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::Black);
-        let white_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::White);
+        let black_agent: Box<MctsAgent<_, ArcNode<_>>> =
+            Box::new(MctsAgent::new(PlayerColor::Black));
+        let white_agent: Box<MctsAgent<_, ArcNode<_>>> =
+            Box::new(MctsAgent::new(PlayerColor::White));
 
         let mut game = TicTacToe::new(white_agent, black_agent);
 

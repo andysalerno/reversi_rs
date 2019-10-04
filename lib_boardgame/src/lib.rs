@@ -36,7 +36,10 @@ impl GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {}
+pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {
+    /// Returns true if this GameMove represents a forced turn pass.
+    fn is_forced_pass(self) -> bool;
+}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
@@ -109,15 +112,11 @@ pub trait GameState: Clone + Send + Display {
     }
 }
 
-pub trait Game<WhiteAgent, BlackAgent>
-where
-    WhiteAgent: GameAgent<Self::State>,
-    BlackAgent: GameAgent<Self::State>,
-{
+pub trait Game {
     type State: GameState;
 
-    fn white_agent(&self) -> &WhiteAgent;
-    fn black_agent(&self) -> &BlackAgent;
+    fn white_agent(&self) -> &dyn GameAgent<Self::State>;
+    fn black_agent(&self) -> &dyn GameAgent<Self::State>;
 
     /// The game's current state.
     fn game_state(&self) -> &Self::State;
@@ -138,9 +137,18 @@ where
         let state = self.game_state();
         let legal_moves = state.legal_moves(player);
 
-        let picked_action = match player {
-            PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
-            PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
+        let picked_action = if legal_moves.len() == 1 && legal_moves[0].is_forced_pass() {
+            out!(
+                "Player {:?} has no options, so they pass their turn.",
+                player
+            );
+
+            legal_moves[0]
+        } else {
+            match player {
+                PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
+                PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
+            }
         };
 
         if legal_moves.iter().find(|&&m| m == picked_action).is_none() {

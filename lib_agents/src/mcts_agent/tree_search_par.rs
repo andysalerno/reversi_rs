@@ -37,14 +37,7 @@ where
 
     // Critical lock scope of this function:
     {
-        // TODO: undo this
-        let data = node.data();
-        let is_expanded = data.is_expanded();
-        if is_expanded {
-            // Another thread beat us to the punch, so no work to do
-            // remove this:
-            // std::process::exit(0);
-            panic!("how?");
+        if node.data().is_expanded() {
             return;
         }
 
