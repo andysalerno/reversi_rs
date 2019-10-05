@@ -103,7 +103,7 @@ where
 }
 
 // TODO: this same work can be done while we are already doing increment_saturation_count()
-fn backprop_sat_descendants_count<TNode, TState>(leaf: &TNode)
+fn backprop_terminal_count<TNode, TState>(leaf: &TNode)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -113,13 +113,13 @@ where
         "Only a leaf considered saturated can have its saturated status backpropagated."
     );
 
-    let mut handle = leaf.parent();
+    let mut handle = Some(leaf.get_handle());
 
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
 
-        data.increment_sat_descendants_count(1);
+        data.increment_terminal_count(1);
 
         handle = node.parent();
     }
@@ -421,7 +421,7 @@ where
 
                 // TODO: these two guys can be combined
                 backprop_saturation(leaf);
-                backprop_sat_descendants_count(leaf);
+                backprop_terminal_count(leaf);
             }
         }
     }
@@ -1036,5 +1036,84 @@ pub mod tests {
             let children = children.iter().cloned();
             traversal.extend(children);
         }
+    }
+
+    #[test]
+    fn mcts_when_root_saturated_expects_treesize_equals_terminal_count() {
+        let mut state = TicTacToeState::new();
+
+        // __X
+        // _O_
+        // X__
+        let moves = vec!["0,0", "1,1", "2,2"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        mcts(root, PlayerColor::White);
+
+        assert!(
+            root.data().is_saturated(),
+            "The node must become saturated for this test to be valid. (Is the test being run with an adequate amount of simulations?)"
+        );
+
+        let mut terminal_count = 0;
+        let mut traversal = vec![root.get_handle()];
+        while let Some(n) = traversal.pop() {
+            let node: &ArcNode<_> = n.borrow();
+
+            if node.children_read().is_empty() {
+                terminal_count += 1;
+            }
+
+            let children = node.children_read();
+            let children = children.iter().cloned();
+            traversal.extend(children);
+        }
+
+        assert_eq!(terminal_count, root.data().terminal_count(),
+        "Expected the root's terminal count after saturation to equal the count of terminal's in the tree.");
+    }
+
+    #[test]
+    fn mcts_expects_final_saturation_increases_root_terminal_count() {
+        let mut state = TicTacToeState::new();
+
+        // XOX
+        // OOX
+        // X_O
+        let moves = vec!["0,0", "1,1", "2,2", "1,2", "0,2", "0,1", "2,1", "2,0"]
+            .into_iter()
+            .map(|s| TicTacToeAction::from_str(s).unwrap());
+
+        state.apply_moves(moves);
+
+        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root: &ArcNode<_> = root_handle.borrow();
+
+        assert!(
+            !root.data().is_saturated(),
+            "The node must not be saturated to begin with."
+        );
+
+        let root_terminal_count_before = root.data().terminal_count();
+
+        assert_eq!(
+            PlayerColor::Black,
+            root.data().state().current_player_turn()
+        );
+
+        mcts(root, PlayerColor::Black);
+
+        let root_terminal_count_after = root.data().terminal_count();
+
+        assert_eq!(
+            root_terminal_count_after, root_terminal_count_before + 1,
+            "By adding one new saturated node, expects root to get its terminal count incremented by one."
+        );
     }
 }

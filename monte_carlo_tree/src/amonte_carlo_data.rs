@@ -10,7 +10,7 @@ pub struct MctsResult<TState: GameState> {
     pub wins: usize,
     pub plays: usize,
     pub is_saturated: bool,
-    pub sat_descendants: usize,
+    pub terminal_count: usize,
     pub tree_size: usize,
 }
 
@@ -23,13 +23,13 @@ where
 
         write!(
             f,
-            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?} Sat desc: {:?}{}",
+            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?} Terminals: {:?}{}",
             self.action,
             self.plays,
             self.wins,
             self.wins as f32 / self.plays as f32,
             self.tree_size,
-            self.sat_descendants,
+            self.terminal_count,
             sat_display
         )
     }
@@ -51,7 +51,7 @@ where
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
     tree_size: AtomicUsize,
-    sat_descendants: AtomicUsize,
+    terminal_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
 }
 
@@ -84,7 +84,7 @@ where
         let children_count = clone_atomic_usize(&self.children_count);
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
         let tree_size = clone_atomic_usize(&self.tree_size);
-        let sat_descendants = clone_atomic_usize(&self.sat_descendants);
+        let terminal_count = clone_atomic_usize(&self.terminal_count);
 
         Self {
             state: self.state.clone(),
@@ -96,7 +96,7 @@ where
             children_saturated_count,
             is_expanded: AtomicBool::new(self.is_expanded()),
             tree_size,
-            sat_descendants,
+            terminal_count,
         }
     }
 }
@@ -120,7 +120,7 @@ where
             is_saturated: data.is_saturated(),
             result: None, // TODO,
             tree_size: data.tree_size(),
-            sat_descendants: data.sat_descendants(),
+            terminal_count: data.terminal_count(),
         }
     }
 }
@@ -168,8 +168,8 @@ where
         );
     }
 
-    pub fn increment_sat_descendants_count(&self, by_count: usize) {
-        self.sat_descendants.fetch_add(by_count, Ordering::SeqCst);
+    pub fn increment_terminal_count(&self, by_count: usize) {
+        self.terminal_count.fetch_add(by_count, Ordering::SeqCst);
     }
 
     pub fn increment_tree_size(&self, count: usize) {
@@ -209,7 +209,7 @@ where
             children_saturated_count: Default::default(),
             end_state_result: Default::default(),
             tree_size: Default::default(),
-            sat_descendants: Default::default(),
+            terminal_count: Default::default(),
         }
     }
 
@@ -231,8 +231,8 @@ where
         self.is_expanded() && saturated_children_count >= children_count
     }
 
-    pub fn sat_descendants(&self) -> usize {
-        self.sat_descendants.load(Ordering::SeqCst)
+    pub fn terminal_count(&self) -> usize {
+        self.terminal_count.load(Ordering::SeqCst)
     }
 
     pub fn end_state_result(&self) -> Option<GameResult> {
