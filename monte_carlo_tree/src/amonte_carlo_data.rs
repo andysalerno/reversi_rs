@@ -10,6 +10,27 @@ pub struct MctsResult<TState: GameState> {
     pub wins: usize,
     pub plays: usize,
     pub is_saturated: bool,
+    pub tree_size: usize,
+}
+
+impl<TState> fmt::Debug for MctsResult<TState>
+where
+    TState: GameState,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sat_display = if self.is_saturated { " (S)" } else { "" };
+
+        write!(
+            f,
+            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?}{}",
+            self.action,
+            self.plays,
+            self.wins,
+            self.wins as f32 / self.plays as f32,
+            self.tree_size,
+            sat_display
+        )
+    }
 }
 
 /// MCTS-related data that every Node will have.
@@ -27,7 +48,21 @@ where
 
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
+    subtree_nodes_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
+}
+
+impl<T> fmt::Debug for AMctsData<T>
+where
+    T: GameState,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Action: {:?} Plays: {:?} Wins: {:?} ({}) Treesize: {:?}",
+            self.action, self.plays, self.wins, 0.00, self.subtree_nodes_count
+        )
+    }
 }
 
 impl<TState> Clone for AMctsData<TState>
@@ -45,6 +80,7 @@ where
         let wins = clone_atomic_usize(&self.wins);
         let children_count = clone_atomic_usize(&self.children_count);
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
+        let subtree_nodes_count = clone_atomic_usize(&self.subtree_nodes_count);
 
         Self {
             state: self.state.clone(),
@@ -55,6 +91,7 @@ where
             children_count,
             children_saturated_count,
             is_expanded: AtomicBool::new(self.is_expanded()),
+            subtree_nodes_count,
         }
     }
 }
@@ -72,9 +109,12 @@ where
         Self {
             plays: data.plays(),
             wins: data.wins(),
-            action: data.action().expect("todo"),
+            action: data
+                .action()
+                .expect("can't convert to MctsResult without an action"),
             is_saturated: data.is_saturated(),
-            result: None, // TODO
+            result: None, // TODO,
+            tree_size: data.tree_size(),
         }
     }
 }
@@ -122,6 +162,10 @@ where
         );
     }
 
+    pub fn increment_subtree_nodes_count(&self) {
+        self.subtree_nodes_count.fetch_add(1, Ordering::SeqCst);
+    }
+
     pub fn state(&self) -> &T {
         &self.state
     }
@@ -138,6 +182,10 @@ where
         self.action
     }
 
+    pub fn tree_size(&self) -> usize {
+        self.subtree_nodes_count.load(Ordering::SeqCst)
+    }
+
     pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
         Self {
             state,
@@ -150,6 +198,7 @@ where
             children_count: Default::default(),
             children_saturated_count: Default::default(),
             end_state_result: Default::default(),
+            subtree_nodes_count: Default::default(),
         }
     }
 

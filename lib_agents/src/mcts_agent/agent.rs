@@ -160,20 +160,7 @@ where
         out!("Simulations per sec: {:.0}", sims_per_sec);
 
         for action_result in &results {
-            let sat_display = if action_result.is_saturated {
-                "(S)"
-            } else {
-                ""
-            };
-
-            out!(
-                "Action: {:?} Plays: {} Wins: {} ({:.2}) {}",
-                action_result.action,
-                action_result.plays,
-                action_result.wins,
-                action_result.wins as f32 / action_result.plays as f32,
-                sat_display,
-            );
+            out!("{:?}", action_result);
         }
     }
 
