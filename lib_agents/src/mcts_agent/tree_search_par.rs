@@ -102,6 +102,29 @@ where
     }
 }
 
+// TODO: this same work can be done while we are already doing increment_saturation_count()
+fn backprop_sat_descendants_count<TNode, TState>(leaf: &TNode)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    assert!(
+        leaf.data().is_saturated(),
+        "Only a leaf considered saturated can have its saturated status backpropagated."
+    );
+
+    let mut handle = leaf.parent();
+
+    while let Some(p) = handle {
+        let node = p.borrow();
+        let data = node.data();
+
+        data.increment_sat_descendants_count(1);
+
+        handle = node.parent();
+    }
+}
+
 fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
     TNode: Node<Data = AMctsData<TState>>,
@@ -389,11 +412,16 @@ where
             }
 
             if leaf.data().end_state_result().is_none() {
+                // TODO: data race possible here? I check if it's none,
+                // then I set. But if two saw none, both set (only one actually sets),
+                // but then both still do the backprop saturation logic. Need lock here?
                 // bit of a hack, this is just to know we've never done this before
                 // Update the terminating node so it knows its own end game result.
                 leaf.data().set_end_state_result(sim_result);
 
+                // TODO: these two guys can be combined
                 backprop_saturation(leaf);
+                backprop_sat_descendants_count(leaf);
             }
         }
     }
