@@ -162,8 +162,8 @@ where
         );
     }
 
-    pub fn increment_tree_size(&self) {
-        self.tree_size.fetch_add(1, Ordering::SeqCst);
+    pub fn increment_tree_size(&self, count: usize) {
+        self.tree_size.fetch_add(count, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> &T {

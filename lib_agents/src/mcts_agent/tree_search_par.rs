@@ -58,6 +58,7 @@ where
         // Now that we've expanded this node, update it to
         // inform it how many children it has.
         node.data().set_children_count(legal_actions.len());
+        backprop_increment_tree_size(node, legal_actions.len());
 
         let new_children = legal_actions
             .iter()
@@ -116,6 +117,23 @@ where
         if is_win {
             data.increment_wins();
         }
+
+        handle = parent.parent();
+    }
+}
+
+fn backprop_increment_tree_size<TNode, TState>(node: &TNode, by_count: usize)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    let mut handle = Some(node.get_handle());
+
+    while let Some(p) = handle {
+        let parent = p.borrow();
+        let data = parent.data();
+
+        data.increment_tree_size(by_count);
 
         handle = parent.parent();
     }
