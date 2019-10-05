@@ -17,7 +17,7 @@ where
     *random_pick(choices, rng).expect("Attempted to pick a random choice, but failed")
 }
 
-pub(crate) fn get_rng() -> impl rand::Rng {
+pub(crate) fn get_rng() -> impl rand::Rng + Clone {
     // use rand::FromEntropy;
     // SmallRng::from_entropy()
     rand::thread_rng()

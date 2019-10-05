@@ -182,20 +182,19 @@ impl ReversiState {
             .map(|index| ((index / Self::BOARD_SIZE), (index % Self::BOARD_SIZE)))
             .map(|(col, row)| BoardPosition::new(col, row));
 
-        let empty_positions = all_positions.filter(|pos| self.get_piece(*pos).is_none());
+        let empty_positions = all_positions.filter(|&pos| self.get_piece(pos).is_none());
 
-        let mut moves: Vec<_> = empty_positions
+        let mut moves = Vec::with_capacity(8);
+
+        empty_positions
             .filter(|pos| {
-                for col_dir in all_directions.iter() {
-                    for row_dir in all_directions.iter() {
-                        if *col_dir == SAME && *row_dir == SAME {
+                for &col_dir in all_directions.iter() {
+                    for &row_dir in all_directions.iter() {
+                        if col_dir == SAME && row_dir == SAME {
                             continue;
                         }
 
-                        let direction = Directions {
-                            col_dir: *col_dir,
-                            row_dir: *row_dir,
-                        };
+                        let direction = Directions { col_dir, row_dir };
 
                         if self
                             .find_sibling_piece_pos(*pos, piece_color, direction)
@@ -209,7 +208,9 @@ impl ReversiState {
                 false
             })
             .map(|position| ReversiPlayerAction::Move { position })
-            .collect();
+            .for_each(|a| moves.push(a));
+        // Note on above line: I have tried using "extend()" instead of "for_each()", but that incurred
+        // a performance hit for reasons I don't understand.
 
         if moves.is_empty() {
             // There's always at least one legal choice: pass the turn
@@ -229,18 +230,24 @@ impl ReversiState {
             return true;
         }
 
-        let white_legal_moves = self.legal_moves(PlayerColor::White);
-        let black_legal_moves = self.legal_moves(PlayerColor::Black);
+        let cur_player_legal_moves = self.legal_moves(self.current_player_turn());
 
-        if white_legal_moves.len() == 1
-            && black_legal_moves.len() == 1
-            && white_legal_moves[0] == ReversiPlayerAction::PassTurn
-            && black_legal_moves[0] == ReversiPlayerAction::PassTurn
+        if cur_player_legal_moves.len() > 1
+            || cur_player_legal_moves[0] != ReversiPlayerAction::PassTurn
         {
-            return true;
+            return false;
         }
 
-        false
+        let opponent_color = opponent(self.current_player_turn());
+        let opponent_legal_moves = self.calc_legal_moves(opponent_color);
+
+        if opponent_legal_moves.len() > 1
+            || opponent_legal_moves[0] != ReversiPlayerAction::PassTurn
+        {
+            return false;
+        }
+
+        true
     }
 
     fn update_stored_state_values(&mut self) {
@@ -297,7 +304,9 @@ impl GameState for ReversiState {
         result
     }
 
+    // TODO: update trait if we're not using PlayerColor anymore
     fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
+        assert_eq!(_player, self.current_player_turn(), "Until the trait is updated, the requested legal moves must always be for the current player.");
         self.cur_state_legal_moves.as_slice()
     }
 
@@ -350,23 +359,20 @@ impl GameState for ReversiState {
         //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
         //      For row, we can check all rows below us (direction -1), above us (direction 1), or the current row (direction 0).
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
-        for col_dir in all_directions.iter() {
-            for row_dir in all_directions.iter() {
-                if *col_dir == SAME && *row_dir == SAME {
+        for &col_dir in all_directions.iter() {
+            for &row_dir in all_directions.iter() {
+                if col_dir == SAME && row_dir == SAME {
                     // staying in the same row and col means not moving at all, so skip this scenario
                     continue;
                 }
 
-                let direction = Directions {
-                    col_dir: *col_dir,
-                    row_dir: *row_dir,
-                };
+                let direction = Directions { col_dir, row_dir };
                 let origin = position;
                 let sibling = self.find_sibling_piece_pos(origin, player_piece, direction);
 
                 if let Some(sibling) = sibling {
                     ReversiState::traverse_from(origin, direction)
-                        .take_while(|p| *p != sibling)
+                        .take_while(|&p| p != sibling)
                         .for_each(|p| {
                             self.flip_piece(p);
                         });
@@ -553,7 +559,8 @@ mod tests {
         let mut cloned = state.clone();
 
         let legal_moves = cloned.legal_moves(cloned.current_player_turn());
-        cloned.apply_move(legal_moves[0]);
+        let first_legal = legal_moves[0];
+        cloned.apply_move(first_legal);
 
         let orig_piece_count = state.white_pieces_count() + state.black_pieces_count();
         let modified_piece_count = cloned.white_pieces_count() + cloned.black_pieces_count();

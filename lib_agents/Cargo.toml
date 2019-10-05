@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 lib_boardgame = {path = "../lib_boardgame" }
+lib_printer = {path = "../lib_printer" }
 monte_carlo_tree = {path = "../monte_carlo_tree" }
 lib_reversi = {path = "../lib_reversi" }
 lib_tic_tac_toe = {path = "../lib_tic_tac_toe" }

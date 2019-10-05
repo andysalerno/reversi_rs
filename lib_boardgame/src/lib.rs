@@ -1,3 +1,4 @@
+use lib_printer::{out, out_impl};
 use std::fmt;
 use std::fmt::Display;
 
@@ -35,7 +36,10 @@ impl GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {}
+pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {
+    /// Returns true if this GameMove represents a forced turn pass.
+    fn is_forced_pass(self) -> bool;
+}
 
 /// Describes a complete state of some Game,
 /// such as the board position, the current player's turn,
@@ -108,15 +112,11 @@ pub trait GameState: Clone + Send + Display {
     }
 }
 
-pub trait Game<WhiteAgent, BlackAgent>
-where
-    WhiteAgent: GameAgent<Self::State>,
-    BlackAgent: GameAgent<Self::State>,
-{
+pub trait Game {
     type State: GameState;
 
-    fn white_agent(&self) -> &WhiteAgent;
-    fn black_agent(&self) -> &BlackAgent;
+    fn white_agent(&self) -> &dyn GameAgent<Self::State>;
+    fn black_agent(&self) -> &dyn GameAgent<Self::State>;
 
     /// The game's current state.
     fn game_state(&self) -> &Self::State;
@@ -137,35 +137,51 @@ where
         let state = self.game_state();
         let legal_moves = state.legal_moves(player);
 
-        let picked_action = match player {
-            PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
-            PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
+        let picked_action = if legal_moves.len() == 1 && legal_moves[0].is_forced_pass() {
+            out!(
+                "Player {:?} has no options, so they pass their turn.",
+                player
+            );
+
+            legal_moves[0]
+        } else {
+            match player {
+                PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
+                PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
+            }
         };
 
         if legal_moves.iter().find(|&&m| m == picked_action).is_none() {
             panic!("Agent provided a move that is illegal.");
         }
 
-        println!("Player {:?} picked move {:?}", player, picked_action);
+        out!("Player {:?} picked move {:?}", player, picked_action);
 
         let state = self.game_state_mut();
 
         state.apply_move(picked_action);
+
+        // Now both players get a chance to observe the selected action and resulting state.
+        let state_copy = state.clone();
+        self.white_agent()
+            .observe_action(player, picked_action, &state_copy);
+        self.black_agent()
+            .observe_action(player, picked_action, &state_copy);
     }
 
     /// Applies each player's turn one at a time until the game is over,
     /// and returns the game result.
     fn play_to_end(&mut self) -> GameResult {
         self.game_state_mut().initialize_board();
-        println!("Board initialized.");
+        out!("Board initialized.");
 
         while !self.is_game_over() {
-            println!("{}", self.game_state().human_friendly());
+            out!("{}", self.game_state().human_friendly());
             let cur_player_color = self.game_state().current_player_turn();
             self.player_take_turn(cur_player_color);
         }
 
-        println!("{}", self.game_state().human_friendly());
+        out!("{}", self.game_state().human_friendly());
 
         self.game_result()
             .expect("The game is over, so there must be a game result.")
@@ -176,6 +192,7 @@ where
 /// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
+    fn observe_action(&self, _player: PlayerColor, _action: TState::Move, _result: &TState) {}
 }
 
 #[cfg(test)]
@@ -196,5 +213,4 @@ pub mod tests {
         assert!(white_wins.is_win_for_player(PlayerColor::White));
         assert!(!white_wins.is_win_for_player(PlayerColor::Black));
     }
-
 }

@@ -1,22 +1,18 @@
 use crate::tic_tac_toe_gamestate::TicTacToeState;
 use lib_boardgame::{Game, GameAgent, GameResult, GameState, PlayerColor};
+use std::borrow::Borrow;
 
-pub struct TicTacToe<WhiteAgent, BlackAgent>
-where
-    WhiteAgent: GameAgent<TicTacToeState>,
-    BlackAgent: GameAgent<TicTacToeState>,
-{
-    white_agent: WhiteAgent,
-    black_agent: BlackAgent,
+pub struct TicTacToe {
+    white_agent: Box<dyn GameAgent<TicTacToeState>>,
+    black_agent: Box<dyn GameAgent<TicTacToeState>>,
     game_state: TicTacToeState,
 }
 
-impl<W, B> TicTacToe<W, B>
-where
-    W: GameAgent<TicTacToeState>,
-    B: GameAgent<TicTacToeState>,
-{
-    pub fn new(white_agent: W, black_agent: B) -> Self {
+impl TicTacToe {
+    pub fn new(
+        white_agent: Box<dyn GameAgent<TicTacToeState>>,
+        black_agent: Box<dyn GameAgent<TicTacToeState>>,
+    ) -> Self {
         Self {
             white_agent,
             black_agent,
@@ -25,19 +21,15 @@ where
     }
 }
 
-impl<W, B> Game<W, B> for TicTacToe<W, B>
-where
-    W: GameAgent<TicTacToeState>,
-    B: GameAgent<TicTacToeState>,
-{
+impl Game for TicTacToe {
     type State = TicTacToeState;
 
-    fn white_agent(&self) -> &W {
-        &self.white_agent
+    fn white_agent(&self) -> &dyn GameAgent<TicTacToeState> {
+        self.white_agent.borrow()
     }
 
-    fn black_agent(&self) -> &B {
-        &self.black_agent
+    fn black_agent(&self) -> &dyn GameAgent<TicTacToeState> {
+        self.black_agent.borrow()
     }
 
     /// The game's current state.

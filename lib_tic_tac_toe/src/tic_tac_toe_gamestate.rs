@@ -23,7 +23,12 @@ impl fmt::Display for TicTacToeAction {
     }
 }
 
-impl GameMove for TicTacToeAction {}
+impl GameMove for TicTacToeAction {
+    /// Hard-set to `false` for TicTacToe -- there is no forced turn passing.
+    fn is_forced_pass(self) -> bool {
+        false
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub struct BoardPosition {
