@@ -48,7 +48,7 @@ where
 
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
-    subtree_nodes_count: AtomicUsize,
+    tree_size: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
 }
 
@@ -60,7 +60,7 @@ where
         write!(
             f,
             "Action: {:?} Plays: {:?} Wins: {:?} ({}) Treesize: {:?}",
-            self.action, self.plays, self.wins, 0.00, self.subtree_nodes_count
+            self.action, self.plays, self.wins, 0.00, self.tree_size
         )
     }
 }
@@ -80,7 +80,7 @@ where
         let wins = clone_atomic_usize(&self.wins);
         let children_count = clone_atomic_usize(&self.children_count);
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
-        let subtree_nodes_count = clone_atomic_usize(&self.subtree_nodes_count);
+        let tree_size = clone_atomic_usize(&self.tree_size);
 
         Self {
             state: self.state.clone(),
@@ -91,7 +91,7 @@ where
             children_count,
             children_saturated_count,
             is_expanded: AtomicBool::new(self.is_expanded()),
-            subtree_nodes_count,
+            tree_size,
         }
     }
 }
@@ -162,8 +162,8 @@ where
         );
     }
 
-    pub fn increment_subtree_nodes_count(&self) {
-        self.subtree_nodes_count.fetch_add(1, Ordering::SeqCst);
+    pub fn increment_tree_size(&self) {
+        self.tree_size.fetch_add(1, Ordering::SeqCst);
     }
 
     pub fn state(&self) -> &T {
@@ -183,7 +183,7 @@ where
     }
 
     pub fn tree_size(&self) -> usize {
-        self.subtree_nodes_count.load(Ordering::SeqCst)
+        self.tree_size.load(Ordering::SeqCst)
     }
 
     pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
@@ -198,7 +198,7 @@ where
             children_count: Default::default(),
             children_saturated_count: Default::default(),
             end_state_result: Default::default(),
-            subtree_nodes_count: Default::default(),
+            tree_size: Default::default(),
         }
     }
 
