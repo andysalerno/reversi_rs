@@ -27,8 +27,8 @@ mod configs {
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 1;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
+    pub(super) const BLACK_THREAD_COUNT: usize = 2;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 2;
 }
 
 fn expand<TNode, TState>(node: &TNode)
@@ -378,14 +378,12 @@ where
             break;
         }
 
-        // Select: travel down to a leaf node, using the explore/exploit rules.
         let leaf = select_to_leaf(root, player_color);
         let leaf = leaf.borrow();
 
-        // Expand: generate fresh child nodes for the selected leaf node.
-        // scenario: the path has already expanded to a terminal, which is marked saturated.
-        // when we are at the PARENT of that terminal, the 'select' stage returns
-        // itself, so we have selected an already-expanded node, and try to expand again.
+        // should return a result, failed if
+        // we got the lock but lost the data race
+        // in that case, continue (i.e. select again)
         expand(leaf);
         let expanded_children = leaf.children_read();
 
@@ -394,13 +392,13 @@ where
                 .expect("Must have had at least one expanded child.");
             let sim_node = sim_node.borrow();
 
-            // simulate
             let sim_result = simulate(sim_node, &mut rng);
 
-            // backprop
             let is_win = sim_result.is_win_for_player(player_color);
             backprop_sim_result(sim_node, is_win);
         } else {
+            // This whole section needs its own double-checked lock.
+
             // We expanded the node, but it had no children,
             // so this node must be a terminating node.
             let sim_result = simulate(leaf, &mut rng);
@@ -429,8 +427,6 @@ where
             }
         }
     }
-
-    dbg!(sim_count);
 }
 
 #[cfg(test)]

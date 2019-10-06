@@ -154,7 +154,6 @@ where
     {
         let total_plays = results.iter().map(|r| r.plays).sum::<usize>();
         let total_plays = total_plays - total_plays_before;
-        dbg!(total_plays);
 
         let sims_per_sec = total_plays as f64 / (elapsed.as_millis() as f64 / 1_000_f64);
         out!("Simulations per sec: {:.0}", sims_per_sec);
