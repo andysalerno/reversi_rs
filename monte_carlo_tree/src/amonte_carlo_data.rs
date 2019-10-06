@@ -53,6 +53,10 @@ where
     tree_size: AtomicUsize,
     terminal_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
+
+    /// When this subtree is fully saturated, this will hold the wins/plays
+    /// of the worst-case scenario when following this path
+    sat_worst_case_ratio: (AtomicUsize, AtomicUsize),
 }
 
 impl<T> fmt::Debug for AMctsData<T>
@@ -85,6 +89,10 @@ where
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
         let tree_size = clone_atomic_usize(&self.tree_size);
         let terminal_count = clone_atomic_usize(&self.terminal_count);
+        let sat_worst_case_ratio = (
+            clone_atomic_usize(&self.sat_worst_case_ratio.0),
+            clone_atomic_usize(&self.sat_worst_case_ratio.1),
+        );
 
         Self {
             state: self.state.clone(),
@@ -97,6 +105,7 @@ where
             is_expanded: AtomicBool::new(self.is_expanded()),
             tree_size,
             terminal_count,
+            sat_worst_case_ratio,
         }
     }
 }
@@ -210,6 +219,7 @@ where
             end_state_result: Default::default(),
             tree_size: Default::default(),
             terminal_count: Default::default(),
+            sat_worst_case_ratio: (Default::default(), Default::default()),
         }
     }
 

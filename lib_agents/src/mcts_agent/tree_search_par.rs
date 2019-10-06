@@ -6,6 +6,10 @@
 /// What we need is for every parent to hold not only "saturated_children / all_children",
 /// but those same numbers for all descendents of its entire subtree.
 /// Then we can know, way up at the root, how well explored the choice really is.
+
+/// Better idea:
+/// backprop "worst case" scenarios from the bottom when saturated
+/// I.e. every child node backprops its worst case scenario
 use std::borrow::Borrow;
 use std::time::{Duration, Instant};
 
