@@ -31,7 +31,7 @@ mod configs {
     pub(super) const WHTIE_THREAD_COUNT: usize = 2;
 }
 
-fn expand<TNode, TState>(node: &TNode)
+fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -42,7 +42,7 @@ where
     // Critical lock scope of this function:
     {
         if node.data().is_expanded() {
-            return;
+            return Err("We acquired the lock, but the previous holder already expanded.");
         }
 
         node.data().mark_expanded();
@@ -51,7 +51,7 @@ where
         if state.is_game_over() {
             // if the game is over, we have nothing to expand
             node.data().set_children_count(0);
-            return;
+            return Ok(());
         }
 
         // TODO: There's no reason for legal_moves() to need this argument
@@ -73,6 +73,8 @@ where
     }
 
     drop(children_write_lock);
+
+    Ok(())
 }
 
 /// Increment this node's count of saturated children.
@@ -381,10 +383,12 @@ where
         let leaf = select_to_leaf(root, player_color);
         let leaf = leaf.borrow();
 
-        // should return a result, failed if
-        // we got the lock but lost the data race
-        // in that case, continue (i.e. select again)
-        expand(leaf);
+        if let Err(_) = expand(leaf) {
+            // another thread beat us to expanding,
+            // so just continue with a new leaf selection
+            continue;
+        }
+
         let expanded_children = leaf.children_read();
 
         if !expanded_children.is_empty() {
@@ -988,7 +992,8 @@ pub mod tests {
                 // Note: this is a bit of a hack right now, they should be exactly equal
                 // but the root node is a special case that doesn't ever get played itself, only its children.
                 node_play_count - child_play_sum <= 1,
-                "A node's play count (left) must be the sum of its children's play counts + 1 (right) (because the parent itself is also played.)"
+                "A node's play count ({}) must be the sum of its children's play counts + 1 ({}) (because the parent itself is also played.)",
+                node_play_count, child_play_sum
             );
 
             let children = node.children_read();
