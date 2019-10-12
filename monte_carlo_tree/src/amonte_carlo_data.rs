@@ -11,6 +11,7 @@ pub struct MctsResult<TState: GameState> {
     pub plays: usize,
     pub is_saturated: bool,
     pub terminal_count: usize,
+    pub terminal_wins_count: usize,
     pub tree_size: usize,
     pub descendants_saturated_count: usize,
 }
@@ -24,12 +25,13 @@ where
 
         write!(
             f,
-            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?} Terminals: {:?};{:?}{}",
+            "A: {:?} P: {:>10?} W: {:>10?} ({:.2}) TS: {:>10?} Term: {:?}/{:?} Sat: {:?}{}",
             self.action,
             self.plays,
             self.wins,
             self.wins as f32 / self.plays as f32,
             self.tree_size,
+            self.terminal_wins_count,
             self.terminal_count,
             self.descendants_saturated_count,
             sat_display
@@ -55,6 +57,7 @@ where
     descendants_saturated_count: AtomicUsize,
     tree_size: AtomicUsize,
     terminal_count: AtomicUsize,
+    terminal_wins_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
 
     /// When this subtree is fully saturated, this will hold the wins/plays
@@ -93,6 +96,7 @@ where
         let descendants_saturated_count = clone_atomic_usize(&self.descendants_saturated_count);
         let tree_size = clone_atomic_usize(&self.tree_size);
         let terminal_count = clone_atomic_usize(&self.terminal_count);
+        let terminal_wins_count = clone_atomic_usize(&self.terminal_wins_count);
         let sat_worst_case_ratio = (
             clone_atomic_usize(&self.sat_worst_case_ratio.0),
             clone_atomic_usize(&self.sat_worst_case_ratio.1),
@@ -111,6 +115,7 @@ where
             terminal_count,
             sat_worst_case_ratio,
             descendants_saturated_count,
+            terminal_wins_count,
         }
     }
 }
@@ -135,6 +140,7 @@ where
             result: None, // TODO,
             tree_size: data.tree_size(),
             terminal_count: data.terminal_count(),
+            terminal_wins_count: data.terminal_wins_count(),
             descendants_saturated_count: data.descendants_saturated_count(),
         }
     }
@@ -159,6 +165,7 @@ where
             end_state_result: Default::default(),
             tree_size: Default::default(),
             terminal_count: Default::default(),
+            terminal_wins_count: Default::default(),
             sat_worst_case_ratio: (Default::default(), Default::default()),
         }
     }
@@ -219,6 +226,10 @@ where
         self.terminal_count.load(Ordering::SeqCst)
     }
 
+    pub fn terminal_wins_count(&self) -> usize {
+        self.terminal_wins_count.load(Ordering::SeqCst)
+    }
+
     pub fn end_state_result(&self) -> Option<GameResult> {
         *self.end_state_result.read().unwrap()
     }
@@ -253,8 +264,12 @@ where
             .fetch_add(by_count, Ordering::SeqCst);
     }
 
-    pub fn increment_terminal_count(&self, by_count: usize) {
-        self.terminal_count.fetch_add(by_count, Ordering::SeqCst);
+    pub fn increment_terminal_count(&self, is_win: bool) {
+        self.terminal_count.fetch_add(1, Ordering::SeqCst);
+
+        if is_win {
+            self.terminal_wins_count.fetch_add(1, Ordering::SeqCst);
+        }
     }
 
     pub fn increment_tree_size(&self, count: usize) {

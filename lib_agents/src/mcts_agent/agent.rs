@@ -91,11 +91,30 @@ where
         let root_handle = self
             .current_root_handle()
             .unwrap_or_else(|| self.reset_root_handle(state));
+        let copy_handle = root_handle.clone();
 
         let result = match self.color {
             PlayerColor::Black => perform_mcts_par::<TNode, TState>(root_handle, self.color),
             PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color),
         };
+
+        let likely_response = copy_handle
+            .borrow()
+            .children_read()
+            .iter()
+            .cloned()
+            .find(|n| n.borrow().data().action().unwrap() == result.action)
+            .unwrap();
+
+        let likely_response = likely_response.borrow().children_read();
+        for c in likely_response.iter() {
+            out!(
+                "Next response {:?} plays/wins: {:?}/{:?}",
+                c.borrow().data().action(),
+                c.borrow().data().wins(),
+                c.borrow().data().plays()
+            );
+        }
 
         let white_wins = if self.color == PlayerColor::White {
             result.wins
@@ -104,6 +123,7 @@ where
         };
 
         out!("{}", pretty_ratio_bar_text(20, white_wins, result.plays));
+        out!("Expects opponent to respond with: {:?}", "hi");
 
         result.action
     }

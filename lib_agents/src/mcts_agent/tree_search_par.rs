@@ -21,8 +21,8 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 12_000;
-    pub(super) const EXTRA_TIME_MS: u64 = 5_000;
+    pub(super) const SIM_TIME_MS: u64 = 3_000;
+    pub(super) const EXTRA_TIME_MS: u64 = 0_000;
 
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
@@ -153,7 +153,7 @@ where
 }
 
 // TODO: this same work can be done while we are already doing increment_saturation_count()
-fn backprop_terminal_count<TNode, TState>(leaf: &TNode)
+fn backprop_terminal_count<TNode, TState>(leaf: &TNode, is_win: bool)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
@@ -169,7 +169,7 @@ where
         let node = p.borrow();
         let data = node.data();
 
-        data.increment_terminal_count(1);
+        data.increment_terminal_count(is_win);
 
         handle = node.parent();
     }
@@ -462,9 +462,10 @@ where
             // 0 if the parent node was expanded, and sim'd on a different child
             // 1 if the parent node was expanded, and sim'd on this child
             // if this is our first time selecting this node...
+            let is_win = sim_result.is_win_for_player(player_color);
             let plays = leaf.data().plays();
+
             if plays == 0 {
-                let is_win = sim_result.is_win_for_player(player_color);
                 backprop_sim_result(leaf, is_win);
             }
 
@@ -478,7 +479,7 @@ where
 
                 // TODO: these two guys can be combined
                 backprop_saturation(leaf);
-                backprop_terminal_count(leaf);
+                backprop_terminal_count(leaf, is_win);
             }
         }
     }
