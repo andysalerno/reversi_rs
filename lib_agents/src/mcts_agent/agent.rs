@@ -98,22 +98,28 @@ where
             PlayerColor::White => perform_mcts_par::<TNode, TState>(root_handle, self.color),
         };
 
-        let likely_response = copy_handle
-            .borrow()
-            .children_read()
-            .iter()
-            .cloned()
-            .find(|n| n.borrow().data().action().unwrap() == result.action)
-            .unwrap();
+        // Find the anticipated opponent responses
+        {
+            let our_selected_child = copy_handle
+                .borrow()
+                .children_read()
+                .iter()
+                .cloned()
+                .find(|n| n.borrow().data().action().unwrap() == result.action)
+                .unwrap();
 
-        let likely_response = likely_response.borrow().children_read();
-        for c in likely_response.iter() {
-            out!(
-                "Next response {:?} plays/wins: {:?}/{:?}",
-                c.borrow().data().action(),
-                c.borrow().data().wins(),
-                c.borrow().data().plays()
-            );
+            let mut opponent_choices = our_selected_child.borrow().children_read().clone();
+
+            opponent_choices.sort_by_key(|c| c.borrow().data().plays());
+
+            for c in opponent_choices.iter().take(3) {
+                out!(
+                    "Anticipated response: {:?} plays/wins: {:?}/{:?}",
+                    c.borrow().data().action(),
+                    c.borrow().data().wins(),
+                    c.borrow().data().plays()
+                );
+            }
         }
 
         let white_wins = if self.color == PlayerColor::White {
@@ -123,7 +129,6 @@ where
         };
 
         out!("{}", pretty_ratio_bar_text(20, white_wins, result.plays));
-        out!("Expects opponent to respond with: {:?}", "hi");
 
         result.action
     }

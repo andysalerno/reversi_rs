@@ -7,7 +7,7 @@ use std::sync::{Arc, Weak};
 #[derive(Debug)]
 pub struct ArcNodeContent<T: Send + Sync> {
     data: T,
-    parent: Weak<Self>, // WTF? this is a ref to self, not ArcNode<T>??
+    parent: Weak<Self>,
     children: WriteOnceLock<Vec<ArcNode<T>>>,
 }
 
