@@ -12,6 +12,7 @@ pub struct MctsResult<TState: GameState> {
     pub is_saturated: bool,
     pub terminal_count: usize,
     pub tree_size: usize,
+    pub descendants_saturated_count: usize,
 }
 
 impl<TState> fmt::Debug for MctsResult<TState>
@@ -23,13 +24,14 @@ where
 
         write!(
             f,
-            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?} Terminals: {:?}{}",
+            "Action: {:?} Plays: {:?} Wins: {:?} ({:.2}) Treesize: {:?} Terminals: {:?};{:?}{}",
             self.action,
             self.plays,
             self.wins,
             self.wins as f32 / self.plays as f32,
             self.tree_size,
             self.terminal_count,
+            self.descendants_saturated_count,
             sat_display
         )
     }
@@ -50,6 +52,7 @@ where
 
     children_count: AtomicUsize,
     children_saturated_count: AtomicUsize,
+    descendants_saturated_count: AtomicUsize,
     tree_size: AtomicUsize,
     terminal_count: AtomicUsize,
     end_state_result: RwLock<Option<GameResult>>,
@@ -87,6 +90,7 @@ where
         let wins = clone_atomic_usize(&self.wins);
         let children_count = clone_atomic_usize(&self.children_count);
         let children_saturated_count = clone_atomic_usize(&self.children_saturated_count);
+        let descendants_saturated_count = clone_atomic_usize(&self.descendants_saturated_count);
         let tree_size = clone_atomic_usize(&self.tree_size);
         let terminal_count = clone_atomic_usize(&self.terminal_count);
         let sat_worst_case_ratio = (
@@ -106,6 +110,7 @@ where
             tree_size,
             terminal_count,
             sat_worst_case_ratio,
+            descendants_saturated_count,
         }
     }
 }
@@ -130,6 +135,7 @@ where
             result: None, // TODO,
             tree_size: data.tree_size(),
             terminal_count: data.terminal_count(),
+            descendants_saturated_count: data.descendants_saturated_count(),
         }
     }
 }
@@ -138,52 +144,26 @@ impl<T> AMctsData<T>
 where
     T: GameState,
 {
-    pub fn increment_plays(&self) {
-        self.plays.fetch_add(1, Ordering::Relaxed);
+    pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
+        Self {
+            state,
+            action,
+
+            // TODO: why can't I use the sugar `..Default::default()` for the remaining??
+            plays: AtomicUsize::new(plays),
+            wins: AtomicUsize::new(wins),
+            is_expanded: AtomicBool::new(false),
+            children_count: Default::default(),
+            children_saturated_count: Default::default(),
+            descendants_saturated_count: Default::default(),
+            end_state_result: Default::default(),
+            tree_size: Default::default(),
+            terminal_count: Default::default(),
+            sat_worst_case_ratio: (Default::default(), Default::default()),
+        }
     }
 
-    pub fn increment_wins(&self) {
-        self.wins.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// The owner of the tree search should call this
-    /// upon expanding the node, to mark it as "expanded".
-    /// This is an important because it distinguishes
-    /// nodes that have been expanded but have no more children (terminal nodes)
-    /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
-    pub fn mark_expanded(&self) {
-        self.is_expanded.store(true, Ordering::SeqCst);
-    }
-
-    pub fn is_expanded(&self) -> bool {
-        self.is_expanded.load(Ordering::SeqCst)
-    }
-
-    pub fn set_children_count(&self, count: usize) {
-        self.children_count.store(count, Ordering::SeqCst);
-    }
-
-    pub fn children_count(&self) -> usize {
-        self.children_count.load(Ordering::SeqCst)
-    }
-
-    pub fn increment_saturated_children_count(&self) {
-        self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
-
-        // TODO: make a debug_assert when confident it's true
-        assert!(
-            self.children_saturated_count.load(Ordering::SeqCst)
-                <= self.children_count.load(Ordering::SeqCst)
-        );
-    }
-
-    pub fn increment_terminal_count(&self, by_count: usize) {
-        self.terminal_count.fetch_add(by_count, Ordering::SeqCst);
-    }
-
-    pub fn increment_tree_size(&self, count: usize) {
-        self.tree_size.fetch_add(count, Ordering::SeqCst);
-    }
+    // "Read" functions
 
     pub fn state(&self) -> &T {
         &self.state
@@ -205,22 +185,16 @@ where
         self.tree_size.load(Ordering::SeqCst)
     }
 
-    pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
-        Self {
-            state,
-            action,
+    pub fn is_expanded(&self) -> bool {
+        self.is_expanded.load(Ordering::SeqCst)
+    }
 
-            // TODO: why can't I use the sugar `..Default::default()` for the remaining??
-            plays: AtomicUsize::new(plays),
-            wins: AtomicUsize::new(wins),
-            is_expanded: AtomicBool::new(false),
-            children_count: Default::default(),
-            children_saturated_count: Default::default(),
-            end_state_result: Default::default(),
-            tree_size: Default::default(),
-            terminal_count: Default::default(),
-            sat_worst_case_ratio: (Default::default(), Default::default()),
-        }
+    pub fn children_count(&self) -> usize {
+        self.children_count.load(Ordering::SeqCst)
+    }
+
+    pub fn descendants_saturated_count(&self) -> usize {
+        self.descendants_saturated_count.load(Ordering::SeqCst)
     }
 
     /// A node is considered saturated if:
@@ -247,6 +221,52 @@ where
 
     pub fn end_state_result(&self) -> Option<GameResult> {
         *self.end_state_result.read().unwrap()
+    }
+
+    // "Write" functions
+
+    /// The owner of the tree search should call this
+    /// upon expanding the node, to mark it as "expanded".
+    /// This is an important because it distinguishes
+    /// nodes that have been expanded but have no more children (terminal nodes)
+    /// with nodes that do have possible children but have not yet been expanded (leaf nodes).
+    pub fn mark_expanded(&self) {
+        self.is_expanded.store(true, Ordering::SeqCst);
+    }
+
+    pub fn set_children_count(&self, count: usize) {
+        self.children_count.store(count, Ordering::SeqCst);
+    }
+
+    pub fn increment_saturated_children_count(&self) {
+        self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
+
+        // TODO: make a debug_assert when confident it's true
+        assert!(
+            self.children_saturated_count.load(Ordering::SeqCst)
+                <= self.children_count.load(Ordering::SeqCst)
+        );
+    }
+
+    pub fn increment_descendants_saturated_count(&self, by_count: usize) {
+        self.descendants_saturated_count
+            .fetch_add(by_count, Ordering::SeqCst);
+    }
+
+    pub fn increment_terminal_count(&self, by_count: usize) {
+        self.terminal_count.fetch_add(by_count, Ordering::SeqCst);
+    }
+
+    pub fn increment_tree_size(&self, count: usize) {
+        self.tree_size.fetch_add(count, Ordering::SeqCst);
+    }
+
+    pub fn increment_plays(&self) {
+        self.plays.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn increment_wins(&self) {
+        self.wins.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn set_end_state_result(&self, result: GameResult) {

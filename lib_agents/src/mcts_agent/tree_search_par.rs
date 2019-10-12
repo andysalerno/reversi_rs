@@ -21,14 +21,14 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 3_000;
-    pub(super) const EXTRA_TIME_MS: u64 = 0_000;
+    pub(super) const SIM_TIME_MS: u64 = 12_000;
+    pub(super) const EXTRA_TIME_MS: u64 = 5_000;
 
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 2;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 2;
+    pub(super) const BLACK_THREAD_COUNT: usize = 1;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -92,16 +92,60 @@ where
 
     let mut handle = leaf.parent();
 
+    let mut count = 1;
+    let mut continuous_saturation = true;
+
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
 
-        data.increment_saturated_children_count();
+        let was_saturated_before = data.is_saturated();
+
+        if continuous_saturation {
+            data.increment_saturated_children_count();
+        }
+
+        data.increment_descendants_saturated_count(count);
+
+        let was_saturated_after = data.is_saturated();
+
+        if !was_saturated_before && was_saturated_after {
+            count += 1;
+        }
 
         if !data.is_saturated() {
             // Don't back-prop any further
             // if we've reached a non-saturated node.
-            return;
+            continuous_saturation = false;
+            // return;
+        }
+
+        handle = node.parent();
+    }
+}
+
+fn backprop_saturated_descendants_count<TNode, TState>(leaf: &TNode)
+where
+    TNode: Node<Data = AMctsData<TState>>,
+    TState: GameState,
+{
+    assert!(
+        leaf.data().is_saturated(),
+        "Only a leaf considered saturated can have its saturated status backpropagated."
+    );
+
+    let mut count = 1;
+
+    let mut handle = leaf.parent();
+
+    while let Some(p) = handle {
+        let node = p.borrow();
+        let data = node.data();
+
+        data.increment_descendants_saturated_count(count);
+
+        if data.is_saturated() {
+            count += 1;
         }
 
         handle = node.parent();
@@ -361,8 +405,6 @@ where
 
     let mut rng = util::get_rng();
 
-    let mut sim_count: usize = 0;
-
     loop {
         if now.elapsed() >= exec_duration {
             let data = root.data();
@@ -374,8 +416,6 @@ where
             }
         }
 
-        sim_count += 1;
-
         if root.data().is_saturated() {
             break;
         }
@@ -386,20 +426,31 @@ where
         if let Err(_) = expand(leaf) {
             // another thread beat us to expanding,
             // so just continue with a new leaf selection
+            panic!("when one thread, this is never legal");
             continue;
         }
 
         let expanded_children = leaf.children_read();
 
+        // Here's the race condition bug:
+        // ThreadA expanded, then enters the "true" part of this if block,
+        // and performs the behavior on the expanded node's child.
+        // ThreadB selected to leaf, and selected the same node's child.
+        // This child node happens to be a terminal.
+        // Now we are executing the "true" and "false" blocks
+        // simultaneously for the same node.
         if !expanded_children.is_empty() {
             let sim_node = util::random_pick(expanded_children.as_slice(), &mut rng)
                 .expect("Must have had at least one expanded child.");
             let sim_node = sim_node.borrow();
 
-            let sim_result = simulate(sim_node, &mut rng);
+            let plays = sim_node.data().plays();
+            if plays == 0 {
+                let sim_result = simulate(sim_node, &mut rng);
 
-            let is_win = sim_result.is_win_for_player(player_color);
-            backprop_sim_result(sim_node, is_win);
+                let is_win = sim_result.is_win_for_player(player_color);
+                backprop_sim_result(sim_node, is_win);
+            }
         } else {
             // This whole section needs its own double-checked lock.
 
