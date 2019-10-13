@@ -16,6 +16,7 @@ where
 {
     color: PlayerColor,
     current_state_root: RefCell<Option<TNode::Handle>>,
+    anticipated_opponent_actions: RefCell<Vec<TState::Move>>,
 }
 
 impl<TState, TNode> MctsAgent<TState, TNode>
@@ -27,6 +28,7 @@ where
         MctsAgent {
             color,
             current_state_root: RefCell::new(None),
+            anticipated_opponent_actions: Default::default(),
         }
     }
 
@@ -81,7 +83,24 @@ where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState + Sync,
 {
-    fn observe_action(&self, _player: PlayerColor, action: TState::Move, _result: &TState) {
+    fn observe_action(&self, player: PlayerColor, action: TState::Move, _result: &TState) {
+        // TODO: this might get broken by skipped turns
+        if player == self.color.opponent()
+            && self
+                .anticipated_opponent_actions
+                .borrow()
+                .iter()
+                .find(|&&a| a == action)
+                .is_none()
+        {
+            out!(
+                "Player {:?} didn't expect action: {:?}. Expected action in: {:?}",
+                self.color,
+                action,
+                self.anticipated_opponent_actions.borrow()
+            );
+        }
+
         if self.current_root_handle().is_some() {
             self.walk_tree_to_child(action);
         }
@@ -112,13 +131,19 @@ where
 
             opponent_choices.sort_by_key(|c| c.borrow().data().plays());
 
+            let mut anticipated = self.anticipated_opponent_actions.borrow_mut();
+            anticipated.drain(..);
+
             for c in opponent_choices.iter().take(3) {
+                let data = c.borrow().data();
+
                 out!(
                     "Anticipated response: {:?} plays/wins: {:?}/{:?}",
-                    c.borrow().data().action(),
-                    c.borrow().data().wins(),
-                    c.borrow().data().plays()
+                    data.action().expect("The choice had no action available."),
+                    data.wins(),
+                    data.plays()
                 );
+                anticipated.push(data.action().expect("Must have had an action."));
             }
         }
 
