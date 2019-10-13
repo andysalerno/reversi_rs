@@ -134,11 +134,11 @@ where
             let mut anticipated = self.anticipated_opponent_actions.borrow_mut();
             anticipated.drain(..);
 
-            for c in opponent_choices.iter().take(3) {
+            for c in opponent_choices.iter().rev().take(3) {
                 let data = c.borrow().data();
 
                 out!(
-                    "Anticipated response: {:?} plays/wins: {:?}/{:?}",
+                    "Anticipated response: {:?} wins/plays: {:?}/{:?}",
                     data.action().expect("The choice had no action available."),
                     data.wins(),
                     data.plays()

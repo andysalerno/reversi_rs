@@ -137,22 +137,20 @@ pub trait Game {
         let state = self.game_state();
         let legal_moves = state.legal_moves(player);
 
-        let picked_action = if legal_moves.len() == 1 && legal_moves[0].is_forced_pass() {
-            out!(
-                "Player {:?} has no options, so they pass their turn.",
-                player
-            );
-
-            legal_moves[0]
-        } else {
-            match player {
-                PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
-                PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
-            }
+        let picked_action = match player {
+            PlayerColor::Black => self.black_agent().pick_move(state, legal_moves),
+            PlayerColor::White => self.white_agent().pick_move(state, legal_moves),
         };
 
         if legal_moves.iter().find(|&&m| m == picked_action).is_none() {
             panic!("Agent provided a move that is illegal.");
+        }
+
+        if legal_moves.len() == 1 && legal_moves[0].is_forced_pass() {
+            out!(
+                "Player {:?} has no options, so they pass their turn.",
+                player
+            );
         }
 
         out!("Player {:?} picked move {:?}", player, picked_action);

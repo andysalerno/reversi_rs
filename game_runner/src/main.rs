@@ -1,4 +1,4 @@
-use lib_agents::{HumanAgent, MctsAgent};
+use lib_agents::{HumanAgent, MctsAgent, RandomAgent};
 use lib_boardgame::{Game, GameResult, PlayerColor};
 use lib_printer::{out, out_impl};
 use lib_reversi::reversi::Reversi;
@@ -65,8 +65,9 @@ fn get_args() -> Args {
 #[allow(unused)]
 fn play_reversi() -> lib_boardgame::GameResult {
     let black = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::Black));
-    let white = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::White));
-    // let white = Box::new(HumanAgent::new(PlayerColor::White));
+    // let white = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::White));
+    let white = Box::new(HumanAgent::new(PlayerColor::White));
+    // let white = Box::new(RandomAgent);
 
     let mut game = Reversi::new(white, black);
 
