@@ -316,8 +316,8 @@ where
 
     let node_mean_val = wins / plays;
 
-    let explore_bias = 2.00;
-    let score = node_mean_val + f32::sqrt((explore_bias * f32::ln(parent_plays)) / plays);
+    let explore_bias = 1.60;
+    let score = node_mean_val + (explore_bias * f32::sqrt(f32::ln(parent_plays) / plays));
 
     if score.is_nan() {
         panic!(
@@ -919,15 +919,15 @@ pub mod tests {
         let parent_plays = tree_root.data().plays();
 
         assert_eq!(
-            1.0929347,
+            1.2365144,
             score_node_for_traversal(child_a.borrow(), parent_plays, true)
         );
         assert_eq!(
-            1.3385662,
+            1.5144148,
             score_node_for_traversal(child_b.borrow(), parent_plays, true)
         );
         assert_eq!(
-            1.8930185,
+            2.141706,
             score_node_for_traversal(child_c.borrow(), parent_plays, true)
         );
         assert_eq!(
