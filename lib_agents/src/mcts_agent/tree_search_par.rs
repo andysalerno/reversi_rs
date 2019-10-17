@@ -21,13 +21,13 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 3_000;
+    pub(super) const SIM_TIME_MS: u64 = 5_000;
     pub(super) const EXTRA_TIME_MS: u64 = 0_000;
 
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 1;
+    pub(super) const BLACK_THREAD_COUNT: usize = 4;
     pub(super) const WHTIE_THREAD_COUNT: usize = 1;
 }
 
@@ -305,6 +305,7 @@ where
         return std::f32::MAX;
     }
 
+    // Experiment
     let wins = if parent_is_player_color {
         data.wins() as f32
     } else {
@@ -317,6 +318,7 @@ where
     let node_mean_val = wins / plays;
 
     let explore_bias = 1.60;
+
     let score = node_mean_val + (explore_bias * f32::sqrt(f32::ln(parent_plays) / plays));
 
     if score.is_nan() {
@@ -350,9 +352,12 @@ where
 
     if root.data().is_saturated() {
         state_children
-            .sort_by_key(|c| (c.borrow().data().wins() * 1000) / c.borrow().data().plays());
+            .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
     } else {
-        state_children.sort_by_key(|c| c.borrow().data().plays());
+        // state_children.sort_by_key(|c| c.borrow().data().plays());
+        // TODO experimenting here
+        state_children
+            .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
     };
 
     // Regardless of any other metric, actions that win the game are always preferred.
@@ -426,7 +431,6 @@ where
         if let Err(_) = expand(leaf) {
             // another thread beat us to expanding,
             // so just continue with a new leaf selection
-            panic!("when one thread, this is never legal");
             continue;
         }
 
@@ -446,10 +450,18 @@ where
 
             let plays = sim_node.data().plays();
             if plays == 0 {
-                let sim_result = simulate(sim_node, &mut rng);
+                // get lock
+                let lock = sim_node.data().get_lock();
 
-                let is_win = sim_result.is_win_for_player(player_color);
-                backprop_sim_result(sim_node, is_win);
+                // check again
+                if sim_node.data().plays() == 0 {
+                    let sim_result = simulate(sim_node, &mut rng);
+
+                    let is_win = sim_result.is_win_for_player(player_color);
+                    backprop_sim_result(sim_node, is_win);
+                }
+
+                drop(lock);
             }
         } else {
             // This whole section needs its own double-checked lock.
@@ -466,20 +478,33 @@ where
             let plays = leaf.data().plays();
 
             if plays == 0 {
-                backprop_sim_result(leaf, is_win);
+                // get lock
+                let lock = leaf.data().get_lock();
+
+                // check again
+                if leaf.data().plays() == 0 {
+                    backprop_sim_result(leaf, is_win);
+                }
+
+                drop(lock);
             }
 
             if leaf.data().end_state_result().is_none() {
-                // TODO: data race possible here? I check if it's none,
-                // then I set. But if two saw none, both set (only one actually sets),
-                // but then both still do the backprop saturation logic. Need lock here?
-                // bit of a hack, this is just to know we've never done this before
-                // Update the terminating node so it knows its own end game result.
-                leaf.data().set_end_state_result(sim_result);
+                let lock = leaf.data().get_lock();
+                if leaf.data().end_state_result().is_none() {
+                    // TODO: data race possible here? I check if it's none,
+                    // then I set. But if two saw none, both set (only one actually sets),
+                    // but then both still do the backprop saturation logic. Need lock here?
+                    // bit of a hack, this is just to know we've never done this before
+                    // Update the terminating node so it knows its own end game result.
+                    leaf.data().set_end_state_result(sim_result);
 
-                // TODO: these two guys can be combined
-                backprop_saturation(leaf);
-                backprop_terminal_count(leaf, is_win);
+                    // TODO: these two guys can be combined
+                    backprop_saturation(leaf);
+                    backprop_terminal_count(leaf, is_win);
+                }
+
+                drop(lock);
             }
         }
     }

@@ -134,7 +134,7 @@ where
             let mut anticipated = self.anticipated_opponent_actions.borrow_mut();
             anticipated.drain(..);
 
-            for c in opponent_choices.iter().rev().take(3) {
+            for c in opponent_choices.iter().rev() {
                 let data = c.borrow().data();
 
                 out!(
@@ -220,9 +220,16 @@ where
             .expect("Must have been a max result")
             .clone()
     } else {
+        //     results
+        //         .iter()
+        //         .max_by_key(|r| r.plays)
+        //         .expect("Must have been a max result")
+        //         .clone()
+        // }
+        // TODO experimenting with this
         results
             .iter()
-            .max_by_key(|r| r.plays)
+            .max_by_key(|r| (r.wins * 10000) / r.plays)
             .expect("Must have been a max result")
             .clone()
     }

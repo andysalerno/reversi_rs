@@ -2,6 +2,7 @@ use lib_boardgame::{GameResult, GameState};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::RwLock;
+use std::sync::Mutex;
 
 #[derive(Default, Clone)]
 pub struct MctsResult<TState: GameState> {
@@ -63,6 +64,7 @@ where
     /// When this subtree is fully saturated, this will hold the wins/plays
     /// of the worst-case scenario when following this path
     sat_worst_case_ratio: (AtomicUsize, AtomicUsize),
+    sim_lock: Mutex<usize>,
 }
 
 impl<T> fmt::Debug for AMctsData<T>
@@ -116,6 +118,7 @@ where
             sat_worst_case_ratio,
             descendants_saturated_count,
             terminal_wins_count,
+            sim_lock: Mutex::new(0),
         }
     }
 }
@@ -167,6 +170,7 @@ where
             terminal_count: Default::default(),
             terminal_wins_count: Default::default(),
             sat_worst_case_ratio: (Default::default(), Default::default()),
+            sim_lock: Mutex::new(0),
         }
     }
 
@@ -174,6 +178,10 @@ where
 
     pub fn state(&self) -> &T {
         &self.state
+    }
+
+    pub fn get_lock(&self) -> std::sync::MutexGuard<usize> {
+        self.sim_lock.lock().expect("could not acquire sim lock")
     }
 
     pub fn plays(&self) -> usize {
