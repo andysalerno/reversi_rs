@@ -22,14 +22,14 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 5_000;
+    pub(super) const SIM_TIME_MS: u64 = 3_000;
     pub(super) const EXTRA_TIME_MS: u64 = 0_000;
 
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
     pub(super) const BLACK_THREAD_COUNT: usize = 4;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 4;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -86,7 +86,7 @@ where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    assert!(
+    debug_assert!(
         leaf.data().is_saturated(),
         "Only a leaf considered saturated can have its saturated status backpropagated."
     );
@@ -99,6 +99,7 @@ where
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
+        let _lock = data.get_lock().lock();
 
         let was_saturated_before = data.is_saturated();
 
@@ -125,43 +126,21 @@ where
     }
 }
 
-fn backprop_saturated_descendants_count<TNode, TState>(leaf: &TNode)
-where
-    TNode: Node<Data = AMctsData<TState>>,
-    TState: GameState,
-{
-    assert!(
-        leaf.data().is_saturated(),
-        "Only a leaf considered saturated can have its saturated status backpropagated."
-    );
-
-    let mut count = 1;
-
-    let mut handle = leaf.parent();
-
-    while let Some(p) = handle {
-        let node = p.borrow();
-        let data = node.data();
-
-        data.increment_descendants_saturated_count(count);
-
-        if data.is_saturated() {
-            count += 1;
-        }
-
-        handle = node.parent();
-    }
-}
-
 // TODO: this same work can be done while we are already doing increment_saturation_count()
 fn backprop_terminal_count<TNode, TState>(leaf: &TNode, is_win: bool)
 where
     TNode: Node<Data = AMctsData<TState>>,
     TState: GameState,
 {
-    assert!(
+    debug_assert!(
         leaf.data().is_saturated(),
         "Only a leaf considered saturated can have its saturated status backpropagated."
+    );
+
+    debug_assert_eq!(
+        leaf.data().plays(),
+        1,
+        "A terminal leaf we are backpropping must have been played exactly once."
     );
 
     let mut handle = Some(leaf.get_handle());
@@ -500,6 +479,8 @@ where
     }
 }
 
+/// If the condition is true, acquires the lock, then confirms the condition is still true
+/// (in case of a race condition), and if still true, executes the action.
 fn run_locked_if<F1, F2, T>(lock: &Mutex<T>, condition: F1, action: F2)
 where
     F1: Fn() -> bool,

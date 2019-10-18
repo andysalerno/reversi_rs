@@ -90,6 +90,7 @@ where
                 .anticipated_opponent_actions
                 .borrow()
                 .iter()
+                .take(3)
                 .find(|&&a| a == action)
                 .is_none()
         {
@@ -134,14 +135,20 @@ where
             let mut anticipated = self.anticipated_opponent_actions.borrow_mut();
             anticipated.drain(..);
 
+            let sum_plays: usize = opponent_choices
+                .iter()
+                .map(|c| c.borrow().data().plays())
+                .sum();
+
             for c in opponent_choices.iter().rev() {
                 let data = c.borrow().data();
 
                 out!(
-                    "Anticipated response: {:?} wins/plays: {:?}/{:?}",
+                    "Anticipated response: {:?} wins/plays: {:?}/{:?} ({:.3})",
                     data.action().expect("The choice had no action available."),
                     data.wins(),
-                    data.plays()
+                    data.plays(),
+                    data.plays() as f32 / sum_plays as f32
                 );
                 anticipated.push(data.action().expect("Must have had an action."));
             }

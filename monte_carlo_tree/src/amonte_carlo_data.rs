@@ -26,7 +26,7 @@ where
 
         write!(
             f,
-            "A: {:?} P: {:>10?} W: {:>10?} ({:.2}) TS: {:>10?} Term: {:?}/{:?} Sat: {:?}{}",
+            "A: {:?} P: {:>10?} W: {:>10?} ({:.3}) TS: {:>10?} Term: {:?}/{:?} Sat: {:?}{}",
             self.action,
             self.plays,
             self.wins,
@@ -64,7 +64,7 @@ where
     /// When this subtree is fully saturated, this will hold the wins/plays
     /// of the worst-case scenario when following this path
     sat_worst_case_ratio: (AtomicUsize, AtomicUsize),
-    sim_lock: Mutex<usize>,
+    sim_lock: Mutex<()>,
 }
 
 impl<T> fmt::Debug for AMctsData<T>
@@ -118,7 +118,7 @@ where
             sat_worst_case_ratio,
             descendants_saturated_count,
             terminal_wins_count,
-            sim_lock: Mutex::new(0),
+            sim_lock: Mutex::new(()),
         }
     }
 }
@@ -170,7 +170,7 @@ where
             terminal_count: Default::default(),
             terminal_wins_count: Default::default(),
             sat_worst_case_ratio: (Default::default(), Default::default()),
-            sim_lock: Mutex::new(0),
+            sim_lock: Mutex::new(()),
         }
     }
 
@@ -180,7 +180,7 @@ where
         &self.state
     }
 
-    pub fn get_lock(&self) -> &std::sync::Mutex<usize> {
+    pub fn get_lock(&self) -> &std::sync::Mutex<()> {
         &self.sim_lock
     }
 
@@ -258,12 +258,13 @@ where
     }
 
     pub fn increment_saturated_children_count(&self) {
-        self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
+        let children_count = self.children_count.load(Ordering::SeqCst);
+        let new_sat_count = 1 + self.children_saturated_count.fetch_add(1, Ordering::SeqCst);
 
-        // TODO: make a debug_assert when confident it's true
         assert!(
-            self.children_saturated_count.load(Ordering::SeqCst)
-                <= self.children_count.load(Ordering::SeqCst)
+            new_sat_count <= children_count,
+            "can never increment saturated children beyond the count of all children. node action: {:?} new_sat_count: {}, children_count: {}",
+            self.action(), new_sat_count, children_count
         );
     }
 
