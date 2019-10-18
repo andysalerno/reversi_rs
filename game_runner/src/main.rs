@@ -16,7 +16,7 @@ fn main() {
     let args = get_args();
 
     let results = (0..args.game_count)
-        .map(|_| play_reversi())
+        .map(|_| play_tic_tac_toe())
         .collect::<Vec<_>>();
 
     let white_wins = results
@@ -76,8 +76,10 @@ fn play_reversi() -> lib_boardgame::GameResult {
 
 #[allow(unused)]
 fn play_tic_tac_toe() -> lib_boardgame::GameResult {
-    let black = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::Black));
+    // let black = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::Black));
+    let black = Box::new(HumanAgent::new(PlayerColor::Black));
     let white = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::White));
+    // let white = Box::new(HumanAgent::new(PlayerColor::White));
 
     let mut game = TicTacToe::new(white, black);
 
