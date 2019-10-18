@@ -1,8 +1,8 @@
 use lib_boardgame::{GameResult, GameState};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::RwLock;
 use std::sync::Mutex;
+use std::sync::RwLock;
 
 #[derive(Default, Clone)]
 pub struct MctsResult<TState: GameState> {
@@ -180,8 +180,8 @@ where
         &self.state
     }
 
-    pub fn get_lock(&self) -> std::sync::MutexGuard<usize> {
-        self.sim_lock.lock().expect("could not acquire sim lock")
+    pub fn get_lock(&self) -> &std::sync::Mutex<usize> {
+        &self.sim_lock
     }
 
     pub fn plays(&self) -> usize {

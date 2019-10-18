@@ -11,6 +11,7 @@
 /// backprop "worst case" scenarios from the bottom when saturated
 /// I.e. every child node backprops its worst case scenario
 use std::borrow::Borrow;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use crossbeam::thread;
@@ -28,7 +29,7 @@ mod configs {
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
     pub(super) const BLACK_THREAD_COUNT: usize = 4;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 4;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -448,21 +449,16 @@ where
                 .expect("Must have had at least one expanded child.");
             let sim_node = sim_node.borrow();
 
-            let plays = sim_node.data().plays();
-            if plays == 0 {
-                // get lock
-                let lock = sim_node.data().get_lock();
-
-                // check again
-                if sim_node.data().plays() == 0 {
+            run_locked_if(
+                sim_node.data().get_lock(),
+                || sim_node.data().plays() == 0,
+                || {
                     let sim_result = simulate(sim_node, &mut rng);
 
                     let is_win = sim_result.is_win_for_player(player_color);
                     backprop_sim_result(sim_node, is_win);
-                }
-
-                drop(lock);
-            }
+                },
+            );
         } else {
             // This whole section needs its own double-checked lock.
 
@@ -475,23 +471,19 @@ where
             // 1 if the parent node was expanded, and sim'd on this child
             // if this is our first time selecting this node...
             let is_win = sim_result.is_win_for_player(player_color);
-            let plays = leaf.data().plays();
 
-            if plays == 0 {
-                // get lock
-                let lock = leaf.data().get_lock();
-
-                // check again
-                if leaf.data().plays() == 0 {
+            run_locked_if(
+                leaf.data().get_lock(),
+                || leaf.data().plays() == 0,
+                || {
                     backprop_sim_result(leaf, is_win);
-                }
+                },
+            );
 
-                drop(lock);
-            }
-
-            if leaf.data().end_state_result().is_none() {
-                let lock = leaf.data().get_lock();
-                if leaf.data().end_state_result().is_none() {
+            run_locked_if(
+                leaf.data().get_lock(),
+                || leaf.data().end_state_result().is_none(),
+                || {
                     // TODO: data race possible here? I check if it's none,
                     // then I set. But if two saw none, both set (only one actually sets),
                     // but then both still do the backprop saturation logic. Need lock here?
@@ -502,11 +494,25 @@ where
                     // TODO: these two guys can be combined
                     backprop_saturation(leaf);
                     backprop_terminal_count(leaf, is_win);
-                }
-
-                drop(lock);
-            }
+                },
+            );
         }
+    }
+}
+
+fn run_locked_if<F1, F2, T>(lock: &Mutex<T>, condition: F1, action: F2)
+where
+    F1: Fn() -> bool,
+    F2: FnOnce(),
+{
+    if condition() {
+        let lock_guard = lock.lock();
+
+        if condition() {
+            action();
+        }
+
+        drop(lock_guard);
     }
 }
 
@@ -1121,7 +1127,7 @@ pub mod tests {
     }
 
     #[test]
-    fn mcts_when_root_saturated_expects_treesize_equals_terminal_count() {
+    fn mcts_when_root_saturated_expects_terminal_count_equals_terminal_count() {
         let mut state = TicTacToeState::new();
 
         // __X
