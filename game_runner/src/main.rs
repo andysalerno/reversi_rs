@@ -1,5 +1,6 @@
 use lib_agents::{HumanAgent, MctsAgent, RandomAgent};
-use lib_boardgame::{Game, GameResult, PlayerColor};
+use lib_boardgame::{Game, GameResult, GameState, PlayerColor};
+use lib_connect_four::{ConnectFour, ConnectFourState};
 use lib_printer::{out, out_impl};
 use lib_reversi::reversi::Reversi;
 use lib_reversi::reversi_gamestate::ReversiState;
@@ -16,7 +17,7 @@ fn main() {
     let args = get_args();
 
     let results = (0..args.game_count)
-        .map(|_| play_tic_tac_toe())
+        .map(|_| play_connect_four())
         .collect::<Vec<_>>();
 
     let white_wins = results
@@ -82,6 +83,23 @@ fn play_tic_tac_toe() -> lib_boardgame::GameResult {
     // let white = Box::new(HumanAgent::new(PlayerColor::White));
 
     let mut game = TicTacToe::new(white, black);
+
+    game.play_to_end()
+}
+
+#[allow(unused)]
+fn play_connect_four() -> lib_boardgame::GameResult {
+    // let black = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::Black));
+    // let black = Box::new(HumanAgent::new(PlayerColor::Black));
+    // let white = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::White));
+    // let black = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::Black));
+    // let white = Box::new(HumanAgent::new(PlayerColor::White));
+    let black = Box::new(RandomAgent);
+    let white = Box::new(RandomAgent);
+
+    let mut game = ConnectFour::new(white, black);
+
+    out!("{}", game.game_state().human_friendly());
 
     game.play_to_end()
 }
