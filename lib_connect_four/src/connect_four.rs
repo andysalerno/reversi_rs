@@ -47,6 +47,16 @@ impl lib_boardgame::GameMove for ConnectFourAction {
     }
 }
 
+impl std::str::FromStr for ConnectFourAction {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let col: usize = s.trim().parse()?;
+
+        Ok(ConnectFourAction::new(col))
+    }
+}
+
 impl Display for ConnectFourAction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "col: {}", self.col)
@@ -61,6 +71,9 @@ pub struct ConnectFourState {
 
     legal_moves: Vec<ConnectFourAction>,
     game_result: Option<GameResult>,
+
+    /// Count of pieces on the board.
+    piece_count: usize,
 }
 
 impl ConnectFourState {
@@ -72,9 +85,11 @@ impl ConnectFourState {
 
             legal_moves: Default::default(),
             game_result: None,
+            piece_count: 0,
         }
     }
 
+    /// Refresh the cached value of legal moves available from this state.
     fn update_legal_moves(&mut self) {
         let legal = (0..GAME_WIDTH)
             .filter(|&i| !self.is_col_full(i))
@@ -84,26 +99,44 @@ impl ConnectFourState {
         std::mem::replace(&mut self.legal_moves, legal);
     }
 
+    /// Returns the piece at the given position.
     fn piece_at(&self, col: usize, height: usize) -> ConnectFourPiece {
         self.board[height][col]
     }
 
+    /// Sets the piece at the given location.
+    /// Does NOT refresh state-based values, such as piece_count or game_result.
     fn set_piece(&mut self, col: usize, height: usize, piece: ConnectFourPiece) {
         self.board[height][col] = piece;
     }
 
+    /// The height of the given column. E.g., an empty column has height 0.
     fn col_height(&self, col: usize) -> usize {
         self.col_cur_height[col]
     }
 
+    /// True if the column is full (has no room left for other pieces).
     fn is_col_full(&self, col: usize) -> bool {
         self.col_height(col) >= GAME_HEIGHT
     }
 
+    /// Increment the cached column height. Internal use only.
     fn increment_col(&mut self, col: usize) {
         self.col_cur_height[col] += 1;
     }
 
+    fn increment_piece_count(&mut self) {
+        self.piece_count += 1;
+    }
+
+    fn update_end_game_result(&mut self) {
+        if self.piece_count >= GAME_HEIGHT * GAME_WIDTH {
+            self.game_result = Some(GameResult::Tie);
+        }
+    }
+
+    /// "Drop" a piece at the given column. The piece "falls" from the top
+    /// and stops at the first position that is above another piece.
     pub fn drop_piece(&mut self, col: usize, piece: ConnectFourPiece) {
         let piece_height = self.col_height(col);
 
@@ -132,6 +165,10 @@ impl ConnectFourState {
                 }
             };
         }
+
+        self.update_legal_moves();
+        self.increment_piece_count();
+        self.update_end_game_result();
     }
 
     fn is_pos_four_in_a_row(&self, pos: Position) -> bool {
@@ -247,8 +284,6 @@ impl GameState for ConnectFourState {
         self.drop_piece(col, piece);
 
         self.player_turn = self.player_turn.opponent();
-
-        self.update_legal_moves();
     }
 
     fn current_player_turn(&self) -> PlayerColor {
@@ -265,6 +300,10 @@ impl GameState for ConnectFourState {
 
     fn is_game_over(&self) -> bool {
         self.game_result.is_some()
+    }
+
+    fn game_result(&self) -> Option<GameResult> {
+        self.game_result
     }
 }
 

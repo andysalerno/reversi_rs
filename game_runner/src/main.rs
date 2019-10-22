@@ -53,7 +53,7 @@ fn get_args() -> Args {
         .nth(1)
         .unwrap_or_else(|| "1".into())
         .parse::<usize>()
-        .expect("Couldn't parse arg as a usize.");
+        .unwrap_or_else(|_| 1);
 
     let start_nboard = args.any(|a| a.to_lowercase() == "nboard");
 
@@ -66,9 +66,9 @@ fn get_args() -> Args {
 #[allow(unused)]
 fn play_reversi() -> lib_boardgame::GameResult {
     let black = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::Black));
-    let white = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::White));
+    // let white = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::White));
     // let white = Box::new(HumanAgent::new(PlayerColor::White));
-    // let white = Box::new(RandomAgent);
+    let white = Box::new(RandomAgent);
 
     let mut game = Reversi::new(white, black);
 
@@ -89,13 +89,11 @@ fn play_tic_tac_toe() -> lib_boardgame::GameResult {
 
 #[allow(unused)]
 fn play_connect_four() -> lib_boardgame::GameResult {
-    // let black = Box::new(MctsAgent::<TicTacToeState>::new(PlayerColor::Black));
-    // let black = Box::new(HumanAgent::new(PlayerColor::Black));
+    let black = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::Black));
     // let white = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::White));
-    // let black = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::Black));
-    // let white = Box::new(HumanAgent::new(PlayerColor::White));
-    let black = Box::new(RandomAgent);
-    let white = Box::new(RandomAgent);
+
+    // let black = Box::new(RandomAgent);
+    let white = Box::new(HumanAgent::new(PlayerColor::White));
 
     let mut game = ConnectFour::new(white, black);
 

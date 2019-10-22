@@ -28,8 +28,8 @@ mod configs {
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 4;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 4;
+    pub(super) const BLACK_THREAD_COUNT: usize = 1;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
