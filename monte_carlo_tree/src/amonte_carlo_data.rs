@@ -13,6 +13,8 @@ pub struct MctsResult<TState: GameState> {
     pub is_saturated: bool,
     pub terminal_count: usize,
     pub terminal_wins_count: usize,
+    pub worst_wins: usize,
+    pub worst_plays: usize,
     pub tree_size: usize,
     pub descendants_saturated_count: usize,
 }
@@ -26,7 +28,7 @@ where
 
         write!(
             f,
-            "A: {:?} P: {:>10?} W: {:>10?} ({:.3}) TS: {:>10?} Term: {:?}/{:?} Sat: {:?}{}",
+            "A: {:?} P: {:>10?} W: {:>10?} ({:.3}) TS: {:>10?} Term: {:?}/{:?} WW/WP: {}/{} Sat: {:?}{}",
             self.action,
             self.plays,
             self.wins,
@@ -34,6 +36,8 @@ where
             self.tree_size,
             self.terminal_wins_count,
             self.terminal_count,
+            self.worst_wins,
+            self.worst_plays,
             self.descendants_saturated_count,
             sat_display
         )
@@ -133,6 +137,8 @@ where
     TState: GameState,
 {
     fn from(data: &AMctsData<TState>) -> Self {
+        let (wwins, wplays) = data.worst_case_wins_plays();
+
         Self {
             plays: data.plays(),
             wins: data.wins(),
@@ -145,6 +151,8 @@ where
             terminal_count: data.terminal_count(),
             terminal_wins_count: data.terminal_wins_count(),
             descendants_saturated_count: data.descendants_saturated_count(),
+            worst_wins: wwins,
+            worst_plays: wplays,
         }
     }
 }
@@ -291,6 +299,30 @@ where
 
     pub fn increment_wins(&self) {
         self.wins.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Updates the current worst case wins/plays ratio,
+    /// if the given wins/plays ratio is better than the current worst case.
+    pub fn update_worst_case(&self, wins: usize, plays: usize) {
+        if plays == 0 {
+            return;
+        }
+
+        // Might need to lock this critical chunk
+        let cur_wins = self.sat_worst_case_ratio.0.load(Ordering::SeqCst);
+        let cur_plays = self.sat_worst_case_ratio.1.load(Ordering::SeqCst);
+
+        if cur_plays == 0 || ((wins as f32 / plays as f32) < (cur_wins as f32 / cur_plays as f32)) {
+            self.sat_worst_case_ratio.0.store(wins, Ordering::SeqCst);
+            self.sat_worst_case_ratio.1.store(plays, Ordering::SeqCst);
+        }
+    }
+
+    pub fn worst_case_wins_plays(&self) -> (usize, usize) {
+        (
+            self.sat_worst_case_ratio.0.load(Ordering::SeqCst),
+            self.sat_worst_case_ratio.1.load(Ordering::SeqCst),
+        )
     }
 
     pub fn set_end_state_result(&self, result: GameResult) {

@@ -90,10 +90,10 @@ fn play_tic_tac_toe() -> lib_boardgame::GameResult {
 #[allow(unused)]
 fn play_connect_four() -> lib_boardgame::GameResult {
     let black = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::Black));
-    // let white = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::White));
+    let white = Box::new(MctsAgent::<ConnectFourState>::new(PlayerColor::White));
 
     // let black = Box::new(RandomAgent);
-    let white = Box::new(HumanAgent::new(PlayerColor::White));
+    // let white = Box::new(HumanAgent::new(PlayerColor::White));
 
     let mut game = ConnectFour::new(white, black);
 

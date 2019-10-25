@@ -221,24 +221,23 @@ where
     }
 
     if results.iter().all(|r| r.is_saturated) {
+        let mut results = results.iter().cloned().collect::<Vec<_>>();
+        results.sort_by_key(|r| r.worst_wins / r.worst_plays);
+
+        results.pop().unwrap()
+    } else {
         results
             .iter()
-            .max_by_key(|r| (r.wins * 10000) / r.plays)
+            .max_by_key(|r| r.plays)
             .expect("Must have been a max result")
             .clone()
-    } else {
-        //     results
-        //         .iter()
-        //         .max_by_key(|r| r.plays)
-        //         .expect("Must have been a max result")
-        //         .clone()
         // }
         // TODO experimenting with this
-        results
-            .iter()
-            .max_by_key(|r| (r.wins * 10000) / r.plays)
-            .expect("Must have been a max result")
-            .clone()
+        // results
+        //     .iter()
+        //     .max_by_key(|r| (r.wins * 10000) / r.plays)
+        //     .expect("Must have been a max result")
+        //     .clone()
     }
 }
 

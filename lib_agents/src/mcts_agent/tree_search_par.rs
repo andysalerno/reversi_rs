@@ -91,10 +91,12 @@ where
         "Only a leaf considered saturated can have its saturated status backpropagated."
     );
 
-    let mut handle = leaf.parent();
-
     let mut count = 1;
     let mut continuous_saturation = true;
+    let (mut wins, mut plays) = (leaf.data().wins(), leaf.data().plays());
+    leaf.data().update_worst_case(wins, plays);
+
+    let mut handle = leaf.parent();
 
     while let Some(p) = handle {
         let node = p.borrow();
@@ -105,11 +107,14 @@ where
 
         if continuous_saturation {
             data.increment_saturated_children_count();
+            data.update_worst_case(wins, plays);
         }
 
         data.increment_descendants_saturated_count(count);
 
         let was_saturated_after = data.is_saturated();
+        wins = data.wins();
+        plays = data.plays();
 
         if !was_saturated_before && was_saturated_after {
             count += 1;
@@ -283,6 +288,12 @@ where
 
     if plays == 0f32 {
         return std::f32::MAX;
+    }
+
+    let (wwins, wplays) = data.worst_case_wins_plays();
+    if wplays > 0 && wwins == 0 {
+        // the worst case is a loss. don't take it.
+        return std::f32::MIN;
     }
 
     // Experiment
@@ -602,7 +613,7 @@ pub mod tests {
     fn expand_expects_creates_children() {
         let tree_root = ArcNode::new_root(make_test_data());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
         let children = tree_root.children_read();
         let children = children.iter().cloned();
 
@@ -617,7 +628,7 @@ pub mod tests {
 
         assert_eq!(0, tree_root.children_read().len());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
 
         // The game used for testing is TicTacToe,
         // which has nine intitial legal children positions.
@@ -630,7 +641,7 @@ pub mod tests {
 
         assert!(!tree_root.data().is_expanded());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
 
         assert!(tree_root.data().is_expanded());
     }
@@ -641,7 +652,7 @@ pub mod tests {
 
         assert_eq!(0, tree_root.data().children_count());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
 
         assert_eq!(9, tree_root.data().children_count());
     }
@@ -809,7 +820,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
         let children = tree_root.children_read();
         let children = children.iter().cloned().collect::<Vec<_>>();
 
@@ -819,7 +830,7 @@ pub mod tests {
         );
 
         // backprop the one remaining child.
-        expand(children[0].borrow());
+        expand(children[0].borrow()).unwrap();
         backprop_saturation(children[0].borrow());
 
         assert!(
@@ -878,7 +889,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        expand(&tree_root);
+        expand(&tree_root).unwrap();
         let children = tree_root.children_read();
         let children = children.iter().cloned().collect::<Vec<_>>();
 
@@ -892,12 +903,71 @@ pub mod tests {
             "Not considered saturated, since we have not expanded yet (so we don't know for sure)"
         );
 
-        expand(children[0].borrow());
+        expand(children[0].borrow()).unwrap();
 
         assert!(
             children[0].borrow().data().is_saturated(),
             "Now that we've expanded, we know it is saturated."
         );
+    }
+
+    #[test]
+    fn backprop_saturation_expects_updates_worst_win_play_counts() {
+        let data = {
+            let mut state = TicTacToeState::initial_state();
+
+            // ___
+            // ___
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,0").unwrap());
+
+            // ___
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("1,1").unwrap());
+
+            // __X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("2,2").unwrap());
+
+            // O_X
+            // _O_
+            // X__
+            state.apply_move(TicTacToeAction::from_str("0,2").unwrap());
+
+            AMctsData::new(state, 0, 0, None)
+        };
+
+        let tree_root = make_node(data.clone());
+
+        mcts(&tree_root, PlayerColor::Black);
+
+        assert!(
+            tree_root.data().is_saturated(),
+            "MCTS must have saturated the root, or this test is meaningless."
+        );
+
+        let children = tree_root.children_read();
+        let children = children.iter().cloned().collect::<Vec<_>>();
+
+        let loss_children = children.iter().filter(|&c| {
+            c.borrow().data().action().unwrap() != TicTacToeAction::from_str("2,0").unwrap()
+        });
+
+        let win_child = children.iter().filter(|&c| {
+            c.borrow().data().action().unwrap() == TicTacToeAction::from_str("2,0").unwrap()
+        });
+
+        for loss_child in loss_children {
+            let (wwins, wplays) = loss_child.borrow().data().worst_case_wins_plays();
+
+            assert_eq!(0, wwins,
+                "Worst case is alawys 0 wins, since these loss actions leave 2,0, open for white to win immediately.");
+
+            assert_eq!(1, wplays,
+                "Worst case is alawys 0 wins, since these loss actions leave 2,0, open for white to win immediately.");
+        }
     }
 
     #[test]
