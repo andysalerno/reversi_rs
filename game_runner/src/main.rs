@@ -17,7 +17,7 @@ fn main() {
     let args = get_args();
 
     let results = (0..args.game_count)
-        .map(|_| play_connect_four())
+        .map(|_| play_reversi())
         .collect::<Vec<_>>();
 
     let white_wins = results

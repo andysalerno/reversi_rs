@@ -222,7 +222,7 @@ where
 
     if results.iter().all(|r| r.is_saturated) {
         let mut results = results.iter().cloned().collect::<Vec<_>>();
-        results.sort_by_key(|r| r.worst_wins / r.worst_plays);
+        results.sort_by_key(|r| r.worst_wins * 10_000 / r.worst_plays);
 
         results.pop().unwrap()
     } else {
