@@ -39,6 +39,53 @@ impl ReversiState {
         }
     }
 
+    pub fn from_board(board: Board) -> Self {
+        let mut state = ReversiState::new();
+
+        state.board = board;
+
+        state
+    }
+
+    pub fn from_board_str(board_str: &str) -> Self {
+        let mut state = ReversiState::new();
+
+        for (i_line, line) in board_str
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| l.len() > 0)
+            .enumerate()
+        {
+            let mut char_index = 0;
+
+            for c in line.chars() {
+                let piece = match c {
+                    'X' => {
+                        char_index += 1;
+                        Some(ReversiPiece::Black)
+                    }
+                    'O' => {
+                        char_index += 1;
+                        Some(ReversiPiece::White)
+                    }
+                    '-' => {
+                        char_index += 1;
+                        None
+                    }
+                    _ => None,
+                };
+
+                if let Some(piece) = piece {
+                    let i_line = (BOARD_SIZE - 1) - i_line;
+                    let position = BoardPosition::new(char_index - 1, i_line);
+                    state.set_piece(position, Some(piece))
+                }
+            }
+        }
+
+        state
+    }
+
     fn transform_coords(position: BoardPosition) -> (usize, usize) {
         (position.col, BOARD_SIZE - position.row - 1)
     }
@@ -551,6 +598,32 @@ mod tests {
         assert_eq!(ReversiPiece::Black, state.get_piece(pos(2, 3)).unwrap());
         assert_eq!(ReversiPiece::Black, state.get_piece(pos(3, 4)).unwrap());
         assert_eq!(ReversiPiece::Black, state.get_piece(pos(4, 5)).unwrap());
+    }
+
+    #[test]
+    fn board_from_str_creates_correct_state() {
+        let board_str = "
+            7| - - X - - X - -
+            6| - - X X X X - -
+            5| X X X X X X X -
+            4| X X O O O O X -
+            3| O O X O O X - X
+            2| X X X X X X X X
+            1| - - X X X X - -
+            0| - - X X O X - -
+              ----------------
+               0 1 2 3 4 5 6 7
+        ";
+
+        let state = ReversiState::from_board_str(board_str);
+
+        let back_to_str = state.human_friendly();
+
+        let state_2 = ReversiState::from_board_str(&back_to_str);
+
+        let back_to_str_2 = state_2.human_friendly();
+
+        assert_eq!(back_to_str, back_to_str_2);
     }
 
     #[test]

@@ -67,8 +67,8 @@ fn get_args() -> Args {
 fn play_reversi() -> lib_boardgame::GameResult {
     let black = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::Black));
     // let white = Box::new(MctsAgent::<ReversiState>::new(PlayerColor::White));
-    // let white = Box::new(HumanAgent::new(PlayerColor::White));
-    let white = Box::new(RandomAgent);
+    let white = Box::new(HumanAgent::new(PlayerColor::White));
+    // let white = Box::new(RandomAgent);
 
     let mut game = Reversi::new(white, black);
 

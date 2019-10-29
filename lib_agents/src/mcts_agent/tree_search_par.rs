@@ -22,14 +22,14 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 3_000;
+    pub(super) const SIM_TIME_MS: u64 = 5_000;
     pub(super) const EXTRA_TIME_MS: u64 = 0_000;
 
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 1;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 1;
+    pub(super) const BLACK_THREAD_COUNT: usize = 4;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 4;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -1216,6 +1216,23 @@ pub mod tests {
 
         assert_eq!(terminal_count, root.data().terminal_count(),
         "Expected the root's terminal count after saturation to equal the count of terminal's in the tree.");
+    }
+
+    fn black_isnt_stupid() {
+        // In this board (black just played (3,1), white to play),
+        // MCTS spent 80.06% of time simulating
+        // white picking (1,1),
+        // but instead white picks (6,3)
+        // 7| - - X - - X - -
+        // 6| - - X X X X - -
+        // 5| X X X X X X X -
+        // 4| X X O O O O X -
+        // 3| O O X O O X - X
+        // 2| X X X X X X X X
+        // 1| - - X X X X - -
+        // 0| - - X X O X - -
+        //   ----------------
+        //    0 1 2 3 4 5 6 7
     }
 
     #[test]
