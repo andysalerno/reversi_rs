@@ -29,7 +29,7 @@ mod configs {
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
     pub(super) const BLACK_THREAD_COUNT: usize = 8;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 8;
+    pub(super) const WHITE_THREAD_COUNT: usize = 8;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -377,7 +377,7 @@ where
 {
     let thread_count = match player_color {
         PlayerColor::Black => configs::BLACK_THREAD_COUNT,
-        PlayerColor::White => configs::WHTIE_THREAD_COUNT,
+        PlayerColor::White => configs::WHITE_THREAD_COUNT,
     };
 
     if thread_count == 1 {
