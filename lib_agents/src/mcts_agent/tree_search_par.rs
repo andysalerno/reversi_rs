@@ -28,8 +28,8 @@ mod configs {
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 4;
-    pub(super) const WHTIE_THREAD_COUNT: usize = 4;
+    pub(super) const BLACK_THREAD_COUNT: usize = 8;
+    pub(super) const WHTIE_THREAD_COUNT: usize = 8;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -300,8 +300,12 @@ where
     let wins = if parent_is_player_color {
         data.wins() as f32
     } else {
-        debug_assert!(data.plays() >= data.wins());
-        (data.plays() - data.wins()) as f32
+        let wins = data.wins();
+        let plays = data.plays();
+
+        debug_assert!(plays >= wins);
+
+        (plays - wins) as f32
     };
 
     let parent_plays = parent_plays as f32;
