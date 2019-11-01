@@ -220,8 +220,13 @@ where
         }
     }
 
-    if results.iter().all(|r| r.is_saturated) {
-        let mut results = results.iter().cloned().collect::<Vec<_>>();
+    if let Some(winner) = results
+        .iter()
+        .find(|r| r.is_saturated && r.worst_wins == r.worst_plays)
+    {
+        winner.clone()
+    } else if results.iter().all(|r| r.is_saturated) {
+        let mut results = results.clone();
         results.sort_by_key(|r| r.worst_wins * 10_000 / r.worst_plays);
 
         results.pop().unwrap()
