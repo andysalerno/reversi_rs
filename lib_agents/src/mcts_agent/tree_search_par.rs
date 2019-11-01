@@ -19,7 +19,7 @@ use crossbeam::thread;
 use crate::util;
 use lib_boardgame::{GameResult, GameState, PlayerColor};
 use lib_printer::{out, out_impl};
-use monte_carlo_tree::{amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, tree::Node};
+use monte_carlo_tree::{monte_carlo_data::MctsData, monte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
     pub(super) const SIM_TIME_MS: u64 = 5_000;
@@ -34,7 +34,7 @@ mod configs {
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     // Acquire the write lock on the children
@@ -67,7 +67,7 @@ where
 
         let new_children = legal_actions
             .iter()
-            .map(|&a| node.new_child(AMctsData::new(state.next_state(a), 0, 0, Some(a))))
+            .map(|&a| node.new_child(MctsData::new(state.next_state(a), 0, 0, Some(a))))
             .collect::<Vec<_>>();
 
         children_write_lock.write(new_children);
@@ -83,7 +83,7 @@ where
 /// follow the same operation for its parent.
 fn backprop_saturation<TNode, TState>(leaf: &TNode)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     debug_assert!(
@@ -134,7 +134,7 @@ where
 // TODO: this same work can be done while we are already doing increment_saturation_count()
 fn backprop_terminal_count<TNode, TState>(leaf: &TNode, is_win: bool)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     debug_assert!(
@@ -162,7 +162,7 @@ where
 
 fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let mut handle = Some(node.get_handle());
@@ -182,7 +182,7 @@ where
 
 fn backprop_increment_tree_size<TNode, TState>(node: &TNode, by_count: usize)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let mut handle = Some(node.get_handle());
@@ -199,7 +199,7 @@ where
 
 fn simulate<TNode, TState, R>(node: &TNode, rng: &mut R) -> GameResult
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
     R: rand::Rng,
 {
@@ -225,7 +225,7 @@ where
 /// returns a handle back to the given node.
 fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
@@ -245,7 +245,7 @@ fn select_child_for_traversal<TNode, TState>(
     player_color: PlayerColor,
 ) -> Option<TNode::Handle>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let parent_data = root.data();
@@ -280,7 +280,7 @@ fn score_node_for_traversal<TNode, TState>(
     parent_is_player_color: bool,
 ) -> f32
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let data = node.data();
@@ -331,7 +331,7 @@ pub fn mcts_result<TNode, TState>(
     player_color: PlayerColor,
 ) -> Vec<MctsResult<TState>>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let root = root_handle.borrow();
@@ -372,7 +372,7 @@ where
 
 fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let thread_count = match player_color {
@@ -396,7 +396,7 @@ where
 
 fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let now = Instant::now();
@@ -527,7 +527,7 @@ pub mod tests {
         TicTacToeState::initial_state()
     }
 
-    fn make_node<G>(data: AMctsData<G>) -> impl Node<Data = AMctsData<G>>
+    fn make_node<G>(data: MctsData<G>) -> impl Node<Data = MctsData<G>>
     where
         G: GameState + Sync + Send,
         G::Move: Sync + Send,
@@ -537,15 +537,15 @@ pub mod tests {
 
     fn add_children_to_parent<TNode, TState>(parent: &TNode, children: Vec<TNode::Handle>)
     where
-        TNode: Node<Data = AMctsData<TState>>,
+        TNode: Node<Data = MctsData<TState>>,
         TState: GameState,
     {
         let parent_write_lock = parent.children_write_lock();
         parent_write_lock.write(children);
     }
 
-    fn make_test_data() -> AMctsData<TicTacToeState> {
-        AMctsData::new(TicTacToeState::initial_state(), 0, 0, None)
+    fn make_test_data() -> MctsData<TicTacToeState> {
+        MctsData::new(TicTacToeState::initial_state(), 0, 0, None)
     }
 
     #[test]
@@ -663,7 +663,7 @@ pub mod tests {
 
     #[test]
     fn select_child_max_score_expects_picks_less_explored_node() {
-        let data = AMctsData::new(TicTacToeState::new(), 0, 0, None);
+        let data = MctsData::new(TicTacToeState::new(), 0, 0, None);
 
         let tree_root = ArcNode::new_root(data.clone());
 
@@ -763,7 +763,7 @@ pub mod tests {
 
     #[test]
     fn select_to_leaf_expects_when_already_leaf_returns_self() {
-        let data = AMctsData::new(TicTacToeState::initial_state(), 10, 10, None);
+        let data = MctsData::new(TicTacToeState::initial_state(), 10, 10, None);
 
         let tree_root = make_node(data.clone());
 
@@ -819,7 +819,7 @@ pub mod tests {
             // XOX
             state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
 
-            AMctsData::new(state, 0, 0, None)
+            MctsData::new(state, 0, 0, None)
         };
 
         let tree_root = make_node(data.clone());
@@ -888,7 +888,7 @@ pub mod tests {
             // XOX
             state.apply_move(TicTacToeAction::from_str("1,0").unwrap());
 
-            AMctsData::new(state, 0, 0, None)
+            MctsData::new(state, 0, 0, None)
         };
 
         let tree_root = make_node(data.clone());
@@ -940,7 +940,7 @@ pub mod tests {
             // X__
             state.apply_move(TicTacToeAction::from_str("0,2").unwrap());
 
-            AMctsData::new(state, 0, 0, None)
+            MctsData::new(state, 0, 0, None)
         };
 
         let tree_root = make_node(data.clone());
@@ -1046,7 +1046,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         assert!(
@@ -1075,7 +1075,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         assert!(
@@ -1109,7 +1109,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::Black);
@@ -1153,7 +1153,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::White);
@@ -1194,7 +1194,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         mcts(root, PlayerColor::White);
@@ -1252,7 +1252,7 @@ pub mod tests {
 
         state.apply_moves(moves);
 
-        let root_handle = ArcNode::new_root(AMctsData::new(state, 0, 0, None));
+        let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
         assert!(

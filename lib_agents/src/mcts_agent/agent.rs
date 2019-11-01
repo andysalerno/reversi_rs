@@ -2,17 +2,17 @@ use super::tree_search_par;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use lib_printer::{out, out_impl};
 use monte_carlo_tree::{
-    amonte_carlo_data::AMctsData, amonte_carlo_data::MctsResult, arc_tree::ArcNode, tree::Node,
+    arc_tree::ArcNode, monte_carlo_data::MctsData, monte_carlo_data::MctsResult, tree::Node,
 };
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::marker::Sync;
 use std::time::Instant;
 
-pub struct MctsAgent<TState, TNode = ArcNode<AMctsData<TState>>>
+pub struct MctsAgent<TState, TNode = ArcNode<MctsData<TState>>>
 where
     TState: GameState,
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
 {
     color: PlayerColor,
     current_state_root: RefCell<Option<TNode::Handle>>,
@@ -22,7 +22,7 @@ where
 impl<TState, TNode> MctsAgent<TState, TNode>
 where
     TState: GameState,
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
 {
     pub fn new(color: PlayerColor) -> Self {
         MctsAgent {
@@ -67,7 +67,7 @@ where
     }
 
     fn reset_root_handle(&self, state: &TState) -> TNode::Handle {
-        let fresh_data = AMctsData::new(state.clone(), 0, 0, None);
+        let fresh_data = MctsData::new(state.clone(), 0, 0, None);
         let fresh_root = TNode::new_root(fresh_data);
 
         let mut opt = self.current_state_root.borrow_mut();
@@ -80,7 +80,7 @@ where
 
 impl<TState, TNode> GameAgent<TState> for MctsAgent<TState, TNode>
 where
-    TNode: Node<Data = AMctsData<TState>>,
+    TNode: Node<Data = MctsData<TState>>,
     TState: GameState + Sync,
 {
     fn observe_action(&self, player: PlayerColor, action: TState::Move, _result: &TState) {
@@ -193,7 +193,7 @@ fn perform_mcts_par<TNode, TState>(
     player_color: PlayerColor,
 ) -> MctsResult<TState>
 where
-    TNode: Node<Data = AMctsData<TState>> + Sync,
+    TNode: Node<Data = MctsData<TState>> + Sync,
     TState: GameState + Sync,
 {
     let total_plays_before = root

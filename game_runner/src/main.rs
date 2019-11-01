@@ -46,7 +46,6 @@ fn main() {
 }
 
 fn get_args() -> Args {
-    // let args = std::env::args().collect::<Vec<_>>();
     let mut args = std::env::args();
 
     let game_count = args
