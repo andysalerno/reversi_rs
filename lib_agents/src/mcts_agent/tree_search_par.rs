@@ -423,7 +423,7 @@ where
         let leaf = select_to_leaf(root, player_color);
         let leaf = leaf.borrow();
 
-        if let Err(_) = expand(leaf) {
+        if expand(leaf).is_err() {
             // another thread beat us to expanding,
             // so just continue with a new leaf selection
             continue;

@@ -135,12 +135,7 @@ fn apply_action_and_observe(
 }
 
 fn parse_msg(msg: &str) -> Result<MsgFromGui, NboardError> {
-    let parsed = match msg
-        .split_whitespace()
-        .into_iter()
-        .collect::<Vec<_>>()
-        .as_slice()
-    {
+    let parsed = match msg.split_whitespace().collect::<Vec<_>>().as_slice() {
         ["nboard", version] => MsgFromGui::NBoard(version.parse::<usize>().unwrap()),
         ["set", "depth", depth_str] => MsgFromGui::SetDepth(depth_str.parse::<usize>().unwrap()),
         ["set", "game", g1, g2, g3, g4, g5] => {
@@ -227,9 +222,8 @@ fn nboard_action_to_reversi_action(n: NBoardAction) -> ReversiPlayerAction {
     let y_pos_val = 7 - (y_pos_val - 1);
 
     let position = lib_reversi::BoardPosition::new(x_pos_val, y_pos_val);
-    let action = lib_reversi::ReversiPlayerAction::Move { position };
 
-    action
+    lib_reversi::ReversiPlayerAction::Move { position }
 }
 
 fn read_from_stdin() -> Result<String, Box<dyn Error>> {
@@ -257,11 +251,7 @@ mod tests {
     fn parse_game_history_finds_one_move() {
         let ggf_string = r"(;GM[Othello]PC[NBoard]DT[2019-09-25 06:42:54 GMT]PB[Andy]PW[]RE[?]TI[5:00]TY[8]BO[8 ---------------------------O*------*O--------------------------- *]B[D3//2.991];)";
 
-        let parsed_move = parse_game_history(ggf_string)
-            .iter()
-            .last()
-            .unwrap()
-            .clone();
+        let parsed_move = parse_game_history(ggf_string).into_iter().last().unwrap();
 
         match parsed_move {
             ReversiPlayerAction::Move { position } => {

@@ -13,5 +13,5 @@ fn main() {
         )));
     }
 
-    log(Log::Info(format!("Exiting.")));
+    log(Log::Info("Exiting.".to_string()));
 }
