@@ -40,7 +40,7 @@ impl ConnectFourAction {
     }
 }
 
-impl lib_boardgame::GameMove for ConnectFourAction {
+impl lib_boardgame::GameAction for ConnectFourAction {
     fn is_forced_pass(self) -> bool {
         // No such thing in this game
         false
@@ -248,7 +248,7 @@ impl Display for ConnectFourState {
 }
 
 impl GameState for ConnectFourState {
-    type Move = ConnectFourAction;
+    type Action = ConnectFourAction;
 
     fn human_friendly(&self) -> String {
         format!("{}", self)
@@ -269,11 +269,11 @@ impl GameState for ConnectFourState {
         state
     }
 
-    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
+    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Action] {
         &self.legal_moves
     }
 
-    fn apply_move(&mut self, action: Self::Move) {
+    fn apply_move(&mut self, action: Self::Action) {
         let col = action.col;
 
         let piece = match self.current_player_turn() {

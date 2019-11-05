@@ -1,5 +1,5 @@
 use crate::BoardPosition;
-use lib_boardgame::GameMove;
+use lib_boardgame::GameAction;
 use lib_printer::{out, out_impl};
 use std::fmt;
 
@@ -9,7 +9,7 @@ pub enum ReversiPlayerAction {
     Move { position: BoardPosition },
 }
 
-impl GameMove for ReversiPlayerAction {
+impl GameAction for ReversiPlayerAction {
     fn is_forced_pass(self) -> bool {
         match self {
             ReversiPlayerAction::PassTurn => true,

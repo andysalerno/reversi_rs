@@ -40,7 +40,7 @@ impl GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy + Debug + PartialEq + Display {
+pub trait GameAction: Copy + Debug + PartialEq + Display {
     /// Returns true if this GameMove represents a forced turn pass.
     fn is_forced_pass(self) -> bool;
 }
@@ -51,7 +51,7 @@ pub trait GameMove: Copy + Debug + PartialEq + Display {
 pub trait GameState: Clone + Display {
     /// The type that will be uesd to describe
     /// the actions that players will select during the game.
-    type Move: GameMove;
+    type Action: GameAction;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String;
@@ -67,11 +67,11 @@ pub trait GameState: Clone + Display {
     fn initial_state() -> Self;
 
     /// Returns the possible moves the given player can make for the current state.
-    fn legal_moves(&self, player: PlayerColor) -> &[Self::Move];
+    fn legal_moves(&self, player: PlayerColor) -> &[Self::Action];
 
     /// Apply the given move (or 'action') to this state, mutating this state
     /// and advancing it to the resulting state.
-    fn apply_move(&mut self, action: Self::Move);
+    fn apply_move(&mut self, action: Self::Action);
 
     /// Returns the player color whose turn it currently is.
     fn current_player_turn(&self) -> PlayerColor;
@@ -85,7 +85,7 @@ pub trait GameState: Clone + Display {
     /// Given a legal move (or 'action'), returns the resulting state of applying the action
     /// to this state, without mutating the original state.
     /// This is done by cloning and then invoking apply_move().
-    fn next_state(&self, action: Self::Move) -> Self {
+    fn next_state(&self, action: Self::Action) -> Self {
         let mut cloned = self.clone();
         cloned.apply_move(action);
 
@@ -122,23 +122,29 @@ pub trait GameState: Clone + Display {
     /// Apply the given moves (or 'actions') to this state, mutating it
     /// each time and advancing it through the chain of states.
     /// Implemented in terms of apply_move().
-    fn apply_moves(&mut self, moves: impl IntoIterator<Item = Self::Move>) {
+    fn apply_moves(&mut self, moves: impl IntoIterator<Item = Self::Action>) {
         for m in moves {
             self.apply_move(m);
         }
     }
 }
 
+/// A trait that describes the high-level behavior of running a game,
+/// i.e. managing the underlying game state.
 pub trait Game {
+    /// The underlying game state for this game.
     type State: GameState;
 
+    /// Returns a handle to the white player agent.
     fn white_agent(&self) -> &dyn GameAgent<Self::State>;
+
+    /// Returns a handle to the black player agent.
     fn black_agent(&self) -> &dyn GameAgent<Self::State>;
 
     /// The game's current state.
     fn game_state(&self) -> &Self::State;
 
-    /// The game's current state.
+    /// The game's current state, mutable.
     fn game_state_mut(&mut self) -> &mut Self::State;
 
     /// True if the the game has ended, either due to a forced win,
@@ -209,13 +215,13 @@ pub trait GameAgent<TState: GameState> {
     /// Given the state and slice of legal moves,
     /// the agent will respond with its selected move for
     /// the player to take.
-    fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
+    fn pick_move(&self, state: &TState, legal_moves: &[TState::Action]) -> TState::Action;
 
     /// Invoked by the game runner to allow both agents
     /// to observe actions taken over the course of the game.
     /// A default implementation is provided that does nothing,
     /// so implementors can ignore this if they have no need for it.
-    fn observe_action(&self, _player: PlayerColor, _action: TState::Move, _result: &TState) {}
+    fn observe_action(&self, _player: PlayerColor, _action: TState::Action, _result: &TState) {}
 }
 
 #[cfg(test)]

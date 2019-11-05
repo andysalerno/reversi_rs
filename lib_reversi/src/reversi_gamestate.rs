@@ -310,7 +310,7 @@ impl ReversiState {
 }
 
 impl GameState for ReversiState {
-    type Move = ReversiPlayerAction;
+    type Action = ReversiPlayerAction;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
@@ -358,7 +358,7 @@ impl GameState for ReversiState {
     }
 
     // TODO: update trait if we're not using PlayerColor anymore
-    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
+    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Action] {
         assert_eq!(_player, self.current_player_turn(), "Until the trait is updated, the requested legal moves must always be for the current player.");
         self.cur_state_legal_moves.as_slice()
     }
@@ -380,7 +380,7 @@ impl GameState for ReversiState {
     ///          O X
     ///        O   X
     ///            X
-    fn apply_move(&mut self, action: Self::Move) {
+    fn apply_move(&mut self, action: Self::Action) {
         let position = match action {
             ReversiPlayerAction::Move { position } => position,
             ReversiPlayerAction::PassTurn => {
