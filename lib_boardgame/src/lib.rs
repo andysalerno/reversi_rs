@@ -1,6 +1,5 @@
 use lib_printer::{out, out_impl};
-use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 /// An enum representing the two possible player colors for all games.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -41,7 +40,7 @@ impl GameResult {
 
 /// Describes a move a player can make in a game.
 /// I.e., in Reversi, a move could be at position (3,7).
-pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {
+pub trait GameMove: Copy + Debug + PartialEq + Display {
     /// Returns true if this GameMove represents a forced turn pass.
     fn is_forced_pass(self) -> bool;
 }
@@ -49,7 +48,7 @@ pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {
 /// A trait describing a complete state of some Game,
 /// such as the board position, the current player's turn,
 /// and other relevant info.
-pub trait GameState: Clone + Send + Display {
+pub trait GameState: Clone + Display {
     /// The type that will be uesd to describe
     /// the actions that players will select during the game.
     type Move: GameMove;
