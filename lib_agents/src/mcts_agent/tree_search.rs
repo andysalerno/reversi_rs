@@ -939,7 +939,7 @@ pub mod tests {
             c.borrow().data().action().unwrap() != TicTacToeAction::from_str("2,0").unwrap()
         });
 
-        let win_child = children.iter().filter(|&c| {
+        let _win_child = children.iter().filter(|&c| {
             c.borrow().data().action().unwrap() == TicTacToeAction::from_str("2,0").unwrap()
         });
 
