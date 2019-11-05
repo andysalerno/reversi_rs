@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 pub struct HumanAgent<TState: GameState>
 where
-    TState::Move: FromStr,
+    TState::Action: FromStr,
 {
     player_color: PlayerColor,
     _phantom: PhantomData<TState>,
@@ -12,8 +12,8 @@ where
 
 impl<TState: GameState> HumanAgent<TState>
 where
-    TState::Move: FromStr,
-    <TState::Move as FromStr>::Err: std::fmt::Debug,
+    TState::Action: FromStr,
+    <TState::Action as FromStr>::Err: std::fmt::Debug,
 {
     pub fn new(player_color: PlayerColor) -> Self {
         Self {
@@ -22,7 +22,7 @@ where
         }
     }
 
-    fn prompt_input(&self) -> TState::Move {
+    fn prompt_input(&self) -> TState::Action {
         use std::io::stdin;
 
         println!("Enter move x,y: ");
@@ -33,7 +33,7 @@ where
             .read_line(&mut input)
             .expect("Couldn't capture user input.");
 
-        let result = TState::Move::from_str(&input);
+        let result = TState::Action::from_str(&input);
 
         match result {
             Ok(r) => r,
@@ -47,10 +47,10 @@ where
 
 impl<TState: GameState> GameAgent<TState> for HumanAgent<TState>
 where
-    TState::Move: FromStr,
-    <TState::Move as FromStr>::Err: std::fmt::Debug,
+    TState::Action: FromStr,
+    <TState::Action as FromStr>::Err: std::fmt::Debug,
 {
-    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Move]) -> TState::Move {
+    fn pick_move(&self, _state: &TState, legal_moves: &[TState::Action]) -> TState::Action {
         loop {
             let user_input = self.prompt_input();
 

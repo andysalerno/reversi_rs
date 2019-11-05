@@ -1,5 +1,5 @@
 use crate::{TicTacToePiece, BOARD_SIZE};
-use lib_boardgame::{GameMove, GameState, PlayerColor};
+use lib_boardgame::{GameAction, GameState, PlayerColor};
 use std::fmt;
 
 type Board = [[Option<TicTacToePiece>; BOARD_SIZE]; BOARD_SIZE];
@@ -23,7 +23,7 @@ impl fmt::Display for TicTacToeAction {
     }
 }
 
-impl GameMove for TicTacToeAction {
+impl GameAction for TicTacToeAction {
     /// Hard-set to `false` for TicTacToe -- there is no forced turn passing.
     fn is_forced_pass(self) -> bool {
         false
@@ -265,7 +265,7 @@ impl TicTacToeState {
 }
 
 impl GameState for TicTacToeState {
-    type Move = TicTacToeAction;
+    type Action = TicTacToeAction;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String {
@@ -314,7 +314,7 @@ impl GameState for TicTacToeState {
 
     /// Returns the possible moves the given player can make for the current state.
     /// In TicTacToe, any empty spot is a legal position for either player.
-    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Move] {
+    fn legal_moves(&self, _player: PlayerColor) -> &[Self::Action] {
         self.cur_state_legal_moves.as_slice()
     }
 

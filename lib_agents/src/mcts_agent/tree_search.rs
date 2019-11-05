@@ -510,7 +510,7 @@ pub mod tests {
     fn make_node<G>(data: MctsData<G>) -> impl Node<Data = MctsData<G>>
     where
         G: GameState + Sync + Send,
-        G::Move: Sync + Send,
+        G::Action: Sync + Send,
     {
         ArcNode::new_root(data)
     }

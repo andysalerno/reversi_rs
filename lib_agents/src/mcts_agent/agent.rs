@@ -16,7 +16,7 @@ where
 {
     color: PlayerColor,
     current_state_root: RefCell<Option<TNode::Handle>>,
-    anticipated_opponent_actions: RefCell<Vec<TState::Move>>,
+    anticipated_opponent_actions: RefCell<Vec<TState::Action>>,
 }
 
 impl<TState, TNode> MctsAgent<TState, TNode>
@@ -32,7 +32,9 @@ where
         }
     }
 
-    fn walk_tree_to_child(&self, action: TState::Move) {
+    fn walk_tree_to_child(&self, action: TState::Action) {
+        // IDEA: half threads are "win seekers" and other half is "loss seeker"
+        // (i.e. explores as though we're playing for the opponent)
         let root_handle = self
             .current_root_handle()
             .expect("Must have a root node to seek through.");
@@ -85,7 +87,7 @@ where
         self.color
     }
 
-    fn observe_action(&self, player: PlayerColor, action: TState::Move, _result: &TState) {
+    fn observe_action(&self, player: PlayerColor, action: TState::Action, _result: &TState) {
         // TODO: this might get broken by skipped turns
         if player == self.color.opponent()
             && self
@@ -109,7 +111,7 @@ where
         }
     }
 
-    fn pick_move(&self, state: &TState, _legal_moves: &[TState::Move]) -> TState::Move {
+    fn pick_move(&self, state: &TState, _legal_moves: &[TState::Action]) -> TState::Action {
         let root_handle = self
             .current_root_handle()
             .unwrap_or_else(|| self.reset_root_handle(state));

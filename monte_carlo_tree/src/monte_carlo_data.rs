@@ -7,7 +7,7 @@ use std::sync::RwLock;
 #[derive(Default, Clone)]
 pub struct MctsResult<TState: GameState> {
     pub result: Option<GameResult>,
-    pub action: TState::Move,
+    pub action: TState::Action,
     pub wins: usize,
     pub plays: usize,
     pub is_saturated: bool,
@@ -53,7 +53,7 @@ where
     state: T,
     plays: AtomicUsize,
     wins: AtomicUsize,
-    action: Option<T::Move>,
+    action: Option<T::Action>,
 
     is_expanded: AtomicBool,
 
@@ -161,7 +161,7 @@ impl<T> MctsData<T>
 where
     T: GameState,
 {
-    pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Move>) -> Self {
+    pub fn new(state: T, plays: usize, wins: usize, action: Option<T::Action>) -> Self {
         Self {
             state,
             action,
@@ -200,7 +200,7 @@ where
         self.wins.load(Ordering::SeqCst)
     }
 
-    pub fn action(&self) -> Option<T::Move> {
+    pub fn action(&self) -> Option<T::Action> {
         self.action
     }
 
