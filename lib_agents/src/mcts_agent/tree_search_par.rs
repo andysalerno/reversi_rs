@@ -959,7 +959,7 @@ pub mod tests {
             c.borrow().data().action().unwrap() != TicTacToeAction::from_str("2,0").unwrap()
         });
 
-        let win_child = children.iter().filter(|&c| {
+        let _win_child = children.iter().filter(|&c| {
             c.borrow().data().action().unwrap() == TicTacToeAction::from_str("2,0").unwrap()
         });
 
@@ -1225,8 +1225,8 @@ pub mod tests {
     fn black_isnt_stupid() {
         // In this board (black just played (3,1), white to play),
         // MCTS spent 80.06% of time simulating
-        // white picking (1,1),
-        // but instead white picks (6,3)
+        // white responding with (1,1),
+        // but instead white responds with (6,3)
         // 7| - - X - - X - -
         // 6| - - X X X X - -
         // 5| X X X X X X X -
@@ -1237,6 +1237,18 @@ pub mod tests {
         // 0| - - X X O X - -
         //   ----------------
         //    0 1 2 3 4 5 6 7
+        let board_str = "
+            7| - - X - - X - -
+            6| - - X X X X - -
+            5| X X X X X X X -
+            4| X X O O O O X -
+            3| O O X O O X - X
+            2| X X X X X X X X
+            1| - - X X X X - -
+            0| - - X X O X - -
+              ----------------
+               0 1 2 3 4 5 6 7
+        ";
     }
 
     #[test]

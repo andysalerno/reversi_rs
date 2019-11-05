@@ -2,6 +2,7 @@ use lib_printer::{out, out_impl};
 use std::fmt;
 use std::fmt::Display;
 
+/// An enum representing the two possible player colors for all games.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PlayerColor {
     Black,
@@ -9,6 +10,7 @@ pub enum PlayerColor {
 }
 
 impl PlayerColor {
+    /// Returns the opposing player color.
     pub fn opponent(self) -> Self {
         match self {
             PlayerColor::Black => PlayerColor::White,
@@ -17,6 +19,8 @@ impl PlayerColor {
     }
 }
 
+/// An enum representing the possible
+/// results of a game that is played to conclusion.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum GameResult {
     Tie,
@@ -25,6 +29,7 @@ pub enum GameResult {
 }
 
 impl GameResult {
+    /// True if the game result is a win for the given player.
     pub fn is_win_for_player(self, player_color: PlayerColor) -> bool {
         match self {
             GameResult::BlackWins => player_color == PlayerColor::Black,
@@ -41,20 +46,25 @@ pub trait GameMove: Copy + fmt::Debug + Send + PartialEq + fmt::Display {
     fn is_forced_pass(self) -> bool;
 }
 
-/// Describes a complete state of some Game,
+/// A trait describing a complete state of some Game,
 /// such as the board position, the current player's turn,
-/// or any other relevant info.
+/// and other relevant info.
 pub trait GameState: Clone + Send + Display {
+    /// The type that will be uesd to describe
+    /// the actions that players will select during the game.
     type Move: GameMove;
 
     /// Returns a human-friendly string for representing the state.
     fn human_friendly(&self) -> String;
 
-    /// Gives the implementation a chance to initialize the starting state of a game
-    /// before gameplay begins.
+    /// Sets the current game state to its initial,
+    /// ready-to-play position. E.g., a game of Reversi begins
+    /// with four pieces already on the board.
+    /// Setting those four pieces would be done here.
     fn initialize_board(&mut self);
 
     /// Returns a fresh, ready-to-play game state for this game.
+    /// Implementors probably want to use initialize_board() to achieve this.
     fn initial_state() -> Self;
 
     /// Returns the possible moves the given player can make for the current state.
@@ -64,14 +74,18 @@ pub trait GameState: Clone + Send + Display {
     /// and advancing it to the resulting state.
     fn apply_move(&mut self, action: Self::Move);
 
-    /// Returns the current player whose turn it currently is.
+    /// Returns the player color whose turn it currently is.
     fn current_player_turn(&self) -> PlayerColor;
 
     /// Returns the score of the given player in this state.
+    /// Note that in some games, this may be meaningless,
+    /// as there is no running score over the course of the game,
+    /// but only a winner and loser determined at the very end.
     fn player_score(&self, player: PlayerColor) -> usize;
 
-    /// Given a legal move (or 'action'), return the resulting state of applying the action
-    /// to this state (does not mutate this state).
+    /// Given a legal move (or 'action'), returns the resulting state of applying the action
+    /// to this state, without mutating the original state.
+    /// This is done by cloning and then invoking apply_move().
     fn next_state(&self, action: Self::Move) -> Self {
         let mut cloned = self.clone();
         cloned.apply_move(action);
@@ -83,17 +97,21 @@ pub trait GameState: Clone + Send + Display {
     /// Advances to the next player's turn.
     fn skip_turn(&mut self);
 
-    /// True if the game is over (i.e. the win condition has been met, or neither player can take any further action).
+    /// True if the game is over; i.e., the win condition has been met, or neither player can take any further action.
     fn is_game_over(&self) -> bool;
 
     /// The GameResult, or None if the game is not yet over.
+    /// The default implementation selects the winner with the highest value
+    /// for player_score().
     fn game_result(&self) -> Option<GameResult> {
+        if !self.is_game_over() {
+            return None;
+        }
+
         let white_score = self.player_score(PlayerColor::White);
         let black_score = self.player_score(PlayerColor::Black);
 
-        if !self.is_game_over() {
-            None
-        } else if white_score > black_score {
+        if white_score > black_score {
             Some(GameResult::WhiteWins)
         } else if black_score > white_score {
             Some(GameResult::BlackWins)
@@ -187,9 +205,17 @@ pub trait Game {
 }
 
 /// A trait representing the functionality of a GameAgent.
-/// Specifically, given a GameState, a GameAgent must be able to decide a GameMove.
+/// Most importantly, given a GameState, a GameAgent must be able to decide a GameMove.
 pub trait GameAgent<TState: GameState> {
+    /// Given the state and slice of legal moves,
+    /// the agent will respond with its selected move for
+    /// the player to take.
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
+
+    /// Invoked by the game runner to allow both agents
+    /// to observe actions taken over the course of the game.
+    /// A default implementation is provided that does nothing,
+    /// so implementors can ignore this if they have no need for it.
     fn observe_action(&self, _player: PlayerColor, _action: TState::Move, _result: &TState) {}
 }
 
