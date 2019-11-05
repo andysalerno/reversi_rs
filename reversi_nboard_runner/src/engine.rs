@@ -1,8 +1,8 @@
 use crate::util::{log, Log, NboardError};
 use lib_agents::MctsAgent;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
-use lib_reversi::reversi_gamestate::ReversiState;
 use lib_reversi::ReversiPlayerAction;
+use lib_reversi::ReversiState;
 use std::error::Error;
 use std::io::{self, Write};
 

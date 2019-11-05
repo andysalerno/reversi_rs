@@ -1,6 +1,8 @@
-use crate::board_directions::*;
 use crate::util::{opponent, BoardDirectionIter};
-use crate::{Board, BoardPosition, Directions, ReversiPiece, ReversiPlayerAction, BOARD_SIZE};
+use crate::{
+    reversi_board::board_directions, Board, BoardPosition, Directions, ReversiPiece,
+    ReversiPlayerAction, BOARD_SIZE,
+};
 use lib_boardgame::{GameState, PlayerColor};
 use std::fmt;
 
@@ -222,7 +224,11 @@ impl ReversiState {
             PlayerColor::White => ReversiPiece::White,
         };
 
-        let all_directions = [POSITIVE, NEGATIVE, SAME];
+        let all_directions = [
+            board_directions::POSITIVE,
+            board_directions::NEGATIVE,
+            board_directions::SAME,
+        ];
 
         // (0,0), (0,1) ... (4, 7), (5, 0) ... (7, 7)
         let all_positions = (0..(Self::BOARD_SIZE * Self::BOARD_SIZE))
@@ -237,7 +243,7 @@ impl ReversiState {
             .filter(|pos| {
                 for &col_dir in all_directions.iter() {
                     for &row_dir in all_directions.iter() {
-                        if col_dir == SAME && row_dir == SAME {
+                        if col_dir == board_directions::SAME && row_dir == board_directions::SAME {
                             continue;
                         }
 
@@ -400,7 +406,11 @@ impl GameState for ReversiState {
 
         self.set_piece(position, Some(player_piece));
 
-        let all_directions = [POSITIVE, NEGATIVE, SAME];
+        let all_directions = [
+            board_directions::POSITIVE,
+            board_directions::NEGATIVE,
+            board_directions::SAME,
+        ];
 
         // Direction: For col and row, we check all directions for which pieces to flip.
         //      For col, we can check all cols to the left (direction -1), right (direction 1), or the current col (direction 0).
@@ -408,7 +418,7 @@ impl GameState for ReversiState {
         //      Checking all directions, including diagonals, means checking all combinations of row/col directions together (except 0,0).
         for &col_dir in all_directions.iter() {
             for &row_dir in all_directions.iter() {
-                if col_dir == SAME && row_dir == SAME {
+                if col_dir == board_directions::SAME && row_dir == board_directions::SAME {
                     // staying in the same row and col means not moving at all, so skip this scenario
                     continue;
                 }

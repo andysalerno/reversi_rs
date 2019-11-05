@@ -2,9 +2,9 @@ use lib_boardgame::PlayerColor;
 
 /// The size of the board.
 /// E.x., if this is 8, the Reversi board is 8x8 spaces large.
-const BOARD_SIZE: usize = 8;
+pub(crate) const BOARD_SIZE: usize = 8;
 
-type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
+pub(crate) type Board = [[Option<ReversiPiece>; BOARD_SIZE]; BOARD_SIZE];
 
 /// When traversing pieces on the board,
 /// a positive direction indicates increasing values for col or row,

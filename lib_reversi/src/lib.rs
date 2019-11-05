@@ -4,6 +4,9 @@ mod reversi_game;
 mod reversi_gamestate;
 mod util;
 
-use reversi_board::{board_directions::*, Directions};
+use reversi_board::{Board, Directions, BOARD_SIZE};
 
+pub use reversi_action::ReversiPlayerAction;
 pub use reversi_board::{BoardPosition, ReversiPiece};
+pub use reversi_game::Reversi;
+pub use reversi_gamestate::ReversiState;

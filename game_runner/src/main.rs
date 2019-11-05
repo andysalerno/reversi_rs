@@ -2,8 +2,8 @@ use lib_agents::{HumanAgent, MctsAgent, RandomAgent};
 use lib_boardgame::{Game, GameResult, GameState, PlayerColor};
 use lib_connect_four::{ConnectFour, ConnectFourState};
 use lib_printer::{out, out_impl};
-use lib_reversi::reversi::Reversi;
-use lib_reversi::reversi_gamestate::ReversiState;
+use lib_reversi::Reversi;
+use lib_reversi::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
 use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
