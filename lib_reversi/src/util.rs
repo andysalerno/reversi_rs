@@ -36,8 +36,8 @@ impl Iterator for BoardDirectionIter {
     type Item = BoardPosition;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next_col = self.cursor.col as i32 + self.direction.col_dir;
-        let next_row = self.cursor.row as i32 + self.direction.row_dir;
+        let next_col = self.cursor.col() as i32 + self.direction.col_dir;
+        let next_row = self.cursor.row() as i32 + self.direction.row_dir;
 
         if next_col < 0 || next_row < 0 {
             return None;
