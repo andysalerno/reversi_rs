@@ -1,4 +1,4 @@
-use super::tree_search_par;
+use super::tree_search;
 use lib_boardgame::{GameAgent, GameState, PlayerColor};
 use lib_printer::{out, out_impl};
 use monte_carlo_tree::{
@@ -204,7 +204,7 @@ where
         .sum::<usize>();
 
     let now = Instant::now();
-    let results = tree_search_par::mcts_result::<TNode, TState>(root, player_color);
+    let results = tree_search::mcts_result::<TNode, TState>(root, player_color);
     let elapsed = now.elapsed();
 
     // Some friendly UI output

@@ -1,15 +1,3 @@
-/// When we used "saturation", we ran many times more
-/// unique simulations, and explored without duplicating any work.
-/// But it gave larger subtrees preference over smaller ones which
-/// might have been better.
-/// Without "saturation", we keep re-playing paths we've already been done.
-/// What we need is for every parent to hold not only "saturated_children / all_children",
-/// but those same numbers for all descendents of its entire subtree.
-/// Then we can know, way up at the root, how well explored the choice really is.
-
-/// Better idea:
-/// backprop "worst case" scenarios from the bottom when saturated
-/// I.e. every child node backprops its worst case scenario
 use std::borrow::Borrow;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -349,8 +337,9 @@ where
         state_children
             .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
     } else {
+        // Traditionally, this is by the node with the most "plays", but
+        // in this implemntation we're picking the highest win/plays ratio.
         // state_children.sort_by_key(|c| c.borrow().data().plays());
-        // TODO experimenting here
         state_children
             .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
     };

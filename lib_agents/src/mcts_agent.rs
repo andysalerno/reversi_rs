@@ -1,4 +1,4 @@
 mod agent;
-mod tree_search_par;
+mod tree_search;
 
 pub use agent::MctsAgent;
