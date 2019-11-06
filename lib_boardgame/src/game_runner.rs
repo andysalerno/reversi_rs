@@ -1,4 +1,4 @@
-use crate::{GameAgent, GameMove, GameResult, GameState, PlayerColor};
+use crate::{GameAction, GameAgent, GameResult, GameState, PlayerColor};
 use lib_printer::{out, out_impl};
 
 /// A trait that describes a game runner.
@@ -10,7 +10,7 @@ pub trait GameRunner<T: GameState> {
 /// Probably all you need to run most games.
 pub struct GeneralGameRunner;
 
-fn player_take_turn<S>(game_state: &mut S, agent: &dyn GameAgent<S>) -> S::Move
+fn player_take_turn<S>(game_state: &mut S, agent: &dyn GameAgent<S>) -> S::Action
 where
     S: GameState,
 {
