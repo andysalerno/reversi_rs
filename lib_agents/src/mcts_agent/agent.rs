@@ -33,8 +33,6 @@ where
     }
 
     fn walk_tree_to_child(&self, action: TState::Move) {
-        // IDEA: half threads are "win seekers" and other half is "loss seeker"
-        // (i.e. explores as though we're playing for the opponent)
         let root_handle = self
             .current_root_handle()
             .expect("Must have a root node to seek through.");
@@ -204,7 +202,7 @@ where
         .sum::<usize>();
 
     let now = Instant::now();
-    let results = tree_search::mcts_result::<TNode, TState>(root, player_color);
+    let results = tree_search::mcts::<TNode, TState>(root, player_color);
     let elapsed = now.elapsed();
 
     // Some friendly UI output
@@ -224,20 +222,24 @@ where
         .iter()
         .find(|r| r.is_saturated && r.worst_wins == r.worst_plays)
     {
+        // If a move gives a guaranteed win, take it.
         winner.clone()
     } else if results.iter().all(|r| r.is_saturated) {
+        // Otherwise, if the full tree has been searched,
+        // pick the move with the highest win ratio.
         let mut results = results.clone();
         results.sort_by_key(|r| r.worst_wins * 10_000 / r.worst_plays);
 
         results.pop().unwrap()
     } else {
+        // Otherwise, we pick the move that was simulated the most.
         results
             .iter()
             .max_by_key(|r| r.plays)
             .expect("Must have been a max result")
             .clone()
-        // }
-        // TODO experimenting with this
+
+        // Though it may be wiser to pick the move with the highest win ratio:
         // results
         //     .iter()
         //     .max_by_key(|r| (r.wins * 10000) / r.plays)

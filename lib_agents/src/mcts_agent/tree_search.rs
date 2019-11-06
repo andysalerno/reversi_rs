@@ -314,7 +314,7 @@ where
     score
 }
 
-pub fn mcts_result<TNode, TState>(
+pub fn mcts<TNode, TState>(
     root_handle: TNode::Handle,
     player_color: PlayerColor,
 ) -> Vec<MctsResult<TState>>
@@ -329,20 +329,11 @@ where
         root.data().plays()
     );
 
-    mcts(root, player_color);
+    mcts_executor(root, player_color);
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
-    if root.data().is_saturated() {
-        state_children
-            .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
-    } else {
-        // Traditionally, this is by the node with the most "plays", but
-        // in this implemntation we're picking the highest win/plays ratio.
-        // state_children.sort_by_key(|c| c.borrow().data().plays());
-        state_children
-            .sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
-    };
+    state_children.sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
 
     // Regardless of any other metric, actions that win the game are always preferred.
     state_children.sort_by_key(|c| {
@@ -359,7 +350,7 @@ where
         .collect()
 }
 
-fn mcts<TNode, TState>(root: &TNode, player_color: PlayerColor)
+fn mcts_executor<TNode, TState>(root: &TNode, player_color: PlayerColor)
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -934,7 +925,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        mcts(&tree_root, PlayerColor::Black);
+        mcts_executor(&tree_root, PlayerColor::Black);
 
         assert!(
             tree_root.data().is_saturated(),
@@ -1043,7 +1034,7 @@ pub mod tests {
             "The node must not be saturated to begin with."
         );
 
-        mcts(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),
@@ -1077,7 +1068,7 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),
@@ -1101,7 +1092,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black);
 
         assert!(
             root.data().is_saturated(),
@@ -1145,7 +1136,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::White);
+        mcts_executor(root, PlayerColor::White);
 
         assert!(
             root.data().is_saturated(),
@@ -1186,7 +1177,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts(root, PlayerColor::White);
+        mcts_executor(root, PlayerColor::White);
 
         assert!(
             root.data().is_saturated(),
@@ -1211,22 +1202,23 @@ pub mod tests {
         "Expected the root's terminal count after saturation to equal the count of terminal's in the tree.");
     }
 
-    fn black_isnt_stupid() {
-        // In this board (black just played (3,1), white to play),
-        // MCTS spent 80.06% of time simulating
-        // white picking (1,1),
-        // but instead white picks (6,3)
-        // 7| - - X - - X - -
-        // 6| - - X X X X - -
-        // 5| X X X X X X X -
-        // 4| X X O O O O X -
-        // 3| O O X O O X - X
-        // 2| X X X X X X X X
-        // 1| - - X X X X - -
-        // 0| - - X X O X - -
-        //   ----------------
-        //    0 1 2 3 4 5 6 7
-    }
+    // TODO: create a test for this scenario
+    // fn black_isnt_stupid() {
+    // In this board (black just played (3,1), white to play),
+    // MCTS spent 80.06% of time simulating
+    // white picking (1,1),
+    // but instead white picks (6,3)
+    // 7| - - X - - X - -
+    // 6| - - X X X X - -
+    // 5| X X X X X X X -
+    // 4| X X O O O O X -
+    // 3| O O X O O X - X
+    // 2| X X X X X X X X
+    // 1| - - X X X X - -
+    // 0| - - X X O X - -
+    //   ----------------
+    //    0 1 2 3 4 5 6 7
+    // }
 
     #[test]
     fn mcts_expects_final_saturation_increases_root_terminal_count() {
@@ -1256,7 +1248,7 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black);
 
         let root_terminal_count_after = root.data().terminal_count();
 
