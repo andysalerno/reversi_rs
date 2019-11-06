@@ -6,7 +6,7 @@ pub struct HumanAgent<TState: GameState>
 where
     TState::Move: FromStr,
 {
-    _player_color: PlayerColor,
+    player_color: PlayerColor,
     _phantom: PhantomData<TState>,
 }
 
@@ -18,7 +18,7 @@ where
     pub fn new(player_color: PlayerColor) -> Self {
         Self {
             _phantom: Default::default(),
-            _player_color: player_color,
+            player_color: player_color,
         }
     }
 
@@ -60,5 +60,9 @@ where
                 return user_input;
             }
         }
+    }
+
+    fn player_color(&self) -> PlayerColor {
+        self.player_color
     }
 }

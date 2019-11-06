@@ -1,6 +1,10 @@
+mod game_runner;
+
 use lib_printer::{out, out_impl};
 use std::fmt;
 use std::fmt::Display;
+
+pub use game_runner::{GameRunner, GeneralGameRunner};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PlayerColor {
@@ -191,6 +195,9 @@ pub trait Game {
 pub trait GameAgent<TState: GameState> {
     fn pick_move(&self, state: &TState, legal_moves: &[TState::Move]) -> TState::Move;
     fn observe_action(&self, _player: PlayerColor, _action: TState::Move, _result: &TState) {}
+
+    /// Returns the player color of this player.
+    fn player_color(&self) -> PlayerColor;
 }
 
 #[cfg(test)]

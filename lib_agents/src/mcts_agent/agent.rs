@@ -81,6 +81,10 @@ where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState + Sync,
 {
+    fn player_color(&self) -> PlayerColor {
+        self.color
+    }
+
     fn observe_action(&self, player: PlayerColor, action: TState::Move, _result: &TState) {
         // TODO: this might get broken by skipped turns
         if player == self.color.opponent()
