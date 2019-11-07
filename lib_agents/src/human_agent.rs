@@ -18,7 +18,7 @@ where
     pub fn new(player_color: PlayerColor) -> Self {
         Self {
             _phantom: Default::default(),
-            player_color: player_color,
+            player_color,
         }
     }
 
