@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
 
 /// A lock that assumes writing will only
-/// happen once, and all read attemps
+/// happen once, and all read attempts
 /// will occur after the write has completed.
 /// The goal is similar to RwLock, but without
 /// the cost of acquiring a read lock on every read

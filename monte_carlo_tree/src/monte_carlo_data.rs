@@ -250,6 +250,13 @@ where
         *self.end_state_result.read().unwrap()
     }
 
+    pub fn worst_case_wins_plays(&self) -> (usize, usize) {
+        (
+            self.sat_worst_case_ratio.0.load(Ordering::SeqCst),
+            self.sat_worst_case_ratio.1.load(Ordering::SeqCst),
+        )
+    }
+
     // "Write" functions
 
     /// The owner of the tree search should call this
@@ -316,13 +323,6 @@ where
             self.sat_worst_case_ratio.0.store(wins, Ordering::SeqCst);
             self.sat_worst_case_ratio.1.store(plays, Ordering::SeqCst);
         }
-    }
-
-    pub fn worst_case_wins_plays(&self) -> (usize, usize) {
-        (
-            self.sat_worst_case_ratio.0.load(Ordering::SeqCst),
-            self.sat_worst_case_ratio.1.load(Ordering::SeqCst),
-        )
     }
 
     pub fn set_end_state_result(&self, result: GameResult) {
