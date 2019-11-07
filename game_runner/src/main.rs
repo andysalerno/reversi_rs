@@ -1,4 +1,4 @@
-use lib_agents::{HumanAgent, MctsAgent, RandomAgent};
+use lib_agents::{HumanAgent, MctsAgent};
 use lib_boardgame::{GameRunner, GeneralGameRunner, PlayerColor};
 use lib_connect_four::ConnectFourState;
 use lib_reversi::ReversiState;

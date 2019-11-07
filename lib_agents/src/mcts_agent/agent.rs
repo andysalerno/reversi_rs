@@ -258,20 +258,12 @@ where
 mod tests {
     use super::*;
 
-    use lib_boardgame::{Game, GameState};
-    use lib_tic_tac_toe::tic_tac_toe::TicTacToe;
-    use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction};
+    use lib_boardgame::GameState;
+    use lib_tic_tac_toe::tic_tac_toe_gamestate::{BoardPosition, TicTacToeAction, TicTacToeState};
 
     #[test]
     fn tree_search_always_picks_winning_move() {
-        let black_agent: Box<MctsAgent<_, ArcNode<_>>> =
-            Box::new(MctsAgent::new(PlayerColor::Black));
-        let white_agent: Box<MctsAgent<_, ArcNode<_>>> =
-            Box::new(MctsAgent::new(PlayerColor::White));
-
-        let mut game = TicTacToe::new(white_agent, black_agent);
-
-        let state = game.game_state_mut();
+        let mut state = TicTacToeState::initial_state();
 
         // Start with black's turn
         assert_eq!(state.current_player_turn(), PlayerColor::Black);
@@ -310,7 +302,7 @@ mod tests {
         let legal_moves = state.legal_moves(PlayerColor::Black);
 
         let test_black_agent: MctsAgent<_, ArcNode<_>> = MctsAgent::new(PlayerColor::Black);
-        let mcts_chosen_move = test_black_agent.pick_move(state, &legal_moves);
+        let mcts_chosen_move = test_black_agent.pick_move(&state, &legal_moves);
 
         // The agent MUST pick the winning move:
         //  V

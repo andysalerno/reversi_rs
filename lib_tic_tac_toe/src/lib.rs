@@ -1,4 +1,3 @@
-pub mod tic_tac_toe;
 pub mod tic_tac_toe_gamestate;
 
 use lib_boardgame::PlayerColor;
