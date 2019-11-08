@@ -73,24 +73,51 @@ pub struct MctsData<T>
 where
     T: GameState,
 {
+    /// The game state represented in this node.
     state: T,
-    plays: AtomicUsize,
-    wins: AtomicUsize,
+
+    /// The action taken to result in the current state.
     action: Option<T::Action>,
 
+    /// The count of times this node has been visited during MCTS.
+    plays: AtomicUsize,
+
+    /// The count of times this node has resulted in a win during MCTS.
+    wins: AtomicUsize,
+
+    /// True if this nodeh as been expanded already during MCTS.
     is_expanded: AtomicBool,
 
+    /// The count of children this node has.
+    /// This number should be either 0, if the node was not yet expanded,
+    /// or the count of all possible child states, if it has been expanded.
     children_count: AtomicUsize,
+
+    /// The count of children that have been fully explored to completion.
     children_saturated_count: AtomicUsize,
+
+    /// The count of all descendants that have been fully explored to completion.
     descendants_saturated_count: AtomicUsize,
+
+    /// The size of the tree rooted at this node.
     tree_size: AtomicUsize,
+
+    /// The count of descendants that are terminal states (are expanded and yet have no children).
     terminal_count: AtomicUsize,
+
+    /// The count of descendants that are terminal states (are expanded and yet have no children)
+    /// that represent winning game results.
     terminal_wins_count: AtomicUsize,
+
+    /// The game result that this node's state represents if this node is a terminal state,
+    /// otherwise None.
     end_state_result: RwLock<Option<GameResult>>,
 
     /// When this subtree is fully saturated, this will hold the wins/plays
     /// of the worst-case scenario when following this path
     sat_worst_case_ratio: (AtomicUsize, AtomicUsize),
+
+    /// A mutex lock that can be used to guarantee exclusion during critical behavior on this node.
     sim_lock: Mutex<()>,
 }
 
