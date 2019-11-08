@@ -4,18 +4,41 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::sync::RwLock;
 
+/// A data struct containing the results of MCTS for a single action.
 #[derive(Default, Clone)]
 pub struct MctsResult<TState: GameState> {
+    /// The game result, if this action ended the game, or None if it did not.
     pub result: Option<GameResult>,
+
+    /// The action taken, represented in this result.
     pub action: TState::Action,
+
+    /// The count of wins during MCTS simulation for this action.
     pub wins: usize,
+
+    /// The count of plays during MCTS simulation for this action.
     pub plays: usize,
+
+    /// True if MCTS explored every possible outcome resulting from this action.
     pub is_saturated: bool,
+
+    /// The count of terminal game states explored during MCTS.
     pub terminal_count: usize,
+
+    /// The count of terminal game states explored during MCTS that were wins.
     pub terminal_wins_count: usize,
+
+    /// The win count of the worst-case scenario (TODO)
     pub worst_wins: usize,
+
+    /// The play count of the worst-case scenario (TODO)
     pub worst_plays: usize,
+
+    /// The size of the state tree explored from this action during MCTS.
     pub tree_size: usize,
+
+    /// The count of descendant states resulting from this action that
+    /// were fully explored to saturation.
     pub descendants_saturated_count: usize,
 }
 
@@ -166,10 +189,13 @@ where
             state,
             action,
 
-            // TODO: why can't I use the sugar `..Default::default()` for the remaining??
             plays: AtomicUsize::new(plays),
             wins: AtomicUsize::new(wins),
             is_expanded: AtomicBool::new(false),
+
+            sim_lock: Mutex::new(()),
+
+            // TODO: why can't I use the sugar `..Default::default()` for the remaining??
             children_count: Default::default(),
             children_saturated_count: Default::default(),
             descendants_saturated_count: Default::default(),
@@ -178,7 +204,6 @@ where
             terminal_count: Default::default(),
             terminal_wins_count: Default::default(),
             sat_worst_case_ratio: (Default::default(), Default::default()),
-            sim_lock: Mutex::new(()),
         }
     }
 
