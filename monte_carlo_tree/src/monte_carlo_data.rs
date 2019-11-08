@@ -1,8 +1,9 @@
+use crate::util::clone_atomic_usize;
+use crate::write_once_lock::{WriteOnceLock, WriteOnceWriteGuard};
 use lib_boardgame::{GameResult, GameState};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
-use std::sync::RwLock;
 
 /// A data struct containing the results of MCTS for a single action.
 #[derive(Default, Clone)]
@@ -111,7 +112,7 @@ where
 
     /// The game result that this node's state represents if this node is a terminal state,
     /// otherwise None.
-    end_state_result: RwLock<Option<GameResult>>,
+    end_state_result: WriteOnceLock<Option<GameResult>>,
 
     /// When this subtree is fully saturated, this will hold the wins/plays
     /// of the worst-case scenario when following this path
@@ -139,11 +140,7 @@ where
     TState: GameState,
 {
     fn clone(&self) -> Self {
-        let end_state_result = self
-            .end_state_result
-            .read()
-            .expect("Couldn't acquire read lock on end state result.");
-        let end_state_result = RwLock::new(*end_state_result);
+        let end_state_result = self.end_state_result.clone();
 
         let plays = clone_atomic_usize(&self.plays);
         let wins = clone_atomic_usize(&self.wins);
@@ -175,11 +172,6 @@ where
             sim_lock: Mutex::new(()),
         }
     }
-}
-
-fn clone_atomic_usize(atom: &AtomicUsize) -> AtomicUsize {
-    let raw = atom.load(Ordering::SeqCst);
-    AtomicUsize::new(raw)
 }
 
 impl<TState> From<&MctsData<TState>> for MctsResult<TState>
@@ -254,6 +246,9 @@ where
         let wins = self.wins.load(Ordering::SeqCst);
         let plays = self.plays.load(Ordering::SeqCst);
 
+        // TODO: eventually downgrade to assert_debug?
+        assert!(plays >= wins, "Impossible to have more wins than plays");
+
         (wins, plays)
     }
 
@@ -304,7 +299,7 @@ where
     }
 
     pub fn end_state_result(&self) -> Option<GameResult> {
-        *self.end_state_result.read().unwrap()
+        *self.end_state_result.read()
     }
 
     pub fn worst_case_wins_plays(&self) -> (usize, usize) {
@@ -383,11 +378,8 @@ where
     }
 
     pub fn set_end_state_result(&self, result: GameResult) {
-        let mut writable = self
-            .end_state_result
-            .write()
-            .expect("Could not lock game result for writing.");
-        *writable = Some(result);
+        let wl = self.end_state_result.write_lock();
+        wl.write(Some(result));
     }
 }
 

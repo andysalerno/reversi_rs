@@ -1,3 +1,4 @@
+use crate::util::clone_atomic_bool;
 use atomic_refcell::{AtomicRef, AtomicRefCell};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard};
@@ -53,7 +54,10 @@ impl<T: Sized> WriteOnceLock<T> {
     }
 
     pub fn write_lock(&self) -> WriteOnceWriteGuard<T> {
-        let write_lock = self.data_write.lock().expect("Acquiring data write lock.");
+        let write_lock = self
+            .data_write
+            .lock()
+            .expect("Failure acquiring data write lock.");
         WriteOnceWriteGuard::new(write_lock, &self.data_read, &self.has_written)
     }
 
@@ -66,6 +70,25 @@ impl<T: Sized> WriteOnceLock<T> {
             self.data_read.borrow()
         } else {
             self.default_value.borrow()
+        }
+    }
+}
+
+impl<T: Default> Default for WriteOnceLock<T> {
+    fn default() -> Self {
+        let d = T::default();
+        let d2 = T::default();
+        Self::new(d, d2)
+    }
+}
+
+impl<T: Clone> Clone for WriteOnceLock<T> {
+    fn clone(&self) -> Self {
+        Self {
+            data_write: Mutex::new(()),
+            data_read: self.data_read.clone(),
+            default_value: self.default_value.clone(),
+            has_written: clone_atomic_bool(&self.has_written),
         }
     }
 }
