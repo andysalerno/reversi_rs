@@ -81,7 +81,7 @@ where
 
     let mut count = 1;
     let mut continuous_saturation = true;
-    let (mut wins, mut plays) = (leaf.data().wins(), leaf.data().plays());
+    let (mut wins, mut plays) = leaf.data().wins_plays();
     leaf.data().update_worst_case(wins, plays);
 
     let mut handle = leaf.parent();
@@ -101,8 +101,14 @@ where
         data.increment_descendants_saturated_count(count);
 
         let was_saturated_after = data.is_saturated();
-        wins = data.wins();
-        plays = data.plays();
+
+        {
+            // ?????
+            // Not legal to do (wins, plays) = data.wins_plays()
+            let (w, p) = data.wins_plays();
+            wins = w;
+            plays = p;
+        }
 
         if !was_saturated_before && was_saturated_after {
             count += 1;
@@ -131,7 +137,7 @@ where
     );
 
     debug_assert_eq!(
-        leaf.data().plays(),
+        leaf.data().wins_plays().1,
         1,
         "A terminal leaf we are backpropping must have been played exactly once."
     );
@@ -238,7 +244,7 @@ where
 {
     let parent_data = root.data();
     let parent_is_player_color = parent_data.state().current_player_turn() == player_color;
-    let parent_plays = parent_data.plays();
+    let parent_plays = parent_data.wins_plays().1;
     let parent_plays = usize::max(1, parent_plays);
 
     let child_nodes = root.children_read();
@@ -272,7 +278,11 @@ where
     TState: GameState,
 {
     let data = node.data();
-    let plays = data.plays() as f32;
+
+    let (mut wins, plays) = {
+        let (w, p) = data.wins_plays();
+        (w as f32, p as f32)
+    };
 
     if plays == 0f32 {
         return std::f32::MAX;
@@ -285,15 +295,9 @@ where
     }
 
     // Experiment
-    let wins = if parent_is_player_color {
-        data.wins() as f32
-    } else {
-        let wins = data.wins();
-        let plays = data.plays();
-
-        debug_assert!(plays >= wins);
-
-        (plays - wins) as f32
+    wins = match parent_is_player_color {
+        true => wins,
+        false => (plays - wins) as f32,
     };
 
     let parent_plays = parent_plays as f32;
@@ -323,17 +327,21 @@ where
     TState: GameState,
 {
     let root = root_handle.borrow();
-    out!(
-        "Beginning mcts on node with wins/plays: {}/{}",
-        root.data().wins(),
-        root.data().plays()
-    );
+
+    {
+        let (wins, plays) = root.data().wins_plays();
+
+        out!("Beginning mcts on node with wins/plays: {}/{}", wins, plays);
+    }
 
     mcts_executor(root, player_color);
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
-    state_children.sort_by_key(|c| (c.borrow().data().wins() * 10000) / c.borrow().data().plays());
+    state_children.sort_by_key(|c| {
+        let (wins, plays) = c.borrow().data().wins_plays();
+        (wins * 10000) / plays
+    });
 
     // Regardless of any other metric, actions that win the game are always preferred.
     state_children.sort_by_key(|c| {
@@ -388,10 +396,9 @@ where
     loop {
         if now.elapsed() >= exec_duration {
             let data = root.data();
+            let (wins, plays) = data.wins_plays();
 
-            if (data.wins() * 1000) / data.plays() > 800
-                || now.elapsed() >= exec_duration + extra_time
-            {
+            if (wins * 1000) / plays > 800 || now.elapsed() >= exec_duration + extra_time {
                 break;
             }
         }
@@ -425,7 +432,7 @@ where
 
             run_locked_if(
                 sim_node.data().get_lock(),
-                || sim_node.data().plays() == 0,
+                || sim_node.data().wins_plays().1 == 0,
                 || {
                     let sim_result = simulate(sim_node, &mut rng);
 
@@ -448,7 +455,7 @@ where
 
             run_locked_if(
                 leaf.data().get_lock(),
-                || leaf.data().plays() == 0,
+                || leaf.data().wins_plays().1 == 0,
                 || {
                     backprop_sim_result(leaf, is_win);
                 },
@@ -551,8 +558,10 @@ pub mod tests {
 
         backprop_sim_result(&tree_root, is_win);
 
-        assert_eq!(1, tree_root.data().plays());
-        assert_eq!(1, tree_root.data().wins());
+        let (wins, plays) = tree_root.data().wins_plays();
+
+        assert_eq!(1, plays);
+        assert_eq!(1, wins);
     }
 
     #[test]
@@ -563,8 +572,10 @@ pub mod tests {
 
         backprop_sim_result(&tree_root, is_win);
 
-        assert_eq!(1, tree_root.data().plays());
-        assert_eq!(0, tree_root.data().wins());
+        let (wins, plays) = tree_root.data().wins_plays();
+
+        assert_eq!(1, plays);
+        assert_eq!(0, wins);
     }
 
     #[test]
@@ -580,17 +591,17 @@ pub mod tests {
         let is_win = true;
         backprop_sim_result(child_level_3.borrow(), is_win);
 
-        assert_eq!(1, child_level_3.borrow().data().plays());
-        assert_eq!(1, child_level_2.borrow().data().plays());
-        assert_eq!(1, child_level_1.borrow().data().plays());
-        assert_eq!(1, tree_root.data().plays());
+        assert_eq!(1, child_level_3.borrow().data().wins_plays().1);
+        assert_eq!(1, child_level_2.borrow().data().wins_plays().1);
+        assert_eq!(1, child_level_1.borrow().data().wins_plays().1);
+        assert_eq!(1, tree_root.data().wins_plays().1);
 
-        assert_eq!(1, child_level_3.borrow().data().wins());
-        assert_eq!(1, child_level_2.borrow().data().wins());
-        assert_eq!(1, child_level_1.borrow().data().wins());
-        assert_eq!(1, tree_root.data().wins());
+        assert_eq!(1, child_level_3.borrow().data().wins_plays().0);
+        assert_eq!(1, child_level_2.borrow().data().wins_plays().0);
+        assert_eq!(1, child_level_1.borrow().data().wins_plays().0);
+        assert_eq!(1, tree_root.data().wins_plays().0);
 
-        assert_eq!(0, child_level_4.borrow().data().plays());
+        assert_eq!(0, child_level_4.borrow().data().wins_plays().0);
     }
 
     #[test]
@@ -693,7 +704,7 @@ pub mod tests {
 
         let selected: &ArcNode<_> = selected.borrow();
 
-        assert_eq!(1, selected.data().plays());
+        assert_eq!(1, selected.data().wins_plays().1);
     }
 
     #[test]
@@ -738,7 +749,7 @@ pub mod tests {
 
         let leaf = leaf.borrow();
 
-        assert_eq!(2, leaf.data().plays());
+        assert_eq!(2, leaf.data().wins_plays().1);
     }
 
     #[test]
@@ -750,8 +761,8 @@ pub mod tests {
         let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
         let leaf = leaf.borrow();
 
-        assert_eq!(10, leaf.data().plays());
-        assert_eq!(10, leaf.data().wins());
+        assert_eq!(10, leaf.data().wins_plays().1);
+        assert_eq!(10, leaf.data().wins_plays().0);
     }
 
     #[test]
@@ -982,7 +993,7 @@ pub mod tests {
         // child c: one visit
         backprop_sim_result(child_c.borrow(), is_win);
 
-        let parent_plays = tree_root.data().plays();
+        let parent_plays = tree_root.data().wins_plays().1;
 
         assert_eq!(
             1.2365144,
@@ -1103,8 +1114,12 @@ pub mod tests {
         while let Some(n) = traversal.pop() {
             let node: &ArcNode<_> = n.borrow();
 
-            let node_play_count = node.data().plays();
-            let child_play_sum: usize = node.children_read().iter().map(|c| c.data().plays()).sum();
+            let node_play_count = node.data().wins_plays().1;
+            let child_play_sum: usize = node
+                .children_read()
+                .iter()
+                .map(|c| c.data().wins_plays().1)
+                .sum();
 
             assert!(
                 // Note: this is a bit of a hack right now, they should be exactly equal
@@ -1149,7 +1164,7 @@ pub mod tests {
 
             if node.children_read().is_empty() {
                 assert_eq!(
-                    node.data().plays(),
+                    node.data().wins_plays().1,
                     1,
                     "A terminal node with no children must have been played exactly one time."
                 );

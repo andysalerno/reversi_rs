@@ -188,10 +188,11 @@ where
 {
     fn from(data: &MctsData<TState>) -> Self {
         let (wwins, wplays) = data.worst_case_wins_plays();
+        let (wins, plays) = data.wins_plays();
 
         Self {
-            plays: data.plays(),
-            wins: data.wins(),
+            wins,
+            plays,
             action: data
                 .action()
                 .expect("can't convert to MctsResult without an action"),
@@ -244,12 +245,16 @@ where
         &self.sim_lock
     }
 
-    pub fn plays(&self) -> usize {
-        self.plays.load(Ordering::SeqCst)
-    }
+    pub fn wins_plays(&self) -> (usize, usize) {
+        // always load wins first, to avoid this scneario:
+        //      Wins/Plays is 10/10.
+        //      We load plays (val 10), but before we load wins,
+        //      another thread backprops a win (so wins/plays becomes 11/11)
+        //      The result is, we loaded wins/plays of 11/10, which is not possible.
+        let wins = self.wins.load(Ordering::SeqCst);
+        let plays = self.plays.load(Ordering::SeqCst);
 
-    pub fn wins(&self) -> usize {
-        self.wins.load(Ordering::SeqCst)
+        (wins, plays)
     }
 
     pub fn action(&self) -> Option<T::Action> {
