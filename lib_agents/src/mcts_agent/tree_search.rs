@@ -265,7 +265,7 @@ where
 
             a_score.partial_cmp(&b_score).unwrap()
         })
-        .and_then(|n| Some(n.clone()))
+        .cloned()
 }
 
 fn score_node_for_traversal<TNode, TState>(
@@ -295,16 +295,17 @@ where
     }
 
     // Experiment
-    wins = match parent_is_player_color {
-        true => wins,
-        false => (plays - wins) as f32,
+    wins = if parent_is_player_color {
+        wins
+    } else {
+        (plays - wins) as f32
     };
 
     let parent_plays = parent_plays as f32;
 
     let node_mean_val = wins / plays;
 
-    let explore_bias = 1.60;
+    let explore_bias = 3.00;
 
     let score = node_mean_val + (explore_bias * f32::sqrt(f32::ln(parent_plays) / plays));
 
