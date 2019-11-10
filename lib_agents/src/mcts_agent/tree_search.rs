@@ -89,7 +89,7 @@ where
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
-        let _lock = data.get_lock().lock();
+        let lock = data.get_lock().lock();
 
         let was_saturated_before = data.is_saturated();
 
@@ -121,6 +121,7 @@ where
             // return;
         }
 
+        drop(lock);
         handle = node.parent();
     }
 }

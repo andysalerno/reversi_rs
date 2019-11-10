@@ -5,7 +5,8 @@ use lib_reversi::ReversiState;
 use lib_tic_tac_toe::tic_tac_toe_gamestate::TicTacToeState;
 
 fn main() {
-    play_reversi();
+    // play_reversi();
+    play_connect_four();
 }
 
 #[allow(unused)]
@@ -28,7 +29,7 @@ fn play_tic_tac_toe() -> lib_boardgame::GameResult {
 #[allow(unused)]
 fn play_connect_four() -> lib_boardgame::GameResult {
     let black = MctsAgent::<ConnectFourState>::new(PlayerColor::Black);
-    let white = HumanAgent::new(PlayerColor::White);
+    let white = MctsAgent::<ConnectFourState>::new(PlayerColor::White);
 
     GeneralGameRunner::play_to_end(&black, &white)
 }
