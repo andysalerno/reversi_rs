@@ -996,22 +996,16 @@ pub mod tests {
 
         let parent_plays = tree_root.data().wins_plays().1;
 
-        assert_eq!(
-            1.2365144,
-            score_node_for_traversal(child_a.borrow(), parent_plays, true)
-        );
-        assert_eq!(
-            1.5144148,
-            score_node_for_traversal(child_b.borrow(), parent_plays, true)
-        );
-        assert_eq!(
-            2.141706,
-            score_node_for_traversal(child_c.borrow(), parent_plays, true)
-        );
-        assert_eq!(
-            340282350000000000000000000000000000000f32,
-            score_node_for_traversal(child_d.borrow(), parent_plays, true)
-        );
+        let unvisited_node_score = score_node_for_traversal(child_d.borrow(), parent_plays, true);
+
+        [child_a, child_b, child_c].iter().for_each(|c| {
+            let visited_node_score = score_node_for_traversal(c.borrow(), parent_plays, true);
+
+            assert!(
+                unvisited_node_score > visited_node_score,
+                "Expected an unvisited node to have a higher score than all others."
+            );
+        });
     }
 
     #[test]
