@@ -1,4 +1,3 @@
-use rand::Rng;
 use std::borrow::Borrow;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -17,10 +16,11 @@ mod configs {
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 8;
-    pub(super) const WHITE_THREAD_COUNT: usize = 8;
+    pub(super) const BLACK_THREAD_COUNT: usize = 4;
+    pub(super) const WHITE_THREAD_COUNT: usize = 4;
 
-    pub(super) const RANDOM_EXPLORE_CHANCE: f32 = 0.00_f32;
+    pub(super) const WHITE_EXPLORE_JITTER: f32 = 0.10;
+    pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.10;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -346,7 +346,21 @@ where
         out!("Beginning mcts on node with wins/plays: {}/{}", wins, plays);
     }
 
-    mcts_executor(root, player_color);
+    let thread_count = match player_color {
+        PlayerColor::Black => configs::BLACK_THREAD_COUNT,
+        PlayerColor::White => configs::WHITE_THREAD_COUNT,
+    };
+
+    let jitter = if thread_count == 1 {
+        0.00
+    } else {
+        match player_color {
+            PlayerColor::Black => configs::BLACK_EXPLORE_JITTER,
+            PlayerColor::White => configs::WHITE_EXPLORE_JITTER,
+        }
+    };
+
+    mcts_executor(root, player_color, thread_count, jitter);
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
@@ -370,26 +384,29 @@ where
         .collect()
 }
 
-fn mcts_executor<TNode, TState>(root: &TNode, player_color: PlayerColor)
-where
+fn mcts_executor<TNode, TState>(
+    root: &TNode,
+    player_color: PlayerColor,
+    thread_count: usize,
+    jitter: f32,
+) where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
-    let thread_count = match player_color {
-        PlayerColor::Black => configs::BLACK_THREAD_COUNT,
-        PlayerColor::White => configs::WHITE_THREAD_COUNT,
-    };
-
     if thread_count == 1 {
-        let jitter = 0.00;
-        mcts_loop(root, player_color, jitter);
+        let jitter_result = 0.00;
+        mcts_loop(root, player_color, jitter_result);
     } else {
+        // Each thread gets this much explore jitter
+        let jitter_chunk_size = jitter / (thread_count as f32);
+
         thread::scope(|s| {
-            for _ in 0..thread_count {
-                let jitter = util::get_rng().gen_range(0.80_f32, 1.20_f32);
+            for i in 0..thread_count {
+                let jitter_result = (i as f32) * jitter_chunk_size;
+                let jitter_result = jitter_result - (jitter / 2.00);
 
                 s.spawn(move |_| {
-                    mcts_loop(root, player_color, jitter);
+                    mcts_loop(root, player_color, jitter_result);
                 });
             }
         })
@@ -524,6 +541,9 @@ pub mod tests {
     use std::str::FromStr;
 
     use monte_carlo_tree::arc_tree::ArcNode;
+
+    const TEST_THREAD_COUNT: usize = 4;
+    const TEST_JITTER: f32 = 0.10;
 
     fn make_test_state() -> impl GameState {
         TicTacToeState::initial_state()
@@ -952,7 +972,12 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        mcts_executor(&tree_root, PlayerColor::Black);
+        mcts_executor(
+            &tree_root,
+            PlayerColor::Black,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+        );
 
         assert!(
             tree_root.data().is_saturated(),
@@ -1056,7 +1081,7 @@ pub mod tests {
             "The node must not be saturated to begin with."
         );
 
-        mcts_executor(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
 
         assert!(
             root.data().is_saturated(),
@@ -1090,7 +1115,7 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts_executor(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
 
         assert!(
             root.data().is_saturated(),
@@ -1114,7 +1139,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
 
         assert!(
             root.data().is_saturated(),
@@ -1162,7 +1187,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::White);
+        mcts_executor(root, PlayerColor::White, TEST_THREAD_COUNT, TEST_JITTER);
 
         assert!(
             root.data().is_saturated(),
@@ -1203,7 +1228,7 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::White);
+        mcts_executor(root, PlayerColor::White, TEST_THREAD_COUNT, TEST_JITTER);
 
         assert!(
             root.data().is_saturated(),
@@ -1274,7 +1299,7 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts_executor(root, PlayerColor::Black);
+        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
 
         let root_terminal_count_after = root.data().terminal_count();
 
