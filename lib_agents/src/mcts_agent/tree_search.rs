@@ -285,6 +285,10 @@ where
     (*child_nodes)
         .iter()
         .filter(|&n| !filter_sat || !n.borrow().data().is_saturated())
+        // .filter(|&n| {
+        //     let (wwins, _wplays) = n.borrow().data().worst_case_wins_plays();
+        //     _wplays == 0 || wwins != 0
+        // })
         .max_by(|&a, &b| {
             let a_score =
                 score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color, jitter);
