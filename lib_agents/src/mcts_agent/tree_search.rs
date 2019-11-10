@@ -1,3 +1,4 @@
+use rand::Rng;
 use std::borrow::Borrow;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -18,6 +19,8 @@ mod configs {
 
     pub(super) const BLACK_THREAD_COUNT: usize = 8;
     pub(super) const WHITE_THREAD_COUNT: usize = 8;
+
+    pub(super) const RANDOM_EXPLORE_CHANCE: f32 = 0.00_f32;
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -218,14 +221,19 @@ where
 /// Selects using max UCB, but on opponent's turn inverts the score.
 /// If the given node has no unsaturated children,
 /// returns a handle back to the given node.
-fn select_to_leaf<TNode, TState>(root: &TNode, player_color: PlayerColor) -> TNode::Handle
+fn select_to_leaf<TNode, TState>(
+    root: &TNode,
+    player_color: PlayerColor,
+    jitter: f32,
+) -> TNode::Handle
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let mut cur_node = root.get_handle();
 
-    while let Some(c) = select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color)
+    while let Some(c) =
+        select_child_for_traversal::<TNode, TState>(cur_node.borrow(), player_color, jitter)
     {
         cur_node = c;
     }
@@ -238,6 +246,7 @@ where
 fn select_child_for_traversal<TNode, TState>(
     root: &TNode,
     player_color: PlayerColor,
+    jitter: f32,
 ) -> Option<TNode::Handle>
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -260,9 +269,9 @@ where
         .filter(|&n| !filter_sat || !n.borrow().data().is_saturated())
         .max_by(|&a, &b| {
             let a_score =
-                score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color);
+                score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color, jitter);
             let b_score =
-                score_node_for_traversal(b.borrow(), parent_plays, parent_is_player_color);
+                score_node_for_traversal(b.borrow(), parent_plays, parent_is_player_color, jitter);
 
             a_score.partial_cmp(&b_score).unwrap()
         })
@@ -273,6 +282,7 @@ fn score_node_for_traversal<TNode, TState>(
     node: &TNode,
     parent_plays: usize,
     parent_is_player_color: bool,
+    jitter: f32,
 ) -> f32
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -306,7 +316,7 @@ where
 
     let node_mean_val = wins / plays;
 
-    let explore_bias = 3.00;
+    let explore_bias = 3.00 * jitter;
 
     let score = node_mean_val + (explore_bias * f32::sqrt(f32::ln(parent_plays) / plays));
 
@@ -371,12 +381,15 @@ where
     };
 
     if thread_count == 1 {
-        mcts_loop(root, player_color);
+        let jitter = 0.00;
+        mcts_loop(root, player_color, jitter);
     } else {
         thread::scope(|s| {
             for _ in 0..thread_count {
+                let jitter = util::get_rng().gen_range(0.80_f32, 1.20_f32);
+
                 s.spawn(move |_| {
-                    mcts_loop(root, player_color);
+                    mcts_loop(root, player_color, jitter);
                 });
             }
         })
@@ -384,7 +397,7 @@ where
     }
 }
 
-fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor)
+fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, jitter: f32)
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
@@ -409,7 +422,7 @@ where
             break;
         }
 
-        let leaf = select_to_leaf(root, player_color);
+        let leaf = select_to_leaf(root, player_color, jitter);
         let leaf = leaf.borrow();
 
         if expand(leaf).is_err() {
@@ -701,6 +714,7 @@ pub mod tests {
         let selected = select_child_for_traversal::<ArcNode<_>, TicTacToeState>(
             child_level_3_handle.borrow(),
             PlayerColor::Black,
+            0.00,
         )
         .expect("the child should have been selected.");
 
@@ -747,7 +761,7 @@ pub mod tests {
         backprop_sim_result(child_level_4b.borrow(), is_win);
         backprop_sim_result(child_level_4b.borrow(), is_win);
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, 0.00);
 
         let leaf = leaf.borrow();
 
@@ -760,7 +774,7 @@ pub mod tests {
 
         let tree_root = make_node(data.clone());
 
-        let leaf = select_to_leaf(&tree_root, PlayerColor::Black);
+        let leaf = select_to_leaf(&tree_root, PlayerColor::Black, 0.00);
         let leaf = leaf.borrow();
 
         assert_eq!(10, leaf.data().wins_plays().1);
@@ -997,10 +1011,11 @@ pub mod tests {
 
         let parent_plays = tree_root.data().wins_plays().1;
 
-        let unvisited_node_score = score_node_for_traversal(child_d.borrow(), parent_plays, true);
+        let unvisited_node_score =
+            score_node_for_traversal(child_d.borrow(), parent_plays, true, 0.00);
 
         [child_a, child_b, child_c].iter().for_each(|c| {
-            let visited_node_score = score_node_for_traversal(c.borrow(), parent_plays, true);
+            let visited_node_score = score_node_for_traversal(c.borrow(), parent_plays, true, 0.00);
 
             assert!(
                 unvisited_node_score > visited_node_score,
