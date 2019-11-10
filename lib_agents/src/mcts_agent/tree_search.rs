@@ -23,12 +23,27 @@ mod configs {
     pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.10;
 }
 
+/// An enum providing the conditions used to determine when the MCTS execution
+/// has completed.
+/// Possible choices are by rollout count
+/// (e.x., "mcts is done after 10_000 rollouts have completed")
+/// and by execution time in ms
+/// (e.x., "mcts is done after 12_000 ms of execution time")
+enum MctsEndCondition {
+    RolloutCount(usize),
+    ExecutionTimeMs(usize),
+}
+
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
 where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     // Acquire the write lock on the children
+    // TODO: this should have a "try_acquire_lock()", since
+    // any time the lock is already held, we don't want to do this work again
+    // instead of waiting/blocking, when we always know we will do nothing afterwards,
+    // just try and move on if we fail
     let children_write_lock = node.children_write_lock();
 
     // Critical lock scope of this function:
@@ -81,8 +96,12 @@ where
         leaf.data().is_saturated(),
         "Only a leaf considered saturated can have its saturated status backpropagated."
     );
+    debug_assert!(
+        leaf.data().children_count() == 0,
+        "We can only invoke this operation on a terminating node with 0 children."
+    );
 
-    let mut count = 1;
+    let mut saturated_descendants_increment_count = 1;
     let mut continuous_saturation = true;
     let (mut wins, mut plays) = leaf.data().wins_plays();
     leaf.data().update_worst_case(wins, plays);
@@ -92,39 +111,34 @@ where
     while let Some(p) = handle {
         let node = p.borrow();
         let data = node.data();
-        let lock = data.get_lock().lock();
 
-        let was_saturated_before = data.is_saturated();
+        data.increment_descendants_saturated_count(saturated_descendants_increment_count);
 
         if continuous_saturation {
+            let lock = data.get_lock().lock();
+
+            let was_saturated_before = data.is_saturated();
+
             data.increment_saturated_children_count();
             data.update_worst_case(wins, plays);
-        }
 
-        data.increment_descendants_saturated_count(count);
+            let was_saturated_after = data.is_saturated();
 
-        let was_saturated_after = data.is_saturated();
+            if !was_saturated_before && was_saturated_after {
+                saturated_descendants_increment_count += 1;
+            }
 
-        {
-            // ?????
-            // Not legal to do (wins, plays) = data.wins_plays()
+            if !was_saturated_after {
+                continuous_saturation = false;
+            }
+
             let (w, p) = data.wins_plays();
             wins = w;
             plays = p;
+
+            drop(lock);
         }
 
-        if !was_saturated_before && was_saturated_after {
-            count += 1;
-        }
-
-        if !data.is_saturated() {
-            // Don't back-prop any further
-            // if we've reached a non-saturated node.
-            continuous_saturation = false;
-            // return;
-        }
-
-        drop(lock);
         handle = node.parent();
     }
 }
@@ -158,6 +172,9 @@ where
     }
 }
 
+/// Starting with the given node,
+/// increment the node's wins/plays counts based on is_win,
+/// and backprop this result up to the root.
 fn backprop_sim_result<TNode, TState>(node: &TNode, is_win: bool)
 where
     TNode: Node<Data = MctsData<TState>>,
@@ -165,16 +182,17 @@ where
 {
     let mut handle = Some(node.get_handle());
 
-    while let Some(p) = handle {
-        let parent = p.borrow();
-        let data = parent.data();
+    while let Some(n) = handle {
+        let node_to_update = n.borrow();
+        let data = node_to_update.data();
+
         data.increment_plays();
 
         if is_win {
             data.increment_wins();
         }
 
-        handle = parent.parent();
+        handle = node_to_update.parent();
     }
 }
 
@@ -442,7 +460,9 @@ where
         let leaf = select_to_leaf(root, player_color, jitter);
         let leaf = leaf.borrow();
 
-        if expand(leaf).is_err() {
+        let expand_result = expand(leaf);
+
+        if expand_result.is_err() {
             // another thread beat us to expanding,
             // so just continue with a new leaf selection
             continue;
@@ -450,13 +470,6 @@ where
 
         let expanded_children = leaf.children_read();
 
-        // Here's the race condition bug:
-        // ThreadA expanded, then enters the "true" part of this if block,
-        // and performs the behavior on the expanded node's child.
-        // ThreadB selected to leaf, and selected the same node's child.
-        // This child node happens to be a terminal.
-        // Now we are executing the "true" and "false" blocks
-        // simultaneously for the same node.
         if !expanded_children.is_empty() {
             let sim_node = util::random_pick(expanded_children.as_slice(), &mut rng)
                 .expect("Must have had at least one expanded child.");
@@ -473,18 +486,15 @@ where
                 },
             );
         } else {
-            // This whole section needs its own double-checked lock.
-
             // We expanded the node, but it had no children,
             // so this node must be a terminating node.
             let sim_result = simulate(leaf, &mut rng);
+            let is_win = sim_result.is_win_for_player(player_color);
 
             // plays could be 0 or 1
             // 0 if the parent node was expanded, and sim'd on a different child
             // 1 if the parent node was expanded, and sim'd on this child
             // if this is our first time selecting this node...
-            let is_win = sim_result.is_win_for_player(player_color);
-
             run_locked_if(
                 leaf.data().get_lock(),
                 || leaf.data().wins_plays().1 == 0,
@@ -497,10 +507,6 @@ where
                 leaf.data().get_lock(),
                 || leaf.data().end_state_result().is_none(),
                 || {
-                    // TODO: data race possible here? I check if it's none,
-                    // then I set. But if two saw none, both set (only one actually sets),
-                    // but then both still do the backprop saturation logic. Need lock here?
-                    // bit of a hack, this is just to know we've never done this before
                     // Update the terminating node so it knows its own end game result.
                     leaf.data().set_end_state_result(sim_result);
 
