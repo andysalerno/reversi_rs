@@ -10,14 +10,11 @@ use lib_printer::{out, out_impl};
 use monte_carlo_tree::{monte_carlo_data::MctsData, monte_carlo_data::MctsResult, tree::Node};
 
 mod configs {
-    pub(super) const SIM_TIME_MS: u64 = 5_000;
-    pub(super) const EXTRA_TIME_MS: u64 = 0_000;
-
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 4;
-    pub(super) const WHITE_THREAD_COUNT: usize = 4;
+    pub(super) const BLACK_THREAD_COUNT: usize = 8;
+    pub(super) const WHITE_THREAD_COUNT: usize = 8;
 
     pub(super) const WHITE_EXPLORE_JITTER: f32 = 0.10;
     pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.10;
@@ -29,9 +26,13 @@ mod configs {
 /// (e.x., "mcts is done after 10_000 rollouts have completed")
 /// and by execution time in ms
 /// (e.x., "mcts is done after 12_000 ms of execution time")
+#[derive(Copy, Clone, Debug)]
 enum MctsEndCondition {
+    /// End MCTS as soon as the given count of rollouts has been performed.
     RolloutCount(usize),
-    ExecutionTimeMs(usize),
+
+    /// End MCTS as soon as it has executed for longer than this duration.
+    ExecutionTime(Duration),
 }
 
 fn expand<TNode, TState>(node: &TNode) -> Result<(), &str>
@@ -338,7 +339,7 @@ where
 
     let node_mean_val = wins / plays;
 
-    let explore_bias = 3.00 * jitter;
+    let explore_bias = 3.00 * (1. + jitter);
 
     let score = node_mean_val + (explore_bias * f32::sqrt(f32::ln(parent_plays) / plays));
 
@@ -352,6 +353,10 @@ where
     score
 }
 
+/// Execute MCTS for the given node,
+/// acting as the given player color.
+/// Returns a vec of results (one per next
+/// possible state).
 pub fn mcts<TNode, TState>(
     root_handle: TNode::Handle,
     player_color: PlayerColor,
@@ -382,7 +387,9 @@ where
         }
     };
 
-    mcts_executor(root, player_color, thread_count, jitter);
+    let end_condition = MctsEndCondition::ExecutionTime(Duration::from_millis(5_000));
+
+    mcts_executor(root, player_color, thread_count, jitter, end_condition);
 
     let mut state_children = root.children_read().iter().cloned().collect::<Vec<_>>();
 
@@ -411,13 +418,14 @@ fn mcts_executor<TNode, TState>(
     player_color: PlayerColor,
     thread_count: usize,
     jitter: f32,
+    end_condition: MctsEndCondition,
 ) where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     if thread_count == 1 {
         let jitter_result = 0.00;
-        mcts_loop(root, player_color, jitter_result);
+        mcts_loop(root, player_color, jitter_result, end_condition);
     } else {
         // Each thread gets this much explore jitter
         let jitter_chunk_size = jitter / (thread_count as f32);
@@ -428,7 +436,7 @@ fn mcts_executor<TNode, TState>(
                 let jitter_result = jitter_result - (jitter / 2.00);
 
                 s.spawn(move |_| {
-                    mcts_loop(root, player_color, jitter_result);
+                    mcts_loop(root, player_color, jitter_result, end_condition);
                 });
             }
         })
@@ -436,24 +444,32 @@ fn mcts_executor<TNode, TState>(
     }
 }
 
-fn mcts_loop<TNode, TState>(root: &TNode, player_color: PlayerColor, jitter: f32)
-where
+fn mcts_loop<TNode, TState>(
+    root: &TNode,
+    player_color: PlayerColor,
+    jitter: f32,
+    end_condition: MctsEndCondition,
+) where
     TNode: Node<Data = MctsData<TState>>,
     TState: GameState,
 {
     let now = Instant::now();
-    let exec_duration = Duration::from_millis(configs::SIM_TIME_MS);
-    let extra_time = Duration::from_millis(configs::EXTRA_TIME_MS);
-
     let mut rng = util::get_rng();
+    let mut rollouts = 0;
 
     loop {
-        if now.elapsed() >= exec_duration {
-            let data = root.data();
-            let (wins, plays) = data.wins_plays();
+        rollouts += 1;
 
-            if (wins * 1000) / plays > 800 || now.elapsed() >= exec_duration + extra_time {
-                break;
+        match end_condition {
+            MctsEndCondition::ExecutionTime(duration) => {
+                if now.elapsed() >= duration {
+                    break;
+                }
+            }
+            MctsEndCondition::RolloutCount(rollout_count) => {
+                if rollouts > rollout_count {
+                    break;
+                }
             }
         }
 
@@ -557,6 +573,10 @@ pub mod tests {
 
     fn make_test_state() -> impl GameState {
         TicTacToeState::initial_state()
+    }
+
+    fn test_end_condition() -> MctsEndCondition {
+        MctsEndCondition::RolloutCount(10_000)
     }
 
     fn make_node<G>(data: MctsData<G>) -> impl Node<Data = MctsData<G>>
@@ -987,6 +1007,7 @@ pub mod tests {
             PlayerColor::Black,
             TEST_THREAD_COUNT,
             TEST_JITTER,
+            test_end_condition(),
         );
 
         assert!(
@@ -1091,7 +1112,13 @@ pub mod tests {
             "The node must not be saturated to begin with."
         );
 
-        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::Black,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         assert!(
             root.data().is_saturated(),
@@ -1125,7 +1152,13 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::Black,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         assert!(
             root.data().is_saturated(),
@@ -1149,7 +1182,13 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::Black,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         assert!(
             root.data().is_saturated(),
@@ -1197,7 +1236,13 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::White, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::White,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         assert!(
             root.data().is_saturated(),
@@ -1238,7 +1283,13 @@ pub mod tests {
         let root_handle = ArcNode::new_root(MctsData::new(state, 0, 0, None));
         let root: &ArcNode<_> = root_handle.borrow();
 
-        mcts_executor(root, PlayerColor::White, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::White,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         assert!(
             root.data().is_saturated(),
@@ -1309,7 +1360,13 @@ pub mod tests {
             root.data().state().current_player_turn()
         );
 
-        mcts_executor(root, PlayerColor::Black, TEST_THREAD_COUNT, TEST_JITTER);
+        mcts_executor(
+            root,
+            PlayerColor::Black,
+            TEST_THREAD_COUNT,
+            TEST_JITTER,
+            test_end_condition(),
+        );
 
         let root_terminal_count_after = root.data().terminal_count();
 
