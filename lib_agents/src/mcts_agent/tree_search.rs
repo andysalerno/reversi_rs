@@ -576,7 +576,7 @@ pub mod tests {
     }
 
     fn test_end_condition() -> MctsEndCondition {
-        MctsEndCondition::RolloutCount(100)
+        MctsEndCondition::RolloutCount(1000)
     }
 
     fn make_node<G>(data: MctsData<G>) -> impl Node<Data = MctsData<G>>
