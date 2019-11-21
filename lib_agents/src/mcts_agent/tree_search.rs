@@ -19,8 +19,8 @@ mod configs {
     pub(super) const BLACK_THREAD_COUNT: usize = 4;
     pub(super) const WHITE_THREAD_COUNT: usize = 4;
 
-    pub(super) const WHITE_EXPLORE_JITTER: f32 = 0.10;
-    pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.10;
+    pub(super) const WHITE_EXPLORE_JITTER: f32 = 0.15;
+    pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.15;
 }
 
 /// An enum providing the conditions used to determine when the MCTS execution
@@ -285,10 +285,10 @@ where
     (*child_nodes)
         .iter()
         .filter(|&n| !filter_sat || !n.borrow().data().is_saturated())
-        // .filter(|&n| {
-        //     let (wwins, _wplays) = n.borrow().data().worst_case_wins_plays();
-        //     _wplays == 0 || wwins != 0
-        // })
+        .filter(|&n| {
+            let (wwins, _wplays) = n.borrow().data().worst_case_wins_plays();
+            _wplays == 0 || wwins != 0
+        })
         .max_by(|&a, &b| {
             let a_score =
                 score_node_for_traversal(a.borrow(), parent_plays, parent_is_player_color, jitter);
@@ -447,6 +447,8 @@ where
 
     let mut rng = util::get_rng();
 
+    let jitter_adjusted = 1.00 + jitter;
+
     loop {
         if now.elapsed() >= exec_duration {
             let data = root.data();
@@ -461,7 +463,7 @@ where
             break;
         }
 
-        let leaf = select_to_leaf(root, player_color, jitter);
+        let leaf = select_to_leaf(root, player_color, jitter_adjusted);
         let leaf = leaf.borrow();
 
         let expand_result = expand(leaf);
