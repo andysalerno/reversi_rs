@@ -13,8 +13,8 @@ mod configs {
     pub(super) const BLACK_FILTER_SAT: bool = true;
     pub(super) const WHITE_FILTER_SAT: bool = true;
 
-    pub(super) const BLACK_THREAD_COUNT: usize = 8;
-    pub(super) const WHITE_THREAD_COUNT: usize = 8;
+    pub(super) const BLACK_THREAD_COUNT: usize = 2;
+    pub(super) const WHITE_THREAD_COUNT: usize = 2;
 
     pub(super) const WHITE_EXPLORE_JITTER: f32 = 0.15;
     pub(super) const BLACK_EXPLORE_JITTER: f32 = 0.15;
@@ -578,7 +578,7 @@ pub mod tests {
     }
 
     fn test_end_condition() -> MctsEndCondition {
-        MctsEndCondition::RolloutCount(10_000)
+        MctsEndCondition::RolloutCount(100)
     }
 
     fn make_node<G>(data: MctsData<G>) -> impl Node<Data = MctsData<G>>
